@@ -12,8 +12,6 @@ var
   MouseMoved: boolean;
   MouseCode: integer;
   LastMouseButton: integer;
-  MouseClickX, MouseClickY: integer;
-  MouseClickButton: integer;
 
   KeyPressed: boolean;
   KeyCode: integer;
@@ -25,8 +23,6 @@ var
 
 function IsKeyPressed(key: integer): boolean;
 function WasKeyPressed(key: integer): boolean;
-procedure ConsumeMousePress;
-procedure ConsumeKeyPress;
 procedure FinishInputFrame;
 
 implementation
@@ -85,10 +81,8 @@ procedure MouseDown(x, y, mb: integer);
 begin
   MouseX := x;
   MouseY := y;
-  MouseJustPressed := true;
-  MouseClickX := x;
-  MouseClickY := y;
-  MouseClickButton := mb;
+  if not MousePressed then
+    MouseJustPressed := true;
   MousePressed := true;
   MouseCode := mb;
   LastMouseButton := mb;
@@ -99,7 +93,10 @@ begin
   MouseX := x;
   MouseY := y;
   if mb <> 0 then
+  begin
     MouseCode := mb;
+    LastMouseButton := mb;
+  end;
   MouseMoved := true;
 end;
 
@@ -109,6 +106,7 @@ begin
   MouseY := y;
   MousePressed := false;
   MouseJustReleased := true;
+  LastMouseButton := mb;
   MouseCode := 0;
 end;
 
@@ -117,22 +115,13 @@ begin
   Resized := true;
 end;
 
-procedure ConsumeMousePress;
-begin
-  MouseJustPressed := false;
-  MouseClickButton := 0;
-end;
-
-procedure ConsumeKeyPress;
-begin
-  KeyJustPressed := false;
-  LastKeyCode := -1;
-end;
-
 procedure FinishInputFrame;
 begin
+  MouseJustPressed := false;
   MouseJustReleased := false;
   MouseMoved := false;
+  KeyJustPressed := false;
+  LastKeyCode := -1;
   Resized := false;
 end;
 
@@ -148,5 +137,4 @@ begin
   LastKeyCode := -1;
   MouseCode := 0;
   LastMouseButton := 0;
-  MouseClickButton := 0;
 end.

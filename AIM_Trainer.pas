@@ -34,12 +34,6 @@ type
                 (MouseY >= Y) and (MouseY <= Y + Height);
     end;
 
-    function ContainsClick: boolean;
-    begin
-      Result := (MouseClickX >= X) and (MouseClickX <= X + Width) and
-                (MouseClickY >= Y) and (MouseClickY <= Y + Height);
-    end;
-
     procedure Render;
     begin
       var c := ColorIf(IsActive and IsHover, HoverColor, NormalColor);
@@ -189,6 +183,37 @@ begin
       ReactionHistory[i] := ReactionHistory[i + 1];
     ReactionHistory[ReactionHistory.Length - 1] := value;
   end;
+
+  if ReactionHistory.Length < MaxReactionHistory then
+  begin
+    SetLength(ReactionHistory, ReactionHistory.Length + 1);
+    ReactionHistory[ReactionHistory.Length - 1] := value;
+  end
+  else
+  begin
+    for var i := 0 to ReactionHistory.Length - 2 do
+      ReactionHistory[i] := ReactionHistory[i + 1];
+    ReactionHistory[ReactionHistory.Length - 1] := value;
+  end;
+end;
+
+procedure ResetGame;
+begin
+  Score := 0;
+  Shots := 0;
+  Misses := 0;
+  WrongClicks := 0;
+  TotalReactionTime := 0;
+  BestReaction := 0;
+  WorstReaction := 0;
+  GameTimeMs := 0;
+  CountdownMs := 2500;
+  FPS := 0;
+  FpsFrames := 0;
+  LastFpsTick := 0;
+  SetLength(ReactionHistory, 0);
+  SpawnTarget;
+  Screen := ScreenCountdown;
 end;
 
 procedure ResetGame;
@@ -292,25 +317,18 @@ end;
 
 procedure ProcessMenu;
 begin
-  if KeyJustPressed then
-    ConsumeKeyPress;
-
-  if not MouseJustPressed then Exit;
-
-  for var i := 0 to Buttons.Length - 1 do
-    if Buttons[i].ContainsClick then
-    begin
-      ConsumeMousePress;
-      case i of
-        0: begin GameMode := ModeClassic; ResetGame; end;
-        1: begin GameMode := ModeDual; ResetGame; end;
-        2: ResetGame;
-        3: Halt;
+  if MouseJustPressed then
+    for var i := 0 to Buttons.Length - 1 do
+      if Buttons[i].IsHover then
+      begin
+        case i of
+          0: begin GameMode := ModeClassic; ResetGame; end;
+          1: begin GameMode := ModeDual; ResetGame; end;
+          2: ResetGame;
+          3: Halt;
+        end;
+        Break;
       end;
-      Exit;
-    end;
-
-  ConsumeMousePress;
 end;
 
 procedure RenderCountdown;
@@ -329,18 +347,6 @@ end;
 
 procedure UpdateCountdown;
 begin
-  if MouseJustPressed then
-    ConsumeMousePress;
-
-  if WasKeyPressed(27) or WasKeyPressed(VK_SPACE) then
-  begin
-    ConsumeKeyPress;
-    Screen := ScreenMenu;
-    Exit;
-  end
-  else if KeyJustPressed then
-    ConsumeKeyPress;
-
   CountdownMs -= FrameTime;
   if CountdownMs <= 0 then
   begin
@@ -376,17 +382,15 @@ begin
   if (GameMode = ModeDual) and (Target.Kind = 1) then
     expectedButton := 2;
 
-  var correctButton := MouseClickButton = expectedButton;
-  var inside := PointInCircle(MouseClickX, MouseClickY, Target.X, Target.Y, Target.Radius);
+  var correctButton := LastMouseButton = expectedButton;
+  var inside := PointInCircle(MouseX, MouseY, Target.X, Target.Y, Target.Radius);
   RegisterShot(correctButton and inside, not correctButton);
-  ConsumeMousePress;
 end;
 
 procedure UpdateGame;
 begin
   if WasKeyPressed(27) or WasKeyPressed(VK_SPACE) then
   begin
-    ConsumeKeyPress;
     Screen := ScreenMenu;
     Exit;
   end;
@@ -423,20 +427,9 @@ end;
 procedure ProcessResults;
 begin
   if WasKeyPressed(VK_R) then
-  begin
-    ConsumeKeyPress;
-    ResetGame;
-  end
-  else if WasKeyPressed(VK_SPACE) or WasKeyPressed(27) then
-  begin
-    ConsumeKeyPress;
+    ResetGame
+  else if WasKeyPressed(VK_SPACE) or WasKeyPressed(27) or MouseJustPressed then
     Screen := ScreenMenu;
-  end
-  else if MouseJustPressed then
-  begin
-    ConsumeMousePress;
-    Screen := ScreenMenu;
-  end;
 end;
 
 procedure UpdateFrameTime;
@@ -476,23 +469,23 @@ begin
     case Screen of
       ScreenMenu:
       begin
-        ProcessMenu;
         RenderMenu;
+        ProcessMenu;
       end;
       ScreenCountdown:
       begin
-        UpdateCountdown;
         RenderCountdown;
+        UpdateCountdown;
       end;
       ScreenGame:
       begin
-        UpdateGame;
         RenderGame;
+        UpdateGame;
       end;
       ScreenResults:
       begin
-        ProcessResults;
         RenderResults;
+        ProcessResults;
       end;
     end;
     Redraw;
