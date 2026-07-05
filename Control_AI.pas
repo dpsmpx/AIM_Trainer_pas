@@ -1,103 +1,140 @@
 unit Control_AI;
-Uses GraphABC;
+
+interface
+
+uses GraphABC;
 
 var
-  // Цветовые настройки
-  BackColor, SelColor, MainColor: Color;
-  
-  // Состояния клавиш
-  UP, DOWN, LEFT, RIGHT, ENTER, R, SPACE, W_, A, S, D: boolean;
-  KeyPressed: boolean;
-  KeyCode: integer;
-  
-  // Состояние мыши
   MouseX, MouseY: integer;
   MousePressed: boolean;
+  MouseJustPressed: boolean;
+  MouseJustReleased: boolean;
   MouseMoved: boolean;
-  MouseCode: integer; // 1-ЛКМ, 2-ПКМ, 3-СКМ
-  
-  // Системные флаги
-  Resized: boolean;
-  Pause: integer;
-  ActiveEdit: integer;
+  MouseCode: integer;
+  LastMouseButton: integer;
 
-// Обработчик нажатия клавиш
-procedure KeyDown(key: integer);
+  KeyPressed: boolean;
+  KeyCode: integer;
+  LastKeyCode: integer;
+  KeyJustPressed: boolean;
+
+  UP, DOWN, LEFT, RIGHT, ENTER, R, SPACE, ESCAPE, W_, A, S, D: boolean;
+  Resized: boolean;
+
+function IsKeyPressed(key: integer): boolean;
+function WasKeyPressed(key: integer): boolean;
+procedure ConsumeMousePress;
+procedure ConsumeKeyPress;
+procedure FinishInputFrame;
+
+implementation
+
+procedure SetKeyState(key: integer; state: boolean);
 begin
   case key of
-    VK_UP: UP := true;
-    VK_DOWN: DOWN := true;
-    VK_LEFT: LEFT := true;
-    VK_RIGHT: RIGHT := true;
-    VK_ENTER: ENTER := true;
-    VK_R: R := true;
-    VK_SPACE: SPACE := true;
-    VK_W: W_ := true;
-    VK_S: S := true;
-    VK_A: A := true;
-    VK_D: D := true;
+    VK_UP: UP := state;
+    VK_DOWN: DOWN := state;
+    VK_LEFT: LEFT := state;
+    VK_RIGHT: RIGHT := state;
+    VK_ENTER: ENTER := state;
+    VK_R: R := state;
+    VK_SPACE: SPACE := state;
+    27: ESCAPE := state;
+    VK_W: W_ := state;
+    VK_A: A := state;
+    VK_S: S := state;
+    VK_D: D := state;
+  end;
+end;
+
+procedure KeyDown(key: integer);
+begin
+  if not ((KeyPressed) and (KeyCode = key)) then
+  begin
+    KeyJustPressed := true;
+    LastKeyCode := key;
   end;
   KeyPressed := true;
   KeyCode := key;
+  SetKeyState(key, true);
 end;
 
-// Обработчик отпускания клавиш
 procedure KeyUp(key: integer);
 begin
-  case key of
-    VK_UP: UP := false;
-    VK_DOWN: DOWN := false;
-    VK_LEFT: LEFT := false;
-    VK_RIGHT: RIGHT := false;
-    VK_ENTER: ENTER := false;
-    VK_R: R := false;
-    VK_SPACE: SPACE := false;
-    VK_W: W_ := false;
-    VK_S: S := false;
-    VK_A: A := false;
-    VK_D: D := false;
+  SetKeyState(key, false);
+  if KeyCode = key then
+  begin
+    KeyPressed := false;
+    KeyCode := -1;
   end;
-  KeyPressed := false;
-  KeyCode := -1;
 end;
 
 function IsKeyPressed(key: integer): boolean;
 begin
-  result := KeyPressed and (KeyCode = key);
+  Result := KeyPressed and (KeyCode = key);
 end;
 
-// Обработчик нажатия кнопок мыши
+function WasKeyPressed(key: integer): boolean;
+begin
+  Result := KeyJustPressed and (LastKeyCode = key);
+end;
+
 procedure MouseDown(x, y, mb: integer);
 begin
   MouseX := x;
   MouseY := y;
+  if not MousePressed then
+    MouseJustPressed := true;
   MousePressed := true;
-  MouseCode := mb; // Сохраняем код кнопки
+  MouseCode := mb;
+  LastMouseButton := mb;
 end;
 
-// Обработчик движения мыши
 procedure MouseMove(x, y, mb: integer);
 begin
   MouseX := x;
   MouseY := y;
-  MouseCode := mb;
+  if mb <> 0 then
+  begin
+    MouseCode := mb;
+    LastMouseButton := mb;
+  end;
   MouseMoved := true;
 end;
 
-// Обработчик отпускания кнопок мыши
 procedure MouseUp(x, y, mb: integer);
 begin
+  MouseX := x;
+  MouseY := y;
   MousePressed := false;
-  MouseCode := 0; // Сброс кода кнопки
+  MouseJustReleased := true;
+  LastMouseButton := mb;
+  MouseCode := 0;
 end;
 
-// Обработчик изменения размера окна
 procedure Resize;
 begin
   Resized := true;
 end;
 
-// Инициализация обработчиков событий
+procedure ConsumeMousePress;
+begin
+  MouseJustPressed := false;
+end;
+
+procedure ConsumeKeyPress;
+begin
+  KeyJustPressed := false;
+  LastKeyCode := -1;
+end;
+
+procedure FinishInputFrame;
+begin
+  MouseJustReleased := false;
+  MouseMoved := false;
+  Resized := false;
+end;
+
 begin
   OnKeyDown := KeyDown;
   OnKeyUp := KeyUp;
@@ -105,9 +142,9 @@ begin
   OnMouseMove := MouseMove;
   OnMouseUp := MouseUp;
   OnResize := Resize;
-  
-  // Начальные значения
-  MouseCode := 0;
+
   KeyCode := -1;
-  ActiveEdit := -1;
+  LastKeyCode := -1;
+  MouseCode := 0;
+  LastMouseButton := 0;
 end.
