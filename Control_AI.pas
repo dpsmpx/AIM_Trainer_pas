@@ -23,8 +23,6 @@ var
 
 function IsKeyPressed(key: integer): boolean;
 function WasKeyPressed(key: integer): boolean;
-procedure ConsumeMousePress;
-procedure ConsumeKeyPress;
 procedure FinishInputFrame;
 
 implementation
@@ -117,21 +115,13 @@ begin
   Resized := true;
 end;
 
-procedure ConsumeMousePress;
-begin
-  MouseJustPressed := false;
-end;
-
-procedure ConsumeKeyPress;
-begin
-  KeyJustPressed := false;
-  LastKeyCode := -1;
-end;
-
 procedure FinishInputFrame;
 begin
+  MouseJustPressed := false;
   MouseJustReleased := false;
   MouseMoved := false;
+  KeyJustPressed := false;
+  LastKeyCode := -1;
   Resized := false;
 end;
 
