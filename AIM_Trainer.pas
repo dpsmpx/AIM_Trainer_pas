@@ -34,11 +34,6 @@ type
                 (MouseY >= Y) and (MouseY <= Y + Height);
     end;
 
-    function ContainsClick: boolean;
-    begin
-      Result := IsHover;
-    end;
-
     procedure Render;
     begin
       var c := ColorIf(IsActive and IsHover, HoverColor, NormalColor);
@@ -79,24 +74,7 @@ var
   LastFpsTick := 0;
   FpsFrames := 0;
   FPS := 0;
-  HeldMouseConsumed := false;
 
-
-function HasActionClick: boolean;
-begin
-  Result := MousePressed and not HeldMouseConsumed;
-end;
-
-procedure ConsumeActionClick;
-begin
-  HeldMouseConsumed := true;
-end;
-
-procedure UpdateHeldMouseState;
-begin
-  if not MousePressed then
-    HeldMouseConsumed := false;
-end;
 
 procedure SpawnTarget;
 begin
@@ -205,6 +183,37 @@ begin
       ReactionHistory[i] := ReactionHistory[i + 1];
     ReactionHistory[ReactionHistory.Length - 1] := value;
   end;
+
+  if ReactionHistory.Length < MaxReactionHistory then
+  begin
+    SetLength(ReactionHistory, ReactionHistory.Length + 1);
+    ReactionHistory[ReactionHistory.Length - 1] := value;
+  end
+  else
+  begin
+    for var i := 0 to ReactionHistory.Length - 2 do
+      ReactionHistory[i] := ReactionHistory[i + 1];
+    ReactionHistory[ReactionHistory.Length - 1] := value;
+  end;
+end;
+
+procedure ResetGame;
+begin
+  Score := 0;
+  Shots := 0;
+  Misses := 0;
+  WrongClicks := 0;
+  TotalReactionTime := 0;
+  BestReaction := 0;
+  WorstReaction := 0;
+  GameTimeMs := 0;
+  CountdownMs := 2500;
+  FPS := 0;
+  FpsFrames := 0;
+  LastFpsTick := 0;
+  SetLength(ReactionHistory, 0);
+  SpawnTarget;
+  Screen := ScreenCountdown;
 end;
 
 procedure ResetGame;
@@ -232,7 +241,7 @@ begin
   DrawTextWithBackground(ARGB(170, 55, 55, 65), 80, 48, WindowW - 80, 120, title, true);
   Font.Size := 14;
   Font.Color := ARGB(230, 235, 235, 245);
-  DrawTextCentered(80, 128, WindowW - 80, 188, subtitle);
+  DrawTextCentered(80, 130, WindowW - 80, 160, subtitle);
 end;
 
 procedure DrawHud;
@@ -308,25 +317,18 @@ end;
 
 procedure ProcessMenu;
 begin
-  if KeyJustPressed then
-    ConsumeKeyPress;
-
-  if not HasActionClick then Exit;
-
-  for var i := 0 to Buttons.Length - 1 do
-    if Buttons[i].ContainsClick then
-    begin
-      ConsumeActionClick;
-      case i of
-        0: begin GameMode := ModeClassic; ResetGame; end;
-        1: begin GameMode := ModeDual; ResetGame; end;
-        2: ResetGame;
-        3: Halt;
+  if MouseJustPressed then
+    for var i := 0 to Buttons.Length - 1 do
+      if Buttons[i].IsHover then
+      begin
+        case i of
+          0: begin GameMode := ModeClassic; ResetGame; end;
+          1: begin GameMode := ModeDual; ResetGame; end;
+          2: ResetGame;
+          3: Halt;
+        end;
+        Break;
       end;
-      Exit;
-    end;
-
-  ConsumeActionClick;
 end;
 
 procedure RenderCountdown;
@@ -345,18 +347,6 @@ end;
 
 procedure UpdateCountdown;
 begin
-  if HasActionClick then
-    ConsumeActionClick;
-
-  if WasKeyPressed(27) or WasKeyPressed(VK_SPACE) then
-  begin
-    ConsumeKeyPress;
-    Screen := ScreenMenu;
-    Exit;
-  end
-  else if KeyJustPressed then
-    ConsumeKeyPress;
-
   CountdownMs -= FrameTime;
   if CountdownMs <= 0 then
   begin
@@ -386,23 +376,21 @@ end;
 
 procedure ProcessGameClick;
 begin
-  if not HasActionClick then Exit;
+  if not MouseJustPressed then Exit;
 
   var expectedButton := 1;
   if (GameMode = ModeDual) and (Target.Kind = 1) then
     expectedButton := 2;
 
-  var correctButton := MouseCode = expectedButton;
+  var correctButton := LastMouseButton = expectedButton;
   var inside := PointInCircle(MouseX, MouseY, Target.X, Target.Y, Target.Radius);
   RegisterShot(correctButton and inside, not correctButton);
-  ConsumeActionClick;
 end;
 
 procedure UpdateGame;
 begin
   if WasKeyPressed(27) or WasKeyPressed(VK_SPACE) then
   begin
-    ConsumeKeyPress;
     Screen := ScreenMenu;
     Exit;
   end;
@@ -439,20 +427,9 @@ end;
 procedure ProcessResults;
 begin
   if WasKeyPressed(VK_R) then
-  begin
-    ConsumeKeyPress;
-    ResetGame;
-  end
-  else if WasKeyPressed(VK_SPACE) or WasKeyPressed(27) then
-  begin
-    ConsumeKeyPress;
+    ResetGame
+  else if WasKeyPressed(VK_SPACE) or WasKeyPressed(27) or MouseJustPressed then
     Screen := ScreenMenu;
-  end
-  else if HasActionClick then
-  begin
-    ConsumeActionClick;
-    Screen := ScreenMenu;
-  end;
 end;
 
 procedure UpdateFrameTime;
@@ -474,7 +451,6 @@ begin
   SetWindowCaption('Aim Trainer PascalABC.NET');
   CenterWindow;
   LockDrawing;
-  InitControls;
   Randomize;
   Font.Name := 'Consolas';
 
@@ -490,27 +466,26 @@ begin
   while true do
   begin
     UpdateFrameTime;
-    UpdateHeldMouseState;
     case Screen of
       ScreenMenu:
       begin
-        ProcessMenu;
         RenderMenu;
+        ProcessMenu;
       end;
       ScreenCountdown:
       begin
-        UpdateCountdown;
         RenderCountdown;
+        UpdateCountdown;
       end;
       ScreenGame:
       begin
-        UpdateGame;
         RenderGame;
+        UpdateGame;
       end;
       ScreenResults:
       begin
-        ProcessResults;
         RenderResults;
+        ProcessResults;
       end;
     end;
     Redraw;
