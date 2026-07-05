@@ -4,96 +4,89 @@ interface
 
 uses GraphABC;
 
-// Базовые математические функции
-function Len2D(x1, y1, x2, y2: double): double;
-function IfThen(Condition: Boolean; TrueValue, FalseValue: Color): Color;
-function IfThen(Condition: Boolean; TrueValue, FalseValue: Integer): Integer;
-function IfThen(Condition: Boolean; TrueValue, FalseValue: String): String;
-function IfThen(Condition: Boolean; TrueValue, FalseValue: Real): Real;
+function DistanceSquared(x1, y1, x2, y2: real): real;
+function PointInCircle(px, py, cx, cy, radius: real): boolean;
+function Clamp(value, minValue, maxValue: integer): integer;
+function ClampReal(value, minValue, maxValue: real): real;
+function ColorIf(condition: boolean; trueValue, falseValue: Color): Color;
+function IntIf(condition: boolean; trueValue, falseValue: integer): integer;
+function RealIf(condition: boolean; trueValue, falseValue: real): real;
+function FormatMs(value: real): string;
+function FormatPercent(value: real): string;
 
-// Процедуры работы с графикой
 procedure DrawTextWithBackground(bgColor: Color; x1, y1, x2, y2: integer; text: string; shadow: boolean);
 procedure DrawTextWithBackground(bgColor: Color; x1, y1, x2, y2: integer; number: integer; shadow: boolean);
 procedure DrawTextWithBackground(bgColor: Color; x1, y1, x2, y2: integer; value: real; shadow: boolean);
 
 implementation
 
-function Len2D(x1, y1, x2, y2: double): double;
+function DistanceSquared(x1, y1, x2, y2: real): real;
 begin
-  Result := Sqrt(Sqr(x2 - x1) + Sqr(y2 - y1));
+  Result := Sqr(x2 - x1) + Sqr(y2 - y1);
 end;
 
-function IfThen(Condition: Boolean; TrueValue, FalseValue: Color): Color;
+function PointInCircle(px, py, cx, cy, radius: real): boolean;
 begin
-  Result := Condition ? TrueValue : FalseValue;
+  Result := DistanceSquared(px, py, cx, cy) <= Sqr(radius);
 end;
 
-function IfThen(Condition: Boolean; TrueValue, FalseValue: Integer): Integer;
+function Clamp(value, minValue, maxValue: integer): integer;
 begin
-  Result := Condition ? TrueValue : FalseValue;
+  if value < minValue then
+    Result := minValue
+  else if value > maxValue then
+    Result := maxValue
+  else
+    Result := value;
 end;
 
-function IfThen(Condition: Boolean; TrueValue, FalseValue: String): String;
+function ClampReal(value, minValue, maxValue: real): real;
 begin
-  Result := Condition ? TrueValue : FalseValue;
+  if value < minValue then
+    Result := minValue
+  else if value > maxValue then
+    Result := maxValue
+  else
+    Result := value;
 end;
 
-function IfThen(Condition: Boolean; TrueValue, FalseValue: Real): Real;
+function ColorIf(condition: boolean; trueValue, falseValue: Color): Color;
 begin
-  Result := Condition ? TrueValue : FalseValue;
+  if condition then Result := trueValue else Result := falseValue;
 end;
 
-procedure DrawBezierLine(x1, y1, cx1, cy1, cx2, cy2, x2, y2: integer; color: Color; width: integer := 1);
+function IntIf(condition: boolean; trueValue, falseValue: integer): integer;
 begin
-  var t := 0.0;
-  var step := 0.02;
-  var points := new Point[Round(1/step)+1];
-  
-  Pen.Color := color;
-  Pen.Width := width;
-  
-  for var i := 0 to points.Length-1 do
-  begin
-    var t_sqr := t*t;
-    var t_cub := t_sqr*t;
-    var nt := 1 - t;
-    var nt_sqr := nt*nt;
-    var nt_cub := nt_sqr*nt;
-    
-    points[i].X := Round(
-      nt_cub * x1 + 
-      3 * nt_sqr * t * cx1 + 
-      3 * nt * t_sqr * cx2 + 
-      t_cub * x2
-    );
-    
-    points[i].Y := Round(
-      nt_cub * y1 + 
-      3 * nt_sqr * t * cy1 + 
-      3 * nt * t_sqr * cy2 + 
-      t_cub * y2
-    );
-    
-    t += step;
-  end;
-  
-  Polyline(points);
+  if condition then Result := trueValue else Result := falseValue;
+end;
+
+function RealIf(condition: boolean; trueValue, falseValue: real): real;
+begin
+  if condition then Result := trueValue else Result := falseValue;
+end;
+
+function FormatMs(value: real): string;
+begin
+  Result := Format('{0:0.0} ms', value);
+end;
+
+function FormatPercent(value: real): string;
+begin
+  Result := Format('{0:0.0}%', value);
 end;
 
 procedure DrawTextWithBackground(bgColor: Color; x1, y1, x2, y2: integer; text: string; shadow: boolean);
 begin
-  // Рисуем фон
   Brush.Color := bgColor;
-  FillRoundRect(x1, y1, x2, y2, 16, 16);
-  
-  // Рисуем тень если нужно
+  Pen.Color := ARGB(80, 255, 255, 255);
+  FillRoundRect(x1, y1, x2, y2, 14, 14);
+
   if shadow then
   begin
-    Font.Color := ARGB(120, 0, 0, 0);
+    Font.Color := ARGB(130, 0, 0, 0);
     DrawTextCentered(x1 + 2, y1 + 2, x2 + 2, y2 + 2, text);
   end;
-  
-  // Основной текст
+
   Font.Color := clWhite;
   DrawTextCentered(x1, y1, x2, y2, text);
 end;

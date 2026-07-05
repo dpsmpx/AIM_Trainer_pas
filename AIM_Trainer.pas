@@ -1,477 +1,519 @@
 uses GraphABC, Control_AI, Base;
 
+const
+  ScreenMenu = 0;
+  ScreenCountdown = 1;
+  ScreenGame = 2;
+  ScreenResults = 3;
+
+  ModeClassic = 1;
+  ModeDual = 2;
+
+  WindowW = 900;
+  WindowH = 650;
+  HudHeight = 76;
+  MaxReactionHistory = 50;
+  GameDurationMs = 60000;
+  MaxMisses = 15;
+  TargetLifeMs = 1150;
+  TargetGrowMs = 220;
+  TargetFadeMs = 260;
+  TargetMaxRadius = 38;
+  TargetMinRadius = 8;
+
 type
   TButton = record
     X, Y, Width, Height: integer;
     Text: string;
     NormalColor, HoverColor: Color;
-    CurrentAlpha: integer;
     IsActive: boolean;
-    
-    procedure Render(shadow: boolean);
-    begin
-      var useColor := IfThen(IsHover and IsActive, HoverColor, NormalColor);
-      DrawTextWithBackground(
-        ARGB(CurrentAlpha, GetRed(useColor), GetGreen(useColor), GetBlue(useColor)),
-        X, Y, X + Width, Y + Height,
-        Text,
-        shadow);
-    end;
-    
+
     function IsHover: boolean;
     begin
       Result := (MouseX >= X) and (MouseX <= X + Width) and
                 (MouseY >= Y) and (MouseY <= Y + Height);
     end;
-  end;
 
-var
-  W := 800;
-  H := 600;
-  MaxRadius := 40;
-  Circle_Count := 1;
-  MaxCTime := 1000;
-  CCTime := MaxCTime div 2;
-  CircleTouched := False;
-  LosesAdded := False;
-  
-  // Статистика
-  Score := 0;
-  TotalShots := 0;
-  Loses := 0;
-  WrongClicks := 0;
-  TotalReactionTime := 0;
-  Max_Loses := 15;
-  Fail := false;
-  
-  // Тайминг
-  FrameTime := 0;
-  LastTime := 0;
-  FPS := 0;
-  tempFPS := 0;
-  TryTime := 0;
-  MaxTryTime := 1000 * 60;
-  IsPlayTime: boolean;
-  
-  // Режимы и графика
-  GameMode := 0;
-  ReactionHistory: array of integer;
-  GraphPoints: array of Point;
-  CircleColors: array of Color;
-  
-  // Управление и кнопки
-  Buttons: array of TButton;
-  SavedGameMode: integer;
-  Screen: integer;
-  prevMousePressed: boolean;
-
-type
-  Circle = record
-    X, Y, Radius: integer;
-    Time, SpawnTime: integer;
-    CType: integer;
-    
-    procedure Spawn;
+    function ContainsClick: boolean;
     begin
-      X := Random(MaxRadius, W - MaxRadius);
-      Y := Random(MaxRadius, H - MaxRadius - 60);
-      Time := MaxCTime;
-      SpawnTime := TryTime;
-      if GameMode = 2 then CType := Random(0, 1);
+      Result := IsHover;
     end;
-    
+
     procedure Render;
     begin
-      if not IsPlayTime then Exit;
-      if Time < MaxCTime then
-      begin
-        if Time > CCTime then
-          Radius := MaxRadius - Round(MaxRadius * ((Time - CCTime) / CCTime))
-        else
-          Radius := Round(MaxRadius * (Time / CCTime));
-        
-        Brush.Color := CircleColors[CType];
-        FillCircle(X, Y, Radius);
-      end;
-      
-      Time -= FrameTime;
-      if Time < 0 then
-      begin
-        Loses += 1;
-        Spawn;
-      end;
-    end;
-    
-    procedure Touch;
-    begin
-      if not IsPlayTime then Exit;
-      
-      var localMousePressed: boolean;
-      if MousePressed and not localMousePressed then
-      begin
-        localMousePressed := true;
-        var validClick := false;
-        
-        case GameMode of
-          1: validClick := (MouseCode = 1);
-          2: validClick := ((CType = 0) and (MouseCode = 1)) or 
-                           ((CType = 1) and (MouseCode = 2));
-        end;
-        
-        if validClick and (Time < MaxCTime) and 
-           (Len2D(MouseX, MouseY, X, Y) < Radius) then
-        begin
-          localMousePressed := False;
-          CircleTouched := True;
-          TotalShots += 1;
-          Score += 1;
-          var reaction := TryTime - SpawnTime;
-          TotalReactionTime += reaction;
-          
-          SetLength(ReactionHistory, ReactionHistory.Length + 1);
-          ReactionHistory[ReactionHistory.Length - 1] := reaction;
-          if ReactionHistory.Length > 50 then 
-            SetLength(ReactionHistory, 50);
-
-          Spawn;
-        end
-        else if not validClick then
-        begin
-          localMousePressed := False;
-          CircleTouched := False;
-          TotalShots += 1;
-          Loses += 1;
-          WrongClicks += 1;
-        end;
-      end
-      else if not MousePressed then
-      begin
-        localMousePressed := false;
-      end;
+      var c := ColorIf(IsActive and IsHover, HoverColor, NormalColor);
+      var alpha := IntIf(IsActive and IsHover, 235, 180);
+      DrawTextWithBackground(ARGB(alpha, GetRed(c), GetGreen(c), GetBlue(c)),
+        X, Y, X + Width, Y + Height, Text, true);
     end;
   end;
 
-var
-  Circles: array of Circle;
+  TTarget = record
+    X, Y: integer;
+    Radius: real;
+    AgeMs: integer;
+    SpawnTimeMs: integer;
+    Kind: integer;
+  end;
 
-procedure CreateButton(var btn: TButton; x, y, w, h: integer; text: string; normalColor, hoverColor: Color);
+var
+  Screen := ScreenMenu;
+  GameMode := ModeClassic;
+  Buttons: array of TButton;
+  Target: TTarget;
+  TargetColors: array of Color;
+  ReactionHistory: array of integer;
+  GraphPoints: array of Point;
+
+  Score := 0;
+  Shots := 0;
+  Misses := 0;
+  WrongClicks := 0;
+  TotalReactionTime := 0;
+  BestReaction := 0;
+  WorstReaction := 0;
+
+  FrameTime := 16;
+  GameTimeMs := 0;
+  CountdownMs := 0;
+  LastFpsTick := 0;
+  FpsFrames := 0;
+  FPS := 0;
+  HeldMouseConsumed := false;
+
+
+function HasActionClick: boolean;
 begin
-  btn.X := x;
-  btn.Y := y;
-  btn.Width := w;
-  btn.Height := h;
-  btn.Text := text;
-  btn.NormalColor := normalColor;
-  btn.HoverColor := hoverColor;
-  btn.CurrentAlpha := 150;
+  Result := MousePressed and not HeldMouseConsumed;
 end;
 
-procedure InitUI;
+procedure ConsumeActionClick;
 begin
-  SetLength(Buttons, 2);
-  var H100 := H - 100;
-  CreateButton(Buttons[0], W div 2 + W div 4 - 100,
-                           50 + H100 div 4 - H100 div 8 - H100 div 16 - H100 div 32,
-                           W div 4, H100 div 8,
-                           'Classic Mode', RGB(97, 207, 255), RGB(77, 187, 235));
-  CreateButton(Buttons[1], W div 2 + W div 4 - 100,
-                           50 + H100 div 4 - H100 div 8 + H100 div 16 + H100 div 32,
-                           W div 4, H100 div 8,
-                           'Dual Mode', RGB(255, 80, 80), RGB(235, 60, 60));
+  HeldMouseConsumed := true;
+end;
+
+procedure UpdateHeldMouseState;
+begin
+  if not MousePressed then
+    HeldMouseConsumed := false;
+end;
+
+procedure SpawnTarget;
+begin
+  Target.X := Random(TargetMaxRadius + 10, WindowW - TargetMaxRadius - 10);
+  Target.Y := Random(TargetMaxRadius + 10, WindowH - HudHeight - TargetMaxRadius - 10);
+  Target.Radius := TargetMinRadius;
+  Target.AgeMs := 0;
+  Target.SpawnTimeMs := GameTimeMs;
+  if GameMode = ModeDual then
+    Target.Kind := Random(2)
+  else
+    Target.Kind := 0;
+end;
+
+procedure UpdateTarget(deltaMs: integer);
+begin
+  Target.AgeMs += deltaMs;
+  if Target.AgeMs <= TargetGrowMs then
+    Target.Radius := TargetMinRadius + (TargetMaxRadius - TargetMinRadius) * Target.AgeMs / TargetGrowMs
+  else if Target.AgeMs >= TargetLifeMs - TargetFadeMs then
+    Target.Radius := TargetMinRadius + (TargetMaxRadius - TargetMinRadius) *
+      ClampReal((TargetLifeMs - Target.AgeMs) / TargetFadeMs, 0.0, 1.0)
+  else
+    Target.Radius := TargetMaxRadius;
+
+  if Target.AgeMs >= TargetLifeMs then
+  begin
+    Misses += 1;
+    SpawnTarget;
+  end;
+end;
+
+procedure RenderTarget;
+begin
+  var c := TargetColors[Target.Kind];
+  Brush.Color := c;
+  Pen.Color := ARGB(230, 255, 255, 255);
+  Pen.Width := 2;
+  FillCircle(Target.X, Target.Y, Round(Target.Radius));
+  Circle(Target.X, Target.Y, Round(Target.Radius));
+
+  if GameMode = ModeDual then
+  begin
+    Font.Size := 12;
+    Font.Color := clWhite;
+    if Target.Kind = 0 then
+      DrawTextCentered(Target.X - 18, Target.Y - 10, Target.X + 18, Target.Y + 10, 'LMB')
+    else
+      DrawTextCentered(Target.X - 18, Target.Y - 10, Target.X + 18, Target.Y + 10, 'RMB');
+  end;
+end;
+
+procedure CreateButton(var b: TButton; x, y, w, h: integer; text: string; normalColor, hoverColor: Color);
+begin
+  b.X := x;
+  b.Y := y;
+  b.Width := w;
+  b.Height := h;
+  b.Text := text;
+  b.NormalColor := normalColor;
+  b.HoverColor := hoverColor;
+  b.IsActive := true;
+end;
+
+procedure BuildMenuButtons;
+begin
+  SetLength(Buttons, 4);
+  CreateButton(Buttons[0], WindowW div 2 - 180, 210, 360, 54, 'Classic mode', RGB(70, 170, 245), RGB(95, 195, 255));
+  CreateButton(Buttons[1], WindowW div 2 - 180, 280, 360, 54, 'Dual mode', RGB(245, 85, 85), RGB(255, 115, 115));
+  CreateButton(Buttons[2], WindowW div 2 - 180, 350, 360, 54, 'Restart last mode', RGB(115, 205, 110), RGB(145, 230, 140));
+  CreateButton(Buttons[3], WindowW div 2 - 180, 420, 360, 54, 'Exit', RGB(110, 110, 120), RGB(145, 145, 155));
+end;
+
+function Accuracy: real;
+begin
+  Result := RealIf(Shots > 0, Score / Shots * 100.0, 0.0);
+end;
+
+function AvgReaction: real;
+begin
+  Result := RealIf(Score > 0, TotalReactionTime / Score, 0.0);
+end;
+
+procedure AddReaction(value: integer);
+begin
+  if value < 0 then value := 0;
+  if Score = 1 then
+  begin
+    BestReaction := value;
+    WorstReaction := value;
+  end
+  else
+  begin
+    if value < BestReaction then BestReaction := value;
+    if value > WorstReaction then WorstReaction := value;
+  end;
+
+  if ReactionHistory.Length < MaxReactionHistory then
+  begin
+    SetLength(ReactionHistory, ReactionHistory.Length + 1);
+    ReactionHistory[ReactionHistory.Length - 1] := value;
+  end
+  else
+  begin
+    for var i := 0 to ReactionHistory.Length - 2 do
+      ReactionHistory[i] := ReactionHistory[i + 1];
+    ReactionHistory[ReactionHistory.Length - 1] := value;
+  end;
+end;
+
+procedure ResetGame;
+begin
+  Score := 0;
+  Shots := 0;
+  Misses := 0;
+  WrongClicks := 0;
+  TotalReactionTime := 0;
+  BestReaction := 0;
+  WorstReaction := 0;
+  GameTimeMs := 0;
+  CountdownMs := 2500;
+  FPS := 0;
+  FpsFrames := 0;
+  LastFpsTick := 0;
+  SetLength(ReactionHistory, 0);
+  SpawnTarget;
+  Screen := ScreenCountdown;
+end;
+
+procedure DrawHeader(title, subtitle: string);
+begin
+  Font.Size := 34;
+  DrawTextWithBackground(ARGB(170, 55, 55, 65), 80, 48, WindowW - 80, 120, title, true);
+  Font.Size := 14;
+  Font.Color := ARGB(230, 235, 235, 245);
+  DrawTextCentered(80, 128, WindowW - 80, 188, subtitle);
+end;
+
+procedure DrawHud;
+begin
+  var y1 := WindowH - HudHeight + 10;
+  var y2 := WindowH - 12;
+  var col := WindowW div 6;
+  var bg := ARGB(210, 50, 50, 58);
+  Font.Size := 13;
+  DrawTextWithBackground(bg, 10, y1, col - 8, y2, 'FPS'#10 + FPS.ToString, true);
+  DrawTextWithBackground(bg, col + 8, y1, 2 * col - 8, y2, 'Score'#10 + Score.ToString, true);
+  DrawTextWithBackground(bg, 2 * col + 8, y1, 3 * col - 8, y2, 'Accuracy'#10 + FormatPercent(Accuracy), true);
+  DrawTextWithBackground(bg, 3 * col + 8, y1, 4 * col - 8, y2, 'Avg'#10 + FormatMs(AvgReaction), true);
+  DrawTextWithBackground(bg, 4 * col + 8, y1, 5 * col - 8, y2, 'Lives'#10 + IntToStr(MaxMisses - Misses), true);
+  DrawTextWithBackground(bg, 5 * col + 8, y1, WindowW - 10, y2, 'Time'#10 + Format('{0:0.0}s', (GameDurationMs - GameTimeMs) / 1000.0), true);
+end;
+
+procedure DrawGraph(x, y, w, h: integer);
+begin
+  Brush.Color := ARGB(150, 34, 34, 42);
+  Pen.Color := ARGB(70, 255, 255, 255);
+  FillRoundRect(x, y, x + w, y + h, 12, 12);
+  Font.Size := 12;
+  Font.Color := ARGB(210, 235, 235, 245);
+  DrawTextCentered(x, y + 6, x + w, y + 26, 'Last reaction times');
+
+  if ReactionHistory.Length = 0 then
+  begin
+    Font.Color := ARGB(150, 235, 235, 245);
+    DrawTextCentered(x, y + h div 2 - 12, x + w, y + h div 2 + 12, 'No hits yet');
+    Exit;
+  end;
+
+  SetLength(GraphPoints, ReactionHistory.Length);
+  var maxVal := 1;
+  for var i := 0 to ReactionHistory.Length - 1 do
+    if ReactionHistory[i] > maxVal then maxVal := ReactionHistory[i];
+
+  var left := x + 24;
+  var top := y + 34;
+  var graphW := w - 48;
+  var graphH := h - 70;
+  for var i := 0 to ReactionHistory.Length - 1 do
+  begin
+    if ReactionHistory.Length = 1 then
+      GraphPoints[i].X := left + graphW div 2
+    else
+      GraphPoints[i].X := left + Round(i * graphW / (ReactionHistory.Length - 1));
+    GraphPoints[i].Y := top + graphH - Round(ReactionHistory[i] * graphH / maxVal);
+  end;
+
+  Pen.Color := ARGB(245, 97, 207, 255);
+  Pen.Width := 3;
+  if GraphPoints.Length = 1 then
+    FillCircle(GraphPoints[0].X, GraphPoints[0].Y, 4)
+  else
+    Polyline(GraphPoints);
+
+  Font.Size := 11;
+  Font.Color := ARGB(220, 235, 235, 245);
+  DrawTextCentered(x + 10, y + h - 30, x + w - 10, y + h - 8,
+    'Best: ' + FormatMs(BestReaction) + '   Avg: ' + FormatMs(AvgReaction) + '   Worst: ' + FormatMs(WorstReaction));
+end;
+
+procedure RenderMenu;
+begin
+  ClearWindow(RGB(24, 24, 30));
+  DrawHeader('AIM TRAINER', 'Left click blue targets. In Dual mode use right click for red targets. Esc/Space returns to menu.');
+  for var i := 0 to Buttons.Length - 1 do
+    Buttons[i].Render;
+  DrawGraph(80, 500, WindowW - 160, 110);
+end;
+
+procedure ProcessMenu;
+begin
+  if KeyJustPressed then
+    ConsumeKeyPress;
+
+  if not HasActionClick then Exit;
+
+  for var i := 0 to Buttons.Length - 1 do
+    if Buttons[i].ContainsClick then
+    begin
+      ConsumeActionClick;
+      case i of
+        0: begin GameMode := ModeClassic; ResetGame; end;
+        1: begin GameMode := ModeDual; ResetGame; end;
+        2: ResetGame;
+        3: Halt;
+      end;
+      Exit;
+    end;
+
+  ConsumeActionClick;
+end;
+
+procedure RenderCountdown;
+begin
+  ClearWindow(RGB(24, 24, 30));
+  RenderTarget;
+  DrawHud;
+  Font.Size := 112;
+  var n := CountdownMs div 1000 + 1;
+  DrawTextWithBackground(ARGB(120, 255, 255, 255), WindowW div 2 - 110, WindowH div 2 - 100,
+    WindowW div 2 + 110, WindowH div 2 + 100, n.ToString, true);
+  Font.Size := 16;
+  Font.Color := clWhite;
+  DrawTextCentered(0, WindowH div 2 + 118, WindowW, WindowH div 2 + 148, 'Get ready');
+end;
+
+procedure UpdateCountdown;
+begin
+  if HasActionClick then
+    ConsumeActionClick;
+
+  if WasKeyPressed(27) or WasKeyPressed(VK_SPACE) then
+  begin
+    ConsumeKeyPress;
+    Screen := ScreenMenu;
+    Exit;
+  end
+  else if KeyJustPressed then
+    ConsumeKeyPress;
+
+  CountdownMs -= FrameTime;
+  if CountdownMs <= 0 then
+  begin
+    GameTimeMs := 0;
+    SpawnTarget;
+    Screen := ScreenGame;
+  end;
+end;
+
+procedure RegisterShot(hit: boolean; wrongButton: boolean);
+begin
+  Shots += 1;
+  if hit then
+  begin
+    Score += 1;
+    var reaction := GameTimeMs - Target.SpawnTimeMs;
+    TotalReactionTime += reaction;
+    AddReaction(reaction);
+    SpawnTarget;
+  end
+  else
+  begin
+    Misses += 1;
+    if wrongButton then WrongClicks += 1;
+  end;
+end;
+
+procedure ProcessGameClick;
+begin
+  if not HasActionClick then Exit;
+
+  var expectedButton := 1;
+  if (GameMode = ModeDual) and (Target.Kind = 1) then
+    expectedButton := 2;
+
+  var correctButton := MouseCode = expectedButton;
+  var inside := PointInCircle(MouseX, MouseY, Target.X, Target.Y, Target.Radius);
+  RegisterShot(correctButton and inside, not correctButton);
+  ConsumeActionClick;
+end;
+
+procedure UpdateGame;
+begin
+  if WasKeyPressed(27) or WasKeyPressed(VK_SPACE) then
+  begin
+    ConsumeKeyPress;
+    Screen := ScreenMenu;
+    Exit;
+  end;
+
+  GameTimeMs += FrameTime;
+  UpdateTarget(FrameTime);
+  ProcessGameClick;
+
+  if (Misses >= MaxMisses) or (GameTimeMs >= GameDurationMs) then
+    Screen := ScreenResults;
+end;
+
+procedure RenderGame;
+begin
+  ClearWindow(RGB(24, 24, 30));
+  RenderTarget;
+  DrawHud;
+end;
+
+procedure RenderResults;
+begin
+  ClearWindow(RGB(24, 24, 30));
+  DrawHeader('RESULTS', 'R - restart, Space/Esc - menu');
+  Font.Size := 18;
+  DrawTextWithBackground(ARGB(180, 55, 55, 65), 160, 180, WindowW - 160, 330,
+    'Score: ' + Score.ToString + #10 +
+    'Shots: ' + Shots.ToString + #10 +
+    'Misses: ' + Misses.ToString + '   Wrong buttons: ' + WrongClicks.ToString + #10 +
+    'Accuracy: ' + FormatPercent(Accuracy) + #10 +
+    'Average reaction: ' + FormatMs(AvgReaction), true);
+  DrawGraph(120, 365, WindowW - 240, 190);
+end;
+
+procedure ProcessResults;
+begin
+  if WasKeyPressed(VK_R) then
+  begin
+    ConsumeKeyPress;
+    ResetGame;
+  end
+  else if WasKeyPressed(VK_SPACE) or WasKeyPressed(27) then
+  begin
+    ConsumeKeyPress;
+    Screen := ScreenMenu;
+  end
+  else if HasActionClick then
+  begin
+    ConsumeActionClick;
+    Screen := ScreenMenu;
+  end;
+end;
+
+procedure UpdateFrameTime;
+begin
+  FrameTime := Clamp(MillisecondsDelta, 1, 100);
+  FpsFrames += 1;
+  LastFpsTick += FrameTime;
+  if LastFpsTick >= 1000 then
+  begin
+    FPS := Round(FpsFrames * 1000 / LastFpsTick);
+    FpsFrames := 0;
+    LastFpsTick := 0;
+  end;
 end;
 
 procedure InitApp;
 begin
-  SetWindowSize(W, H);
-  SetWindowCaption('Aim Trainer');
+  SetWindowSize(WindowW, WindowH);
+  SetWindowCaption('Aim Trainer PascalABC.NET');
   CenterWindow;
   LockDrawing;
+  InitControls;
+  Randomize;
   Font.Name := 'Consolas';
-  Font.Size := 14;
-  
-  SetLength(CircleColors, 2);
-  CircleColors[0] := ARGB(220, 97, 207, 255);
-  CircleColors[1] := ARGB(220, 255, 80, 80);
-  
-  SetLength(Circles, Circle_Count);
+
+  SetLength(TargetColors, 2);
+  TargetColors[0] := ARGB(225, 97, 207, 255);
+  TargetColors[1] := ARGB(225, 255, 85, 85);
   SetLength(ReactionHistory, 0);
-  SetLength(Buttons, 0);
-  
-  InitUI;
-end;
-
-procedure InitGame;
-begin
-  CircleTouched := False;
-  LosesAdded := False;
-  Score := 0;
-  TotalShots := 0;
-  Loses := 0;
-  WrongClicks := 0;
-  TotalReactionTime := 0;
-  LastTime := 1000;
-  IsPlayTime := true;  // Включаем игровой процесс
-  Circles[0].Spawn;
-  Fail := False;       // Сбрасываем флаг поражения
-end;
-
-procedure RenderUpdateCircles;
-begin
-  for var i := 0 to Circles.Length - 1 do
-  begin
-    Circles[i].Render;
-    Circles[i].Touch;
-  end;
-end;
-
-procedure Render;
-begin
-  ClearWindow(RGB(28, 28, 32));
-  if IsPlayTime then
-    RenderUpdateCircles;
-  
-  // Сохраняем настройки шрифта
-  var oldFontSize := Font.Size;
-  Font.Size := 14;
-  
-  // Информационная панель
-  var bgColor := ARGB(220, 60, 60, 65);
-  var infoH := 60;
-  var colWidth := W div 5;
-  var paddingW := 16;
-  var bottom := 16;
-  
-  DrawTextWithBackground(bgColor, 0 + paddingW,
-                         H - infoH, colWidth - paddingW,
-                         H - bottom, 'FPS:'#10 + FPS.ToString, True);
-  
-  // Отрисовка элементов
-  DrawTextWithBackground(bgColor, colWidth + paddingW,
-                         H - infoH, 2 * colWidth - paddingW,
-                         H - bottom, 'Score:'#10 + Score, True);
-  
-  // Accuracy
-  var accuracy := IfThen(TotalShots > 0, (Score / TotalShots * 100), 0.0);
-  DrawTextWithBackground(bgColor, 2 * colWidth + paddingW,
-                         H - infoH, 3 * colWidth - paddingW,
-                         H - bottom, 'Accuracy:'#10 + Format('{0:0.0}%', accuracy), True);
-  
-  // Avg Reaction
-  var avgReaction := IfThen(Score > 0, TotalReactionTime / Score, 0.0);
-  DrawTextWithBackground(bgColor, 3 * colWidth + paddingW,
-                         H - infoH, 4 * colWidth - paddingW,
-                         H - bottom, 'Avg:'#10 + Format('{0:0.0}ms', avgReaction), True);
-  
-  // Lives
-  DrawTextWithBackground(bgColor, 4 * colWidth + paddingW,
-                         H - infoH, W - paddingW,
-                         H - bottom, 'Lives:'#10 + (Max_Loses - Loses), True);
-  
-  Font.Size := oldFontSize;
-end;
-
-procedure Countdown;
-begin
-  IsPlayTime := false;
-  var oldFontSize := Font.Size;
-  var i := 2;
-  
-  while i > 0 do
-  begin
-    Render;
-    Brush.Color := ARGB(32, 255, 255, 255);
-    FillCircle(W div 2, H div 2, 100);
-    Font.Size := 120;
-    DrawTextCentered(0, H div 2 - 100, W, H div 2 + 100, IntToStr(i));
-    Font.Size := 20;
-    DrawTextCentered(0, H div 2 + 120, W, H div 2 + 140, 'Start on 0!');
-    Redraw;
-    Sleep(500);
-    i -= 1;
-  end;
-  
-  Font.Size := oldFontSize;
-  IsPlayTime := true;
-end;
-
-procedure Update;
-begin
-  // Обработка пробела для возврата в меню
-  if IsKeyPressed(VK_Space) then
-  begin
-    Screen := 0;
-    Fail := True;
-    while IsKeyPressed(VK_Space) do;
-  end;
-  
-  if MousePressed and not prevMousePressed then
-  begin
-    TotalShots += 1;
-    if ((GameMode = 2) and not CircleTouched) or 
-       (not CircleTouched and not LosesAdded) then
-    begin
-      Loses += 1;
-      LosesAdded := True;
-    end;
-    prevMousePressed := MousePressed;
-  end;
-  
-  if not MousePressed then
-  begin
-    CircleTouched := False;
-    LosesAdded := False;
-  end;
-  
-  if Loses >= Max_Loses then 
-  begin
-    Fail := True;
-    IsPlayTime := false; // Дополнительная защита
-  end;
-  
-  // FPS
-  FrameTime := MillisecondsDelta;
-  TryTime += FrameTime;
-  tempFPS += 1;
-  
-  if LastTime > 0 then 
-    LastTime -= FrameTime 
-  else
-  begin
-    FPS := tempFPS;
-    tempFPS := 0;
-    LastTime := 1000;
-  end;
-end;
-
-procedure GamePlay;
-begin
-  IsPlayTime := true; // Включаем игровой процесс только здесь
-  InitGame;       // Сброс состояния
-  Fail := False;  // Явный сброс флага завершения
-  Countdown;      // Запуск отсчёта
-  
-  while not Fail do
-  begin
-    Render;
-    Redraw;
-    Update;
-  end;
-  
-  IsPlayTime := false; // Выключаем при завершении
-  Screen := 0;
-end;
-
-procedure StartScreen;
-begin
-  InitUI;
-  IsPlayTime := false;
-  // Активируем кнопки
-  for var i := 0 to Buttons.Length - 1 do
-    Buttons[i].IsActive := true;
-
-  while Screen = 0 do
-  begin
-    Render;
-    ClearWindow(ARGB(32, 255, 255, 255));
-    
-    // Заголовок
-    DrawTextWithBackground(ARGB(150, 100, 100, 100), 50, 50, W div 2, H div 2 - 50, 'AIM TRAINER', True);
-    
-    // Кнопки
-    for var i := 0 to Buttons.Length - 1 do
-    begin
-      Buttons[i].CurrentAlpha := IfThen(Buttons[i].IsHover, 220, 150);
-      Buttons[i].Render(True);
-    end;
-    
-    // График в нижней половине
-    var GraphY := H div 2;
-    var GraphH := H div 2 - 110;
-    Brush.Color := ARGB(150, 100, 100, 100);
-    FillRoundRect(50, GraphY, W - 50, GraphY + GraphH, 8, 8);
-    
-    if ReactionHistory.Length > 0 then
-    begin
-      SetLength(GraphPoints, ReactionHistory.Length);
-      var maxVal := ReactionHistory.Max();
-      if maxVal = 0 then maxVal := 1;
-      
-      for var i := 0 to ReactionHistory.Length - 1 do
-      begin
-        GraphPoints[i].X := 50 + Round(i * ((W - 100) / ReactionHistory.Length));
-        GraphPoints[i].Y := GraphY + GraphH - Round(ReactionHistory[i] * (GraphH / maxVal));
-      end;
-      
-      Pen.Color := ARGB(255, 97, 207, 255);
-      Pen.Width := 2;
-      Polyline(GraphPoints);
-    end;
-    
-    Redraw;
-    
-    // Обработка клавиши пробела
-    if IsKeyPressed(VK_Space) then
-    begin
-      Screen := 0;
-      while IsKeyPressed(VK_Space) do;
-    end;
-    
-    // Обработка клика по кнопкам
-    if MousePressed then
-    begin
-      for var i := 0 to Buttons.Length - 1 do
-      begin
-        if Buttons[i].IsHover and Buttons[i].IsActive then
-        begin
-          GameMode := i + 1;
-          Screen := 1;  // Явно устанавливаем экран игры
-          IsPlayTime := true;
-          //GamePlay;
-          Break;
-        end;
-      end;
-      while MousePressed do; // Ждём отпускания кнопки
-    end;
-  end;
-  
-  IsPlayTime := true;
-end;
-
-procedure DrawGraph;
-var
-  GraphX := 50;
-  GraphY := H div 2 - 50;
-  GraphW := W - 100;
-  GraphH := H div 2 - 100;
-begin
-  Brush.Color := ARGB(150, 30, 30, 35);
-  FillRoundRect(GraphX, GraphY, GraphX + GraphW, GraphY + GraphH, 8, 8);
-  
-  if ReactionHistory.Length > 0 then
-  begin
-    SetLength(GraphPoints, ReactionHistory.Length);
-    var maxVal := ReactionHistory.Max();
-    if maxVal = 0 then maxVal := 1;
-    
-    for var i := 0 to ReactionHistory.Length - 1 do
-    begin
-      GraphPoints[i].X := GraphX + Round(i * (GraphW / ReactionHistory.Length));
-      GraphPoints[i].Y := GraphY + GraphH - Round(ReactionHistory[i] * (GraphH / maxVal));
-    end;
-    
-    Pen.Color := ARGB(255, 97, 207, 255);
-    Pen.Width := 2;
-    Polyline(GraphPoints);
-  end;
+  BuildMenuButtons;
 end;
 
 begin
   InitApp;
-  while True do
+  while true do
   begin
-    if Screen = 0 then
-      StartScreen
-    else if Screen = 1 then
-      GamePlay;
+    UpdateFrameTime;
+    UpdateHeldMouseState;
+    case Screen of
+      ScreenMenu:
+      begin
+        ProcessMenu;
+        RenderMenu;
+      end;
+      ScreenCountdown:
+      begin
+        UpdateCountdown;
+        RenderCountdown;
+      end;
+      ScreenGame:
+      begin
+        UpdateGame;
+        RenderGame;
+      end;
+      ScreenResults:
+      begin
+        ProcessResults;
+        RenderResults;
+      end;
+    end;
+    Redraw;
+    FinishInputFrame;
   end;
 end.
