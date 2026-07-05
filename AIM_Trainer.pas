@@ -183,6 +183,37 @@ begin
       ReactionHistory[i] := ReactionHistory[i + 1];
     ReactionHistory[ReactionHistory.Length - 1] := value;
   end;
+
+  if ReactionHistory.Length < MaxReactionHistory then
+  begin
+    SetLength(ReactionHistory, ReactionHistory.Length + 1);
+    ReactionHistory[ReactionHistory.Length - 1] := value;
+  end
+  else
+  begin
+    for var i := 0 to ReactionHistory.Length - 2 do
+      ReactionHistory[i] := ReactionHistory[i + 1];
+    ReactionHistory[ReactionHistory.Length - 1] := value;
+  end;
+end;
+
+procedure ResetGame;
+begin
+  Score := 0;
+  Shots := 0;
+  Misses := 0;
+  WrongClicks := 0;
+  TotalReactionTime := 0;
+  BestReaction := 0;
+  WorstReaction := 0;
+  GameTimeMs := 0;
+  CountdownMs := 2500;
+  FPS := 0;
+  FpsFrames := 0;
+  LastFpsTick := 0;
+  SetLength(ReactionHistory, 0);
+  SpawnTarget;
+  Screen := ScreenCountdown;
 end;
 
 procedure ResetGame;
