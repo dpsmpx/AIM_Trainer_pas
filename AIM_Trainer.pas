@@ -23,7 +23,7 @@ type
     SpawnTime: integer;
     CType: integer;
     procedure Spawn(const MaxRadius, W, H: integer; const GameMode: TGameMode; const PrevCircle: TCircle);
-    procedure Update(const FrameTime: integer; var Loses: integer; var Fail: boolean; const MaxRadius, MaxCTime, CCTime: integer);
+    procedure Update(const FrameTime: integer; var Loses: integer; var Fail: boolean; const MaxCTime, CCTime: integer);
     procedure Render(const CircleColors: array of Color; const MaxRadius, MaxCTime, CCTime: integer);
     function GetHitInfo(const mx, my: integer; const GameMode: TGameMode; const Button: integer; const MaxRadius, MaxCTime, CCTime: integer): THitInfo;
   end;
@@ -38,7 +38,6 @@ type
     MaxLoses: integer;
     Fail: boolean;
     TryTime: integer;
-    MaxTryTime: integer;
     IsPlayTime: boolean;
     Circles: array of TCircle;
     CircleCount: integer;
@@ -305,7 +304,7 @@ begin
 end;
 
 // Теперь Update использует переданные параметры, а не глобальный Game
-procedure TCircle.Update(const FrameTime: integer; var Loses: integer; var Fail: boolean; const MaxRadius, MaxCTime, CCTime: integer);
+procedure TCircle.Update(const FrameTime: integer; var Loses: integer; var Fail: boolean; const MaxCTime, CCTime: integer);
 begin
   if not Game.IsPlayTime then Exit;
   Time -= FrameTime;
@@ -382,7 +381,6 @@ begin
     MaxLoses := 15;
     Fail := false;
     TryTime := 0;
-    MaxTryTime := 60000;
     IsPlayTime := true;
     MaxRadius := 40;
     MaxCTime := 1000;
@@ -448,6 +446,65 @@ begin
 end;
 
 // ----- Отрисовка -----
+// Рисует плавную кривую через массив точек, используя кривые Безье
+procedure DrawSmoothCurve(points: array of Point; color: Color; width: integer);
+var
+  i, n: integer;
+  p0, p1: Point;
+  t0x, t0y, t1x, t1y: integer;
+  cp1x, cp1y, cp2x, cp2y: integer;
+begin
+  n := Length(points);
+  if n < 2 then Exit;
+  if n = 2 then
+  begin
+    Pen.Color := color;
+    Pen.Width := width;
+    Line(points[0].X, points[0].Y, points[1].X, points[1].Y);
+    Exit;
+  end;
+
+  Pen.Color := color;
+  Pen.Width := width;
+
+  for i := 0 to n-2 do
+  begin
+    p0 := points[i];
+    p1 := points[i+1];
+
+    // Вычисляем касательные
+    if i = 0 then
+    begin
+      t0x := p1.X - p0.X;
+      t0y := p1.Y - p0.Y;
+    end
+    else
+    begin
+      t0x := (points[i+1].X - points[i-1].X) div 2;
+      t0y := (points[i+1].Y - points[i-1].Y) div 2;
+    end;
+
+    if i = n-2 then
+    begin
+      t1x := p1.X - p0.X;
+      t1y := p1.Y - p0.Y;
+    end
+    else
+    begin
+      t1x := (points[i+2].X - points[i].X) div 2;
+      t1y := (points[i+2].Y - points[i].Y) div 2;
+    end;
+
+    // Контрольные точки для кубической кривой
+    cp1x := p0.X + t0x div 3;
+    cp1y := p0.Y + t0y div 3;
+    cp2x := p1.X - t1x div 3;
+    cp2y := p1.Y - t1y div 3;
+
+    DrawBezierLine(p0.X, p0.Y, cp1x, cp1y, cp2x, cp2y, p1.X, p1.Y, color, width);
+  end;
+end;
+
 procedure DrawGraph;
 var
   graphX, graphY, graphW, graphH: integer;
@@ -476,13 +533,10 @@ begin
     DrawTextCentered(graphX - 50, yPos - 8, graphX - 5, yPos + 8, IntToStr(val));
   end;
 
+  // Линия графика (плавная кривая Безье)
   points := GetReactionPoints;
   if Length(points) > 0 then
-  begin
-    Pen.Color := ARGB(255, 97, 207, 255);
-    Pen.Width := 2;
-    Polyline(points);
-  end;
+    DrawSmoothCurve(points, ARGB(255, 97, 207, 255), 2);
 end;
 
 procedure RenderGame;
@@ -647,7 +701,7 @@ begin
 
   for i := 0 to Game.CircleCount - 1 do
   begin
-    Game.Circles[i].Update(Game.FrameTime, Game.Loses, Game.Fail, Game.MaxRadius, Game.MaxCTime, Game.CCTime);
+    Game.Circles[i].Update(Game.FrameTime, Game.Loses, Game.Fail, Game.MaxCTime, Game.CCTime);
     if Game.Circles[i].Time < 0 then
       Game.Circles[i].Spawn(Game.MaxRadius, W, H, Game.GameMode, Game.Circles[i]);
   end;
