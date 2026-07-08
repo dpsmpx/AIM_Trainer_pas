@@ -4,9 +4,6 @@ interface
 
 uses GraphABC;
 
-// ===== Базовые математические функции =====
-function Len2D(x1, y1, x2, y2: double): double;
-
 /// Универсальный тернарный оператор (работает с любым типом)
 function IfThen<T>(Condition: Boolean; TrueValue, FalseValue: T): T;
 
@@ -19,11 +16,6 @@ procedure DrawTextWithBackground(bgColor: Color; x1, y1, x2, y2, fontSize: integ
 procedure DrawBezierLine(x1, y1, cx1, cy1, cx2, cy2, x2, y2: integer; color: Color; width: integer := 1);
 
 implementation
-
-function Len2D(x1, y1, x2, y2: double): double;
-begin
-  Result := Sqrt(Sqr(x2 - x1) + Sqr(y2 - y1));
-end;
 
 function IfThen<T>(Condition: Boolean; TrueValue, FalseValue: T): T;
 begin
