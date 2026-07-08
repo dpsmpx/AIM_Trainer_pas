@@ -4,137 +4,217 @@ interface
 
 uses GraphABC;
 
+type
+  TButtonState = record
+    Held: boolean;
+    Pressed: boolean;
+    Released: boolean;
+  end;
+
+  TInputState = record
+    Keys: array[0..255] of TButtonState;
+    MouseX, MouseY: integer;
+    MouseButtons: array[1..3] of TButtonState;
+    MouseMoved: boolean;
+    Resized: boolean;
+  end;
+
 var
-  MouseX, MouseY: integer;
-  MousePressed: boolean;
-  MouseJustPressed: boolean;
-  MouseJustReleased: boolean;
-  MouseMoved: boolean;
-  MouseCode: integer;
-  LastMouseButton: integer;
+  Input: TInputState;
 
-  KeyPressed: boolean;
-  KeyCode: integer;
-  LastKeyCode: integer;
-  KeyJustPressed: boolean;
+procedure InitInput;
+procedure UpdateInput;
 
-  UP, DOWN, LEFT, RIGHT, ENTER, R, SPACE, ESCAPE, W_, A, S, D: boolean;
-  Resized: boolean;
-
+function IsKeyHeld(key: integer): boolean;
 function IsKeyPressed(key: integer): boolean;
-function WasKeyPressed(key: integer): boolean;
-procedure FinishInputFrame;
+function IsKeyReleased(key: integer): boolean;
+
+function IsMouseButtonHeld(button: integer): boolean;
+function IsMouseButtonPressed(button: integer): boolean;
+function IsMouseButtonReleased(button: integer): boolean;
+
+// Сбросить флаг Pressed для указанной кнопки мыши (после обработки события)
+procedure ClearMouseButtonPressed(button: integer);
+
+function GetMousePos: Point;
+function IsResized: boolean;
+
+const
+  KEY_UP    = VK_UP;
+  KEY_DOWN  = VK_DOWN;
+  KEY_LEFT  = VK_LEFT;
+  KEY_RIGHT = VK_RIGHT;
+  KEY_ENTER = VK_ENTER;
+  KEY_R     = VK_R;
+  KEY_SPACE = VK_SPACE;
+  KEY_W     = VK_W;
+  KEY_A     = VK_A;
+  KEY_S     = VK_S;
+  KEY_D     = VK_D;
 
 implementation
 
-procedure SetKeyState(key: integer; state: boolean);
-begin
-  case key of
-    VK_UP: UP := state;
-    VK_DOWN: DOWN := state;
-    VK_LEFT: LEFT := state;
-    VK_RIGHT: RIGHT := state;
-    VK_ENTER: ENTER := state;
-    VK_R: R := state;
-    VK_SPACE: SPACE := state;
-    27: ESCAPE := state;
-    VK_W: W_ := state;
-    VK_A: A := state;
-    VK_S: S := state;
-    VK_D: D := state;
-  end;
-end;
-
 procedure KeyDown(key: integer);
 begin
-  if not ((KeyPressed) and (KeyCode = key)) then
+  if (key >= 0) and (key <= 255) then
   begin
-    KeyJustPressed := true;
-    LastKeyCode := key;
+    Input.Keys[key].Held := true;
+    Input.Keys[key].Pressed := true;
   end;
-  KeyPressed := true;
-  KeyCode := key;
-  SetKeyState(key, true);
 end;
 
 procedure KeyUp(key: integer);
 begin
-  SetKeyState(key, false);
-  if KeyCode = key then
+  if (key >= 0) and (key <= 255) then
   begin
-    KeyPressed := false;
-    KeyCode := -1;
+    Input.Keys[key].Held := false;
+    Input.Keys[key].Released := true;
   end;
-end;
-
-function IsKeyPressed(key: integer): boolean;
-begin
-  Result := KeyPressed and (KeyCode = key);
-end;
-
-function WasKeyPressed(key: integer): boolean;
-begin
-  Result := KeyJustPressed and (LastKeyCode = key);
 end;
 
 procedure MouseDown(x, y, mb: integer);
 begin
-  MouseX := x;
-  MouseY := y;
-  if not MousePressed then
-    MouseJustPressed := true;
-  MousePressed := true;
-  MouseCode := mb;
-  LastMouseButton := mb;
-end;
-
-procedure MouseMove(x, y, mb: integer);
-begin
-  MouseX := x;
-  MouseY := y;
-  if mb <> 0 then
+  Input.MouseX := x;
+  Input.MouseY := y;
+  if (mb >= 1) and (mb <= 3) then
   begin
-    MouseCode := mb;
-    LastMouseButton := mb;
+    Input.MouseButtons[mb].Held := true;
+    Input.MouseButtons[mb].Pressed := true;
   end;
-  MouseMoved := true;
 end;
 
 procedure MouseUp(x, y, mb: integer);
 begin
-  MouseX := x;
-  MouseY := y;
-  MousePressed := false;
-  MouseJustReleased := true;
-  LastMouseButton := mb;
-  MouseCode := 0;
+  Input.MouseX := x;
+  Input.MouseY := y;
+  if (mb >= 1) and (mb <= 3) then
+  begin
+    Input.MouseButtons[mb].Held := false;
+    Input.MouseButtons[mb].Released := true;
+  end;
+end;
+
+procedure MouseMove(x, y, mb: integer);
+begin
+  Input.MouseX := x;
+  Input.MouseY := y;
+  Input.MouseMoved := true;
 end;
 
 procedure Resize;
 begin
-  Resized := true;
+  Input.Resized := true;
 end;
 
-procedure FinishInputFrame;
+procedure InitInput;
+var
+  i: integer;
 begin
-  MouseJustPressed := false;
-  MouseJustReleased := false;
-  MouseMoved := false;
-  KeyJustPressed := false;
-  LastKeyCode := -1;
-  Resized := false;
-end;
+  for i := 0 to 255 do
+  begin
+    Input.Keys[i].Held := false;
+    Input.Keys[i].Pressed := false;
+    Input.Keys[i].Released := false;
+  end;
+  for i := 1 to 3 do
+  begin
+    Input.MouseButtons[i].Held := false;
+    Input.MouseButtons[i].Pressed := false;
+    Input.MouseButtons[i].Released := false;
+  end;
+  Input.MouseX := 0;
+  Input.MouseY := 0;
+  Input.MouseMoved := false;
+  Input.Resized := false;
 
-begin
   OnKeyDown := KeyDown;
   OnKeyUp := KeyUp;
   OnMouseDown := MouseDown;
-  OnMouseMove := MouseMove;
   OnMouseUp := MouseUp;
+  OnMouseMove := MouseMove;
   OnResize := Resize;
+end;
 
-  KeyCode := -1;
-  LastKeyCode := -1;
-  MouseCode := 0;
-  LastMouseButton := 0;
+procedure UpdateInput;
+var
+  i: integer;
+begin
+  // Сбрасываем Pressed и Released для клавиш (для клавиш оставляем как есть)
+  for i := 0 to 255 do
+  begin
+    Input.Keys[i].Pressed := false;
+    Input.Keys[i].Released := false;
+  end;
+  // Для мыши сбрасываем только Released, Pressed сбрасываем вручную через ClearMouseButtonPressed
+  for i := 1 to 3 do
+    Input.MouseButtons[i].Released := false;
+  Input.MouseMoved := false;
+  Input.Resized := false;
+end;
+
+procedure ClearMouseButtonPressed(button: integer);
+begin
+  if (button >= 1) and (button <= 3) then
+    Input.MouseButtons[button].Pressed := false;
+end;
+
+function IsKeyHeld(key: integer): boolean;
+begin
+  if (key >= 0) and (key <= 255) then
+    Result := Input.Keys[key].Held
+  else
+    Result := false;
+end;
+
+function IsKeyPressed(key: integer): boolean;
+begin
+  if (key >= 0) and (key <= 255) then
+    Result := Input.Keys[key].Pressed
+  else
+    Result := false;
+end;
+
+function IsKeyReleased(key: integer): boolean;
+begin
+  if (key >= 0) and (key <= 255) then
+    Result := Input.Keys[key].Released
+  else
+    Result := false;
+end;
+
+function IsMouseButtonHeld(button: integer): boolean;
+begin
+  if (button >= 1) and (button <= 3) then
+    Result := Input.MouseButtons[button].Held
+  else
+    Result := false;
+end;
+
+function IsMouseButtonPressed(button: integer): boolean;
+begin
+  if (button >= 1) and (button <= 3) then
+    Result := Input.MouseButtons[button].Pressed
+  else
+    Result := false;
+end;
+
+function IsMouseButtonReleased(button: integer): boolean;
+begin
+  if (button >= 1) and (button <= 3) then
+    Result := Input.MouseButtons[button].Released
+  else
+    Result := false;
+end;
+
+function GetMousePos: Point;
+begin
+  Result.X := Input.MouseX;
+  Result.Y := Input.MouseY;
+end;
+
+function IsResized: boolean;
+begin
+  Result := Input.Resized;
+end;
+
 end.
