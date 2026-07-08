@@ -15,8 +15,6 @@ type
     Keys: array[0..255] of TButtonState;
     MouseX, MouseY: integer;
     MouseButtons: array[1..3] of TButtonState;
-    MouseMoved: boolean;
-    Resized: boolean;
   end;
 
 var
@@ -37,20 +35,6 @@ function IsMouseButtonReleased(button: integer): boolean;
 procedure ClearMouseButtonPressed(button: integer);
 
 function GetMousePos: Point;
-function IsResized: boolean;
-
-const
-  KEY_UP    = VK_UP;
-  KEY_DOWN  = VK_DOWN;
-  KEY_LEFT  = VK_LEFT;
-  KEY_RIGHT = VK_RIGHT;
-  KEY_ENTER = VK_ENTER;
-  KEY_R     = VK_R;
-  KEY_SPACE = VK_SPACE;
-  KEY_W     = VK_W;
-  KEY_A     = VK_A;
-  KEY_S     = VK_S;
-  KEY_D     = VK_D;
 
 implementation
 
@@ -98,12 +82,6 @@ procedure MouseMove(x, y, mb: integer);
 begin
   Input.MouseX := x;
   Input.MouseY := y;
-  Input.MouseMoved := true;
-end;
-
-procedure Resize;
-begin
-  Input.Resized := true;
 end;
 
 procedure InitInput;
@@ -124,15 +102,12 @@ begin
   end;
   Input.MouseX := 0;
   Input.MouseY := 0;
-  Input.MouseMoved := false;
-  Input.Resized := false;
 
   OnKeyDown := KeyDown;
   OnKeyUp := KeyUp;
   OnMouseDown := MouseDown;
   OnMouseUp := MouseUp;
   OnMouseMove := MouseMove;
-  OnResize := Resize;
 end;
 
 procedure UpdateInput;
@@ -148,8 +123,6 @@ begin
   // Для мыши сбрасываем только Released, Pressed сбрасываем вручную через ClearMouseButtonPressed
   for i := 1 to 3 do
     Input.MouseButtons[i].Released := false;
-  Input.MouseMoved := false;
-  Input.Resized := false;
 end;
 
 procedure ClearMouseButtonPressed(button: integer);
@@ -210,11 +183,6 @@ function GetMousePos: Point;
 begin
   Result.X := Input.MouseX;
   Result.Y := Input.MouseY;
-end;
-
-function IsResized: boolean;
-begin
-  Result := Input.Resized;
 end;
 
 end.
