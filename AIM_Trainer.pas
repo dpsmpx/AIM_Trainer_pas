@@ -480,117 +480,6 @@ begin
   end;
 end;
 
-procedure LoadStats;
-var
-  f: Text;
-  line: string;
-  parts: array of string;
-  i, idx, val, m, rk, ai: integer;
-begin
-  Stats.BestScore := 0;
-  Stats.BestAccuracy := 0;
-  Stats.BestPrecision := 0;
-  Stats.BestAvgReaction := 0;
-  Stats.GamesPlayed := 0;
-  Stats.TutorialSeen := false;
-  SavedReactionCount := 0;
-  SavedReactionIndex := 0;
-  for i := 0 to 49 do SavedReactionHistory[i] := 0;
-  SetDefaultSettings;
-  CurrentTheme := 0;
-  for m := 0 to 3 do LeaderboardCount[m] := 0;
-  for i := 0 to 7 do AchievementUnlocked[i] := false;
-
-  if not FileExists(StatsFileName) then Exit;
-
-  try
-    Assign(f, StatsFileName);
-    Reset(f);
-    try
-      while not Eof(f) do
-      begin
-        Readln(f, line);
-        parts := line.Split('=');
-        if Length(parts) = 2 then
-        begin
-          if parts[0] = 'BestScore' then Stats.BestScore := StrToInt(parts[1])
-          else if parts[0] = 'BestAccuracy' then Stats.BestAccuracy := StrToFloat(parts[1])
-          else if parts[0] = 'BestPrecision' then Stats.BestPrecision := StrToFloat(parts[1])
-          else if parts[0] = 'BestAvgReaction' then Stats.BestAvgReaction := StrToFloat(parts[1])
-          else if parts[0] = 'GamesPlayed' then Stats.GamesPlayed := StrToInt(parts[1])
-          else if parts[0] = 'TutorialSeen' then Stats.TutorialSeen := (parts[1] = 'True')
-          else if parts[0] = 'ReactionCount' then SavedReactionCount := StrToInt(parts[1])
-          else if parts[0] = 'ReactionIndex' then SavedReactionIndex := StrToInt(parts[1])
-          else if parts[0] = 'ShowMainMenuEffects' then ShowMainMenuEffects := (parts[1] = 'True')
-          else if parts[0] = 'SetCircleSize' then Settings.CircleSize := StrToInt(parts[1])
-          else if parts[0] = 'SetLifetimeMs' then Settings.LifetimeMs := StrToInt(parts[1])
-          else if parts[0] = 'SetLives' then Settings.Lives := StrToInt(parts[1])
-          else if parts[0] = 'SetSoundEnabled' then Settings.SoundEnabled := (parts[1] = 'True')
-          else if parts[0] = 'CurrentTheme' then CurrentTheme := StrToInt(parts[1])
-          else if Copy(parts[0], 1, 7) = 'LBCount' then
-          begin
-            m := StrToInt(Copy(parts[0], 8, Length(parts[0]) - 7));
-            if (m >= 0) and (m <= 3) then LeaderboardCount[m] := StrToInt(parts[1]);
-          end
-          else if (Length(parts[0]) = 5) and (Copy(parts[0], 1, 2) = 'LB') then
-          begin
-            m := StrToInt(Copy(parts[0], 3, 1));
-            rk := StrToInt(Copy(parts[0], 4, 1));
-            if (m >= 0) and (m <= 3) and (rk >= 0) and (rk <= 9) then
-            begin
-              if parts[0][5] = 'S' then Leaderboard[m][rk].Score := StrToInt(parts[1])
-              else if parts[0][5] = 'A' then Leaderboard[m][rk].Accuracy := StrToFloat(parts[1]);
-            end;
-          end
-          else if Copy(parts[0], 1, 4) = 'Achv' then
-          begin
-            ai := StrToInt(Copy(parts[0], 5, Length(parts[0]) - 4));
-            if (ai >= 0) and (ai <= 7) then AchievementUnlocked[ai] := (parts[1] = 'True');
-          end
-          else if Copy(parts[0], 1, 8) = 'Reaction' then
-          begin
-            idx := StrToInt(Copy(parts[0], 9, Length(parts[0])-8));
-            val := StrToInt(parts[1]);
-            if (idx >= 0) and (idx < 50) then
-              SavedReactionHistory[idx] := val;
-          end;
-        end;
-      end;
-    finally
-      Close(f);
-    end;
-  except
-    // Повреждённый или временно недоступный файл статистики — сохраняем
-    // копию на случай, если её захочется разобрать вручную, и начинаем
-    // с чистого листа вместо того, чтобы уронить программу при старте
-    BackupCorruptStatsFile;
-    Stats.BestScore := 0;
-    Stats.BestAccuracy := 0;
-    Stats.BestPrecision := 0;
-    Stats.BestAvgReaction := 0;
-    Stats.GamesPlayed := 0;
-    Stats.TutorialSeen := false;
-    SavedReactionCount := 0;
-    SavedReactionIndex := 0;
-    for i := 0 to 49 do SavedReactionHistory[i] := 0;
-    SetDefaultSettings;
-    CurrentTheme := 0;
-    for m := 0 to 3 do LeaderboardCount[m] := 0;
-    for i := 0 to 7 do AchievementUnlocked[i] := false;
-  end;
-
-  // Защита от значений, которые в принципе не проходят по границам панели
-  // настроек (например, файл правили руками) — не даём им сломать игру
-  if (Settings.CircleSize < MIN_CIRCLE_SIZE) or (Settings.CircleSize > MAX_CIRCLE_SIZE) then
-    Settings.CircleSize := 40;
-  if (Settings.LifetimeMs < MIN_LIFETIME) or (Settings.LifetimeMs > MAX_LIFETIME) then
-    Settings.LifetimeMs := 1000;
-  if (Settings.Lives < MIN_LIVES) or (Settings.Lives > MAX_LIVES) then
-    Settings.Lives := 15;
-  if (CurrentTheme < 0) or (CurrentTheme > 2) then
-    CurrentTheme := 0;
-end;
-
 procedure SaveStats;
 var
   f: Text;
@@ -647,6 +536,127 @@ begin
     // Не удалось сохранить статистику (например, файл занят) — не
     // критично для игры, просто пропускаем сохранение в этот раз
   end;
+end;
+
+procedure LoadStats;
+var
+  f: Text;
+  line: string;
+  parts: array of string;
+  i, idx, val, m, rk, ai: integer;
+  loaded: boolean;
+begin
+  // Инициализация значений по умолчанию
+  Stats.BestScore := 0;
+  Stats.BestAccuracy := 0;
+  Stats.BestPrecision := 0;
+  Stats.BestAvgReaction := 0;
+  Stats.GamesPlayed := 0;
+  Stats.TutorialSeen := false;
+  SavedReactionCount := 0;
+  SavedReactionIndex := 0;
+  for i := 0 to 49 do SavedReactionHistory[i] := 0;
+  SetDefaultSettings;
+  CurrentTheme := 0;
+  for m := 0 to 3 do LeaderboardCount[m] := 0;
+  for i := 0 to 7 do AchievementUnlocked[i] := false;
+  loaded := false;
+
+  // Если файл существует – пытаемся загрузить
+  if FileExists(StatsFileName) then
+  begin
+    try
+      Assign(f, StatsFileName);
+      Reset(f);
+      try
+        while not Eof(f) do
+        begin
+          Readln(f, line);
+          parts := line.Split('=');
+          if Length(parts) = 2 then
+          begin
+            if parts[0] = 'BestScore' then Stats.BestScore := StrToInt(parts[1])
+            else if parts[0] = 'BestAccuracy' then Stats.BestAccuracy := StrToFloat(parts[1])
+            else if parts[0] = 'BestPrecision' then Stats.BestPrecision := StrToFloat(parts[1])
+            else if parts[0] = 'BestAvgReaction' then Stats.BestAvgReaction := StrToFloat(parts[1])
+            else if parts[0] = 'GamesPlayed' then Stats.GamesPlayed := StrToInt(parts[1])
+            else if parts[0] = 'TutorialSeen' then Stats.TutorialSeen := (parts[1] = 'True')
+            else if parts[0] = 'ReactionCount' then SavedReactionCount := StrToInt(parts[1])
+            else if parts[0] = 'ReactionIndex' then SavedReactionIndex := StrToInt(parts[1])
+            else if parts[0] = 'ShowMainMenuEffects' then ShowMainMenuEffects := (parts[1] = 'True')
+            else if parts[0] = 'SetCircleSize' then Settings.CircleSize := StrToInt(parts[1])
+            else if parts[0] = 'SetLifetimeMs' then Settings.LifetimeMs := StrToInt(parts[1])
+            else if parts[0] = 'SetLives' then Settings.Lives := StrToInt(parts[1])
+            else if parts[0] = 'SetSoundEnabled' then Settings.SoundEnabled := (parts[1] = 'True')
+            else if parts[0] = 'CurrentTheme' then CurrentTheme := StrToInt(parts[1])
+            else if Copy(parts[0], 1, 7) = 'LBCount' then
+            begin
+              m := StrToInt(Copy(parts[0], 8, Length(parts[0]) - 7));
+              if (m >= 0) and (m <= 3) then LeaderboardCount[m] := StrToInt(parts[1]);
+            end
+            else if (Length(parts[0]) = 5) and (Copy(parts[0], 1, 2) = 'LB') then
+            begin
+              m := StrToInt(Copy(parts[0], 3, 1));
+              rk := StrToInt(Copy(parts[0], 4, 1));
+              if (m >= 0) and (m <= 3) and (rk >= 0) and (rk <= 9) then
+              begin
+                if parts[0][5] = 'S' then Leaderboard[m][rk].Score := StrToInt(parts[1])
+                else if parts[0][5] = 'A' then Leaderboard[m][rk].Accuracy := StrToFloat(parts[1]);
+              end;
+            end
+            else if Copy(parts[0], 1, 4) = 'Achv' then
+            begin
+              ai := StrToInt(Copy(parts[0], 5, Length(parts[0]) - 4));
+              if (ai >= 0) and (ai <= 7) then AchievementUnlocked[ai] := (parts[1] = 'True');
+            end
+            else if Copy(parts[0], 1, 8) = 'Reaction' then
+            begin
+              idx := StrToInt(Copy(parts[0], 9, Length(parts[0])-8));
+              val := StrToInt(parts[1]);
+              if (idx >= 0) and (idx < 50) then
+                SavedReactionHistory[idx] := val;
+            end;
+          end;
+        end;
+        loaded := true; // чтение прошло без ошибок
+      finally
+        Close(f);
+      end;
+    except
+      // Ошибка при чтении – создаём бэкап и сбрасываем всё на дефолты
+      BackupCorruptStatsFile;
+      // Сброс значений уже сделан в начале, но нужно убедиться, что они дефолтные
+      // (они уже установлены, но могли быть частично изменены до исключения)
+      Stats.BestScore := 0;
+      Stats.BestAccuracy := 0;
+      Stats.BestPrecision := 0;
+      Stats.BestAvgReaction := 0;
+      Stats.GamesPlayed := 0;
+      Stats.TutorialSeen := false;
+      SavedReactionCount := 0;
+      SavedReactionIndex := 0;
+      for i := 0 to 49 do SavedReactionHistory[i] := 0;
+      SetDefaultSettings;
+      CurrentTheme := 0;
+      for m := 0 to 3 do LeaderboardCount[m] := 0;
+      for i := 0 to 7 do AchievementUnlocked[i] := false;
+      loaded := false;
+    end;
+  end;
+
+  // Защита от некорректных значений (если файл был повреждён частично)
+  if (Settings.CircleSize < MIN_CIRCLE_SIZE) or (Settings.CircleSize > MAX_CIRCLE_SIZE) then
+    Settings.CircleSize := 40;
+  if (Settings.LifetimeMs < MIN_LIFETIME) or (Settings.LifetimeMs > MAX_LIFETIME) then
+    Settings.LifetimeMs := 1000;
+  if (Settings.Lives < MIN_LIVES) or (Settings.Lives > MAX_LIVES) then
+    Settings.Lives := 15;
+  if (CurrentTheme < 0) or (CurrentTheme > 2) then
+    CurrentTheme := 0;
+
+  // Если файл не существовал или был повреждён – создаём новый с дефолтными значениями
+  if not loaded then
+    SaveStats;
 end;
 
 // ----- Частицы -----
@@ -2565,7 +2575,7 @@ var
   panelX, panelY, panelW, panelH: integer;
 begin
   Brush.Color := ARGB(225, 15, 15, 18);
-  FillRoundRect(0, 0, W, H, 0, 0);
+  FillRoundRect(0, 0, W, H, 1, 1);
 
   panelW := 480; panelH := 220;
   panelX := (W - panelW) div 2;
