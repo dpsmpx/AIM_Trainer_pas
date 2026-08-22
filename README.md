@@ -66,8 +66,8 @@
 
 ## Скриншоты
 
-<img width="802" height="632" alt="Главное меню" src="https://github.com/user-attachments/assets/d1b32614-1b1e-4137-9892-bb0d12df85bf" />
-<img width="802" height="632" alt="Игровой процесс" src="https://github.com/user-attachments/assets/dc06b289-95db-4559-b288-f5855cc695dd" />
+<img width="802" height="627" alt="image" src="https://github.com/user-attachments/assets/801eda9e-8244-436d-8e39-e768788ffdca" />
+<img width="802" height="627" alt="image" src="https://github.com/user-attachments/assets/02f1611b-153f-4acd-ac05-27d7b1f2dfd6" />
 
 ---
 
