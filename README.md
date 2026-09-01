@@ -3,7 +3,7 @@
 **Тренажёр реакции и меткости** с графикой GraphABC. Проект на Pascal, открытый исходный код, 4 режима игры, достижения, статистика и профили.
 
 [![Pascal](https://img.shields.io/badge/Pascal-3.8-blue?logo=pascal)](https://pascalabc.net/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-GPLv3-yellow.svg)](https://opensource.org/licenses/GPLv3)
 
 ---
 
