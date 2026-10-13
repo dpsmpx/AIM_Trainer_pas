@@ -16,6 +16,8 @@
   `docs/ARCHITECTURE.md`, `docs/MANUAL_CHECKS.md`, `docs/PROVENANCE.md`,
   `docs/PROCESS.md`, этот файл, `tools/check_docs.py`, шаблон PR, хук
   начала сессии.
+- Первая крупная задача — полный перенос программы на C++ (поручение
+  автора, D-08; `ROADMAP/ROADMAP.md`, `task-cpp`).
 - Код не менялся.
 
 ## 23 августа – 1 сентября 2026 — README

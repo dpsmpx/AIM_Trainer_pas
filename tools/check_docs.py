@@ -14,8 +14,9 @@
 5. Ссылка `D-NN` в документах ведёт на существующее решение, `AUD-NN` —
    на находку аудита.
 6. `TODO.md`: пункт верхнего уровня — «- `М` **Что** — …».
-7. `ROADMAP/ROADMAP.md`: задача — `### <a id="task-N"></a>[ ] …` или
-   `[+]`, шаг — `- [ ]` или `- [+]`.
+7. `ROADMAP/ROADMAP.md`: задача — `### <a id="task-…"></a>[ ] …` или
+   `[+]` (якорь — номер этапа или имя: `task-2`, `task-cpp`), шаг —
+   `- [ ]` или `- [+]`.
 8. Чего по решениям быть не должно, того нет (`MUST_BE_ABSENT`).
 
 Только стандартная библиотека, без сети. Коды возврата: 0 — чисто,
@@ -52,7 +53,7 @@ PATH_RE = re.compile(r"^(?:docs|ROADMAP|tools|\.claude|\.github)/[\w./-]*(?::\d+
 D_REF_RE = re.compile(r"(?<![\w:-])D-(\d{2})(?![\w-])")
 AUD_REF_RE = re.compile(r"(?<![\w:-])AUD-(\d{2})(?![\w-])")
 TODO_ITEM_RE = re.compile(r"^- `[МСТК]` \*\*[^*]+\*\*")
-TASK_RE = re.compile(r'^### <a id="task-\d+"></a>\[[ +]\] \S')
+TASK_RE = re.compile(r'^### <a id="task-[a-z0-9-]+"></a>\[[ +]\] \S')
 STEP_RE = re.compile(r"^- \[[ +]\] \S")
 
 
