@@ -18,6 +18,9 @@
    `[+]` (якорь — номер этапа или имя: `task-2`, `task-cpp`), шаг —
    `- [ ]` или `- [+]`.
 8. Чего по решениям быть не должно, того нет (`MUST_BE_ABSENT`).
+9. Исходники Pascal-версии не изменены (`PASCAL_FROZEN`, D-09): хэш
+   `git hash-object` каждого файла совпадает с записанным. Меняются эти
+   хэши только вместе с новым решением.
 
 Только стандартная библиотека, без сети. Коды возврата: 0 — чисто,
 1 — есть находки.
@@ -46,6 +49,13 @@ DECISION_FIELDS = ("**Статус.**", "**Решение.**", "**Почему.*
 MUST_BE_ABSENT = {".github/workflows": "D-07"}
 # Названо в документах как отклонённое, но не запрещено (D-01, «Отклонено»).
 NAMED_ABSENT = {"tools/dpv"}
+# Pascal-версия остаётся как есть (D-09): хэши blob на коммите cbf5c3c.
+PASCAL_FROZEN = {
+    "AIM_Trainer.pas": "fab3b6383dbaf9909ae5da77f68295e21ec2376c",
+    "AimCircle.pas": "265704c2c59518759ed573b9d048afc5c2b2b382",
+    "Control_AI.pas": "33a228e5afa8853dff320c6afbe23140b799a94c",
+    "Base.pas": "41e8be2f9904fd4b4d164e7c39173c54207115f2",
+}
 
 LINK_RE = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 CODE_RE = re.compile(r"`([^`\s]+)`")
@@ -137,6 +147,15 @@ def main() -> int:
     for path, rule in MUST_BE_ABSENT.items():
         if (ROOT / path).exists():
             bad.append(f"есть {path} — против {rule}")
+
+    for name, want in PASCAL_FROZEN.items():
+        if not (ROOT / name).is_file():
+            bad.append(f"нет {name} — Pascal-версия остаётся как есть (D-09)")
+            continue
+        got = subprocess.run(["git", "-C", str(ROOT), "hash-object", name],
+                             capture_output=True, text=True).stdout.strip()
+        if got != want:
+            bad.append(f"{name} изменён — Pascal-версия остаётся как есть (D-09)")
 
     check_shape(TODO, TODO_ITEM_RE, "пункт TODO", bad, "- ")
     check_shape(ROADMAP, TASK_RE, "задача ROADMAP", bad, "### ")
