@@ -39,6 +39,9 @@ ROOT_ALLOW = {
     "README.md", "CLAUDE.md", "TODO.md", "LICENSE",
     "AIM_Trainer.pas", "AimCircle.pas", "Control_AI.pas", "Base.pas",
     "docs", "ROADMAP", "tools",
+    # C++-версия (D-20); build/ — каталог сборки, в Git не попадает.
+    "CMakeLists.txt", "CMakePresets.json", "src", "tests",
+    ".clang-format", ".clang-tidy", "build",
 }
 DECISIONS = ROOT / "docs/direction/DECISIONS.md"
 AUDITS = ROOT / "docs/audits"
