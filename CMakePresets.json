@@ -38,8 +38,8 @@
     },
     {
       "name": "linux-asan",
-      "displayName": "Linux, Clang, ASan и UBSan",
-      "inherits": "linux-clang",
+      "displayName": "Linux, GCC, ASan и UBSan",
+      "inherits": "linux-gcc",
       "cacheVariables": { "AIM_SANITIZE": "ON" }
     },
     {
@@ -67,6 +67,7 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_C_COMPILER": "x86_64-w64-mingw32-clang",
         "CMAKE_CXX_COMPILER": "x86_64-w64-mingw32-clang++",
+        "CMAKE_RC_COMPILER": "x86_64-w64-mingw32-windres",
         "BUILD_TESTING": "OFF"
       }
     }

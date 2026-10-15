@@ -9,9 +9,8 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <windows.h>
-
 #include <SDL3/SDL_timer.h>
+#include <windows.h>
 
 #include <atomic>
 #include <condition_variable>
@@ -99,7 +98,7 @@ void RawMouse::Impl::run() {
     RAWINPUTDEVICE device{};
     device.usUsagePage = 0x01;  // Generic Desktop
     device.usUsage = 0x02;      // мышь
-    device.dwFlags = 0;         // ввод — только пока программа впереди
+    device.dwFlags = 0;  // ввод — только пока программа впереди
     device.hwndTarget = window;
     if (RegisterRawInputDevices(&device, 1, sizeof device) == FALSE) {
         finish_start(false, win32_error("RegisterRawInputDevices"));
@@ -115,8 +114,8 @@ void RawMouse::Impl::run() {
     for (;;) {
         // MWMO_INPUTAVAILABLE — проснуться и на ввод, который уже лежит в
         // очереди, а не только на новый.
-        const DWORD woke = MsgWaitForMultipleObjectsEx(1, &stop_event, INFINITE, QS_ALLINPUT,
-                                                       MWMO_INPUTAVAILABLE);
+        const DWORD woke =
+            MsgWaitForMultipleObjectsEx(1, &stop_event, INFINITE, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
         if (woke != WAIT_OBJECT_0 + 1) break;  // сигнал остановки или ошибка
         MSG msg{};
         while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE) != FALSE) {
@@ -160,8 +159,10 @@ void RawMouse::Impl::handle(HRAWINPUT input, core::Nanoseconds time) {
         if (queue.size() >= kMaxQueued) queue.erase(queue.begin());
         queue.push_back({time, button});
     };
-    if ((flags & RI_MOUSE_LEFT_BUTTON_DOWN) != 0) push(swap ? MouseButton::Right : MouseButton::Left);
-    if ((flags & RI_MOUSE_RIGHT_BUTTON_DOWN) != 0) push(swap ? MouseButton::Left : MouseButton::Right);
+    if ((flags & RI_MOUSE_LEFT_BUTTON_DOWN) != 0)
+        push(swap ? MouseButton::Right : MouseButton::Left);
+    if ((flags & RI_MOUSE_RIGHT_BUTTON_DOWN) != 0)
+        push(swap ? MouseButton::Left : MouseButton::Right);
     if ((flags & RI_MOUSE_MIDDLE_BUTTON_DOWN) != 0) push(MouseButton::Middle);
     if ((flags & RI_MOUSE_BUTTON_4_DOWN) != 0) push(MouseButton::X1);
     if ((flags & RI_MOUSE_BUTTON_5_DOWN) != 0) push(MouseButton::X2);
@@ -199,9 +200,13 @@ RawMouse::~RawMouse() {
     if (impl_->owns_receiver) g_receiver_taken = false;
 }
 
-bool RawMouse::active() const { return impl_->active; }
+bool RawMouse::active() const {
+    return impl_->active;
+}
 
-const std::string& RawMouse::problem() const { return impl_->problem; }
+const std::string& RawMouse::problem() const {
+    return impl_->problem;
+}
 
 void RawMouse::drain(std::vector<core::RawPress>& out) {
     const std::lock_guard lock(impl_->mutex);

@@ -10,6 +10,7 @@
 | что не закончено, вопросы автору | [`TODO.md`](../TODO.md) |
 | как устроена программа: модули, экраны, время, ввод, цели, счёт, файлы | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | как проверить правку на Windows | [`MANUAL_CHECKS.md`](MANUAL_CHECKS.md) |
+| как собрать C++-версию у автора и в сессии, пресеты, тесты | [`BUILD.md`](BUILD.md) |
 | выбор библиотеки: замерщики ввода, как их прогнать и читать журналы | [`LIB_PROBES.md`](LIB_PROBES.md) |
 | зачем правила и откуда | [`PROCESS.md`](PROCESS.md) |
 | откуда код и на каком основании | [`PROVENANCE.md`](PROVENANCE.md) |
@@ -17,4 +18,5 @@
 | аудит и ревью 13 октября 2026 | [`audits/PROJECT_AUDIT.md`](audits/PROJECT_AUDIT.md) |
 | описание для игрока | [`README.md`](../README.md) — витрина, не источник истины (D-06) |
 
-Проверка документов: `python3 tools/check_docs.py`.
+Проверка документов: `python3 tools/check_docs.py`; C++-версии —
+`tools/check_cpp.sh` (D-25).

@@ -26,7 +26,7 @@ struct RawPress {
 
 enum class ClickTimeSource : std::uint8_t {
     RawInput,  ///< свой поток сырого ввода (D-24)
-    Event,     ///< событие SDL: сырого нажатия нет или оно не нашлось
+    Event,  ///< событие SDL: сырого нажатия нет или оно не нашлось
 };
 
 struct ClickTime {

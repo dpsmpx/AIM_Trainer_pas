@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "core/click_time.h"
+#include "core/screen.h"
 #include "platform/raw_mouse.h"
 
 namespace {
@@ -30,11 +31,9 @@ using aim::core::ClickTimeSource;
 using aim::core::MouseButton;
 using aim::core::Nanoseconds;
 
-constexpr int kWidth = 800;  // D-02
-constexpr int kHeight = 600;
+using aim::core::kDarkBackground;
+
 constexpr const char* kTitle = "Aim Trainer";
-// Фон тёмной темы оригинала (InitThemes в AIM_Trainer.pas).
-constexpr SDL_Color kBackground{28, 28, 32, 255};
 // Ожидание события, пока рисовать нечего: каркас не крутит кадры впустую.
 constexpr Sint32 kIdleWaitMs = 16;
 
@@ -85,13 +84,16 @@ std::string_view button_name(MouseButton button) {
     return "?";
 }
 
-double to_ms(Nanoseconds ns) { return static_cast<double>(ns) / 1e6; }
+double to_ms(Nanoseconds ns) {
+    return static_cast<double>(ns) / 1e6;
+}
 
 // Заголовок окна — проверка D-24 у автора (docs/MANUAL_CHECKS.md, сценарий 21):
 // откуда взято время клика и насколько от него отстоит метка события SDL.
 std::string describe_click(MouseButton button, float x, float y, Nanoseconds event_time,
                            const ClickTime& click) {
-    std::string text = std::format("{} — {} ({:.0f}, {:.0f}): ", kTitle, button_name(button), x, y);
+    const std::string text =
+        std::format("{} — {} ({:.0f}, {:.0f}): ", kTitle, button_name(button), x, y);
     if (click.source == ClickTimeSource::Event) return text + "время из события SDL";
     const bool event_earlier = event_time <= click.time;
     const Nanoseconds gap = event_earlier ? click.time - event_time : event_time - click.time;
@@ -122,7 +124,8 @@ int main(int argc, char* argv[]) {
     }
     SDL_Window* window = nullptr;
     SDL_Renderer* renderer = nullptr;
-    if (!SDL_CreateWindowAndRenderer(kTitle, kWidth, kHeight, 0, &window, &renderer)) {
+    if (!SDL_CreateWindowAndRenderer(kTitle, aim::core::kWindowWidth, aim::core::kWindowHeight, 0,
+                                     &window, &renderer)) {
         SDL_Log("SDL_CreateWindowAndRenderer: %s", SDL_GetError());
         SDL_Quit();
         return 1;
@@ -131,19 +134,20 @@ int main(int argc, char* argv[]) {
     int status = 0;
     {
         aim::platform::RawMouse raw_mouse;
-        const std::string raw_state =
-            raw_mouse.active() ? "есть" : "нет — " + raw_mouse.problem();
-        SDL_Log("SDL %d.%d.%d, рендер %s; сырой ввод мыши: %s", SDL_VERSIONNUM_MAJOR(SDL_GetVersion()),
-                SDL_VERSIONNUM_MINOR(SDL_GetVersion()), SDL_VERSIONNUM_MICRO(SDL_GetVersion()),
-                SDL_GetRendererName(renderer), raw_state.c_str());
-        SDL_SetWindowTitle(window, std::format("{} — каркас C++: сырой ввод мыши {}", kTitle,
-                                               raw_state).c_str());
+        const std::string raw_state = raw_mouse.active() ? "есть" : "нет — " + raw_mouse.problem();
+        SDL_Log("SDL %d.%d.%d, рендер %s; сырой ввод мыши: %s",
+                SDL_VERSIONNUM_MAJOR(SDL_GetVersion()), SDL_VERSIONNUM_MINOR(SDL_GetVersion()),
+                SDL_VERSIONNUM_MICRO(SDL_GetVersion()), SDL_GetRendererName(renderer),
+                raw_state.c_str());
+        SDL_SetWindowTitle(
+            window, std::format("{} — каркас C++: сырой ввод мыши {}", kTitle, raw_state).c_str());
 
         ClickTimer clicks;
         std::vector<aim::core::RawPress> fresh;
         const auto take_raw = [&] {
             raw_mouse.drain(fresh);
-            for (const auto& press : fresh) clicks.add(press);
+            for (const auto& press : fresh)
+                clicks.add(press);
             fresh.clear();
         };
 
@@ -169,10 +173,10 @@ int main(int argc, char* argv[]) {
                         const ClickTime click =
                             from_mouse ? clicks.resolve(*button, event.button.timestamp)
                                        : ClickTime{event.button.timestamp, ClickTimeSource::Event};
-                        SDL_SetWindowTitle(window, describe_click(*button, event.button.x,
-                                                                  event.button.y,
-                                                                  event.button.timestamp, click)
-                                                       .c_str());
+                        SDL_SetWindowTitle(window,
+                                           describe_click(*button, event.button.x, event.button.y,
+                                                          event.button.timestamp, click)
+                                               .c_str());
                         break;
                     }
                     default: break;
@@ -182,8 +186,8 @@ int main(int argc, char* argv[]) {
             take_raw();
             clicks.forget_old(SDL_GetTicksNS());
 
-            SDL_SetRenderDrawColor(renderer, kBackground.r, kBackground.g, kBackground.b,
-                                   kBackground.a);
+            SDL_SetRenderDrawColor(renderer, kDarkBackground.r, kDarkBackground.g,
+                                   kDarkBackground.b, SDL_ALPHA_OPAQUE);
             SDL_RenderClear(renderer);
             ++frame;
             const bool last = options->frames > 0 && frame >= options->frames;

@@ -7,17 +7,20 @@
 
 #include <initializer_list>
 
+#include "core/screen.h"
+
 namespace {
 
-constexpr int kWidth = 800;
-constexpr int kHeight = 600;
-constexpr Uint8 kR = 28, kG = 28, kB = 32;  // InitThemes в AIM_Trainer.pas, «Тёмная»
+using aim::core::kDarkBackground;
+constexpr int kWidth = aim::core::kWindowWidth;
+constexpr int kHeight = aim::core::kWindowHeight;
 
 bool pixel_is_background(SDL_Surface* frame, int x, int y) {
     Uint8 r = 0, g = 0, b = 0, a = 0;
     if (!SDL_ReadSurfacePixel(frame, x, y, &r, &g, &b, &a)) return false;
-    if (r == kR && g == kG && b == kB) return true;
-    SDL_Log("пиксель (%d, %d): %u, %u, %u вместо %u, %u, %u", x, y, r, g, b, kR, kG, kB);
+    if (r == kDarkBackground.r && g == kDarkBackground.g && b == kDarkBackground.b) return true;
+    SDL_Log("пиксель (%d, %d): %u, %u, %u вместо %u, %u, %u", x, y, r, g, b, kDarkBackground.r,
+            kDarkBackground.g, kDarkBackground.b);
     return false;
 }
 

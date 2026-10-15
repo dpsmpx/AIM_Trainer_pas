@@ -7,7 +7,9 @@
 namespace aim::core {
 namespace {
 
-constexpr Nanoseconds ms(Nanoseconds value) { return value * 1'000'000; }
+constexpr Nanoseconds ms(Nanoseconds value) {
+    return value * 1'000'000;
+}
 
 TEST(ClickTimer, WithoutRawPressTimeIsFromEvent) {
     ClickTimer timer;
@@ -132,7 +134,8 @@ TEST(ClickTimer, ForgetOldNearClockStartKeepsEverything) {
 TEST(ClickTimer, CapacityKeepsNewestPresses) {
     ClickTimer timer;
     const auto extra = static_cast<Nanoseconds>(ClickTimer::kCapacity) + 6;
-    for (Nanoseconds i = 0; i < extra; ++i) timer.add({ms(1000 + i * 100), MouseButton::X1});
+    for (Nanoseconds i = 0; i < extra; ++i)
+        timer.add({ms(1000 + i * 100), MouseButton::X1});
     EXPECT_EQ(timer.pending(), ClickTimer::kCapacity);
     // Самое старое забыто, самое новое — на месте.
     EXPECT_EQ(timer.resolve(MouseButton::X1, ms(1000)).source, ClickTimeSource::Event);

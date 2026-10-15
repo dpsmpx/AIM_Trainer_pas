@@ -1,9 +1,10 @@
 # Сборка и файлы игрока в репозиторий не попадают (D-04, AUD-23).
 
-# Сборка C++-версии и замерщиков (D-20)
+# Сборка C++-версии и замерщиков (D-20); свои пресеты CMake — у каждого свои
 /build/
 compile_commands.json
 .cache/
+CMakeUserPresets.json
 
 # Сборка PascalABC.NET
 *.exe

@@ -12,9 +12,13 @@ RawMouse::RawMouse() : impl_(std::make_unique<Impl>()) {}
 
 RawMouse::~RawMouse() = default;
 
-bool RawMouse::active() const { return false; }
+bool RawMouse::active() const {
+    return false;
+}
 
-const std::string& RawMouse::problem() const { return impl_->problem; }
+const std::string& RawMouse::problem() const {
+    return impl_->problem;
+}
 
 void RawMouse::drain(std::vector<core::RawPress>& /*out*/) {}
 

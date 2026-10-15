@@ -7,16 +7,17 @@ namespace aim::core {
 
 namespace {
 
-Nanoseconds saturating_sub(Nanoseconds a, Nanoseconds b) { return a > b ? a - b : 0; }
+Nanoseconds saturating_sub(Nanoseconds a, Nanoseconds b) {
+    return a > b ? a - b : 0;
+}
 
 }  // namespace
 
 void ClickTimer::add(const RawPress& press) {
     // Поток отдаёт нажатия по порядку; если порядок всё же нарушен, нажатие
     // встаёт на своё место, и поиск ниже остаётся верным.
-    const auto at = std::upper_bound(
-        pending_.begin(), pending_.end(), press.time,
-        [](Nanoseconds t, const RawPress& p) { return t < p.time; });
+    const auto at = std::upper_bound(pending_.begin(), pending_.end(), press.time,
+                                     [](Nanoseconds t, const RawPress& p) { return t < p.time; });
     pending_.insert(at, press);
     if (pending_.size() > kCapacity) {
         const auto extra = static_cast<std::ptrdiff_t>(pending_.size() - kCapacity);
