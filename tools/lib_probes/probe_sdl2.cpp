@@ -73,10 +73,14 @@ int main(int, char*[]) {
         while (SDL_PollEvent(&e)) {
             switch (e.type) {
                 case SDL_QUIT:
+                    session.note("выход: окно закрыто");
                     running = false;
                     break;
                 case SDL_KEYDOWN:
-                    if (e.key.keysym.sym == SDLK_ESCAPE) running = false;
+                    if (e.key.keysym.sym == SDLK_ESCAPE) {
+                        session.note("выход: Esc");
+                        running = false;
+                    }
                     break;
                 case SDL_MOUSEBUTTONDOWN: {
                     const Uint32 lib_now = SDL_GetTicks();
@@ -84,7 +88,8 @@ int main(int, char*[]) {
                     const Uint32 age_ms = lib_now - e.button.timestamp;
                     session.click(to_probe_button(e.button.button), static_cast<float>(e.button.x),
                                   static_cast<float>(e.button.y), t,
-                                  probe::from_age(t, static_cast<probe::Ns>(age_ms) * 1'000'000ULL));
+                                  probe::from_age(t, static_cast<probe::Ns>(age_ms) * 1'000'000ULL),
+                                  std::to_string(e.button.timestamp));
                     break;
                 }
                 default:
@@ -93,14 +98,14 @@ int main(int, char*[]) {
         }
 
         const probe::View v = session.frame();
-        SDL_SetRenderDrawColor(renderer, 28, 28, 32, 255);
+        SDL_SetRenderDrawColor(renderer, probe::kBackground.r, probe::kBackground.g,
+                               probe::kBackground.b, 255);
         SDL_RenderClear(renderer);
-        if (v.target) fill_circle(renderer, v.x, v.y, v.r, SDL_Color{97, 207, 255, 255});
-        if (v.selftest)
-            SDL_SetRenderDrawColor(renderer, 255, 200, 40, 255);
-        else
-            SDL_SetRenderDrawColor(renderer, 97, 207, 255, 255);
-        const SDL_FRect bar{0, 0, v.progress * static_cast<float>(probe::kWidth), 6};
+        if (v.target)
+            fill_circle(renderer, v.x, v.y, v.r,
+                        SDL_Color{probe::kTarget.r, probe::kTarget.g, probe::kTarget.b, 255});
+        SDL_SetRenderDrawColor(renderer, v.bar.r, v.bar.g, v.bar.b, 255);
+        const SDL_FRect bar{0, 0, v.progress * static_cast<float>(probe::kWidth), v.bar_h};
         SDL_RenderFillRectF(renderer, &bar);
         const std::string title = session.take_title();
         if (!title.empty()) SDL_SetWindowTitle(window, title.c_str());

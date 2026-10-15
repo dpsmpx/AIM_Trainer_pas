@@ -34,8 +34,13 @@ void on_button(GLFWwindow* w, int button, int action, int) {
                      std::nullopt);
 }
 
+bool g_escape = false;
+
 void on_key(GLFWwindow* w, int key, int, int action, int) {
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) glfwSetWindowShouldClose(w, GLFW_TRUE);
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+        g_escape = true;
+        glfwSetWindowShouldClose(w, GLFW_TRUE);
+    }
 }
 
 void fill_circle(float cx, float cy, float r) {
@@ -77,23 +82,22 @@ int main() {
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
         glOrtho(0, probe::kWidth, probe::kHeight, 0, -1, 1);
-        glClearColor(28 / 255.0f, 28 / 255.0f, 32 / 255.0f, 1.0f);
+        glClearColor(probe::kBackground.r / 255.0f, probe::kBackground.g / 255.0f,
+                     probe::kBackground.b / 255.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         if (v.target) {
-            glColor3f(0.38f, 0.81f, 1.0f);
+            glColor3ub(probe::kTarget.r, probe::kTarget.g, probe::kTarget.b);
             fill_circle(v.x, v.y, v.r);
         }
-        if (v.selftest)
-            glColor3f(1.0f, 0.78f, 0.16f);
-        else
-            glColor3f(0.38f, 0.81f, 1.0f);
-        glRectf(0, 0, v.progress * static_cast<float>(probe::kWidth), 6);
+        glColor3ub(v.bar.r, v.bar.g, v.bar.b);
+        glRectf(0, 0, v.progress * static_cast<float>(probe::kWidth), v.bar_h);
         const std::string title = session.take_title();
         if (!title.empty()) glfwSetWindowTitle(window, title.c_str());
         const probe::Ns call = probe::now();
         glfwSwapBuffers(window);
         session.presented(call, probe::now());
     }
+    session.note(g_escape ? "выход: Esc" : "выход: окно закрыто");
     session.finish();
     g_session = nullptr;
     glfwDestroyWindow(window);

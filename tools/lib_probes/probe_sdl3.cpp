@@ -89,10 +89,14 @@ int main(int, char*[]) {
         while (SDL_PollEvent(&e)) {
             switch (e.type) {
                 case SDL_EVENT_QUIT:
+                    session.note("выход: окно закрыто");
                     running = false;
                     break;
                 case SDL_EVENT_KEY_DOWN:
-                    if (e.key.key == SDLK_ESCAPE) running = false;
+                    if (e.key.key == SDLK_ESCAPE) {
+                        session.note("выход: Esc");
+                        running = false;
+                    }
                     break;
                 case SDL_EVENT_MOUSE_MOTION:
                     cursor_x = std::clamp(cursor_x + e.motion.xrel, 0.0f,
@@ -111,7 +115,7 @@ int main(int, char*[]) {
                     const float x = e.button.x, y = e.button.y;
 #endif
                     session.click(to_probe_button(e.button.button), x, y, t,
-                                  probe::from_age(t, age));
+                                  probe::from_age(t, age), std::to_string(e.button.timestamp));
                     break;
                 }
                 default:
@@ -120,14 +124,15 @@ int main(int, char*[]) {
         }
 
         const probe::View v = session.frame();
-        SDL_SetRenderDrawColor(renderer, 28, 28, 32, 255);
+        SDL_SetRenderDrawColor(renderer, probe::kBackground.r, probe::kBackground.g,
+                               probe::kBackground.b, 255);
         SDL_RenderClear(renderer);
-        if (v.target) fill_circle(renderer, v.x, v.y, v.r, SDL_FColor{0.38f, 0.81f, 1.0f, 1.0f});
-        if (v.selftest)
-            SDL_SetRenderDrawColor(renderer, 255, 200, 40, 255);
-        else
-            SDL_SetRenderDrawColor(renderer, 97, 207, 255, 255);
-        const SDL_FRect bar{0, 0, v.progress * static_cast<float>(probe::kWidth), 6};
+        if (v.target)
+            fill_circle(renderer, v.x, v.y, v.r,
+                        SDL_FColor{probe::kTarget.r / 255.0f, probe::kTarget.g / 255.0f,
+                                   probe::kTarget.b / 255.0f, 1.0f});
+        SDL_SetRenderDrawColor(renderer, v.bar.r, v.bar.g, v.bar.b, 255);
+        const SDL_FRect bar{0, 0, v.progress * static_cast<float>(probe::kWidth), v.bar_h};
         SDL_RenderFillRect(renderer, &bar);
 #ifdef PROBE_SDL3_RAW
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);

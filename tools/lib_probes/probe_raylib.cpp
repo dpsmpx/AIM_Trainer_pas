@@ -30,7 +30,9 @@ int main() {
     probe::LibInfo info;
     info.name = "raylib";
     info.version = RAYLIB_VERSION;
-    info.renderer = "OpenGL (rlgl поверх GLFW)";
+    // В «показ кадра» у raylib входит весь EndDrawing: вывод пакета рисования,
+    // смена кадра и опрос ввода (src/rcore.c) — отдельной функции показа нет.
+    info.renderer = "OpenGL (rlgl поверх GLFW); показ = EndDrawing: отрисовка, смена кадра, опрос ввода";
     info.timestamp = "нет: IsMouseButtonPressed — состояние, обновлённое в EndDrawing прошлого кадра";
     probe::Session session(info, GetWindowHandle());
 
@@ -43,16 +45,19 @@ int main() {
 
         const probe::View v = session.frame();
         BeginDrawing();
-        ClearBackground(Color{28, 28, 32, 255});
-        if (v.target) DrawCircleV(Vector2{v.x, v.y}, v.r, Color{97, 207, 255, 255});
-        DrawRectangleV(Vector2{0, 0}, Vector2{v.progress * static_cast<float>(probe::kWidth), 6},
-                       v.selftest ? Color{255, 200, 40, 255} : Color{97, 207, 255, 255});
+        ClearBackground(Color{probe::kBackground.r, probe::kBackground.g, probe::kBackground.b, 255});
+        if (v.target)
+            DrawCircleV(Vector2{v.x, v.y}, v.r,
+                        Color{probe::kTarget.r, probe::kTarget.g, probe::kTarget.b, 255});
+        DrawRectangleV(Vector2{0, 0}, Vector2{v.progress * static_cast<float>(probe::kWidth), v.bar_h},
+                       Color{v.bar.r, v.bar.g, v.bar.b, 255});
         const std::string title = session.take_title();
         if (!title.empty()) SetWindowTitle(title.c_str());
         const probe::Ns call = probe::now();
         EndDrawing();  // показ кадра и опрос ввода
         session.presented(call, probe::now());
     }
+    session.note(IsKeyPressed(KEY_ESCAPE) ? "выход: Esc" : "выход: WindowShouldClose");
     session.finish();
     CloseWindow();
     return 0;

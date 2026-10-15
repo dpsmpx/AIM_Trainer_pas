@@ -54,9 +54,13 @@ int main() {
         while (const std::optional event = window.pollEvent()) {
             const probe::Ns t = probe::now();
             if (event->is<sf::Event::Closed>()) {
+                session.note("выход: окно закрыто");
                 running = false;
             } else if (const auto* key = event->getIf<sf::Event::KeyPressed>()) {
-                if (key->code == sf::Keyboard::Key::Escape) running = false;
+                if (key->code == sf::Keyboard::Key::Escape) {
+                    session.note("выход: Esc");
+                    running = false;
+                }
             } else if (const auto* mb = event->getIf<sf::Event::MouseButtonPressed>()) {
                 session.click(to_probe_button(mb->button), static_cast<float>(mb->position.x),
                               static_cast<float>(mb->position.y), t, std::nullopt);
@@ -68,17 +72,15 @@ int main() {
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
         glOrtho(0, probe::kWidth, probe::kHeight, 0, -1, 1);
-        glClearColor(28 / 255.0f, 28 / 255.0f, 32 / 255.0f, 1.0f);
+        glClearColor(probe::kBackground.r / 255.0f, probe::kBackground.g / 255.0f,
+                     probe::kBackground.b / 255.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         if (v.target) {
-            glColor3f(0.38f, 0.81f, 1.0f);
+            glColor3ub(probe::kTarget.r, probe::kTarget.g, probe::kTarget.b);
             fill_circle(v.x, v.y, v.r);
         }
-        if (v.selftest)
-            glColor3f(1.0f, 0.78f, 0.16f);
-        else
-            glColor3f(0.38f, 0.81f, 1.0f);
-        glRectf(0, 0, v.progress * static_cast<float>(probe::kWidth), 6);
+        glColor3ub(v.bar.r, v.bar.g, v.bar.b);
+        glRectf(0, 0, v.progress * static_cast<float>(probe::kWidth), v.bar_h);
         const std::string title = session.take_title();
         if (!title.empty()) window.setTitle(sf::String::fromUtf8(title.begin(), title.end()));
         const probe::Ns call = probe::now();

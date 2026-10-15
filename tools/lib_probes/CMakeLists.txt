@@ -45,7 +45,7 @@ function(add_probe name source title)
         $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic -Wshadow -Wconversion
                                   -Wsign-conversion -Werror>)
     target_link_options(probe_${name} PRIVATE -static)
-    target_link_libraries(probe_${name} PRIVATE dwmapi)
+    target_link_libraries(probe_${name} PRIVATE dwmapi winmm)
 endfunction()
 
 if(PROBE_LIB STREQUAL "SDL3")
