@@ -51,7 +51,7 @@ for lib in "${LIBS[@]}"; do
     echo "== $lib"
     cmake -S "$ROOT/tools/lib_probes" -B "$OUT/$lib" -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_TOOLCHAIN_FILE="$ROOT/tools/lib_probes/llvm-mingw.cmake" \
+        -DCMAKE_TOOLCHAIN_FILE="$ROOT/tools/cmake/llvm-mingw.cmake" \
         -DPROBE_LIB="$lib" "${args[@]}" >"$OUT-$lib-configure.log" 2>&1 ||
         { tail -30 "$OUT-$lib-configure.log"; exit 1; }
     cmake --build "$OUT/$lib" >"$OUT-$lib-build.log" 2>&1 ||
