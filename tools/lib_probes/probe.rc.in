@@ -1,0 +1,33 @@
+// Свойства EXE замерщика: какая библиотека внутри и из какой сборки
+// (tools/lib_probes/CMakeLists.txt, add_probe).
+#pragma code_page(65001)
+#include <winver.h>
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION 1,0,0,0
+PRODUCTVERSION 1,0,0,0
+FILEFLAGSMASK 0x3fL
+FILEFLAGS 0x0L
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "041904B0"
+        BEGIN
+            VALUE "FileDescription", "AIM Trainer: замерщик ввода, @PROBE_TITLE@"
+            VALUE "ProductName", "AIM Trainer — выбор библиотеки"
+            VALUE "OriginalFilename", "AimProbe_@PROBE_NAME@.exe"
+            VALUE "InternalName", "@PROBE_NAME@"
+            VALUE "FileVersion", "1.0"
+            VALUE "ProductVersion", "1.0"
+            VALUE "Comments", "Коммит @PROBE_REVISION@; исходники — github.com/dpsmpx/AIM_Trainer_pas, tools/lib_probes"
+            VALUE "LegalCopyright", "GNU GPL v3"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0419, 1200
+    END
+END

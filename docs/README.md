@@ -10,6 +10,7 @@
 | что не закончено, вопросы автору | [`TODO.md`](../TODO.md) |
 | как устроена программа: модули, экраны, время, ввод, цели, счёт, файлы | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | как проверить правку на Windows | [`MANUAL_CHECKS.md`](MANUAL_CHECKS.md) |
+| выбор библиотеки: замерщики ввода, как их прогнать и читать журналы | [`LIB_PROBES.md`](LIB_PROBES.md) |
 | зачем правила и откуда | [`PROCESS.md`](PROCESS.md) |
 | откуда код и на каком основании | [`PROVENANCE.md`](PROVENANCE.md) |
 | вехи истории | [`CHANGELOG.md`](CHANGELOG.md) |
