@@ -26,6 +26,9 @@ if(NOT PROBE_REVISION)
     set(PROBE_REVISION "неизвестно")
 endif()
 
+# Ресурс с описанием EXE — в UTF-8: llvm-windres сам кодовую страницу не узнаёт.
+string(APPEND CMAKE_RC_FLAGS " --codepage=65001")
+
 include(FetchContent)
 
 # Замерщик: свой код — со всеми предупреждениями как ошибками (D-19), всё

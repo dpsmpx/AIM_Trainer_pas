@@ -60,7 +60,7 @@ done
 
 rm -rf "$OUT/AimProbes"
 mkdir -p "$OUT/AimProbes"
-find "$OUT" -maxdepth 2 -name 'AimProbe_*.exe' -exec cp {} "$OUT/AimProbes/" \;
+find "$OUT" -mindepth 2 -maxdepth 2 -name 'AimProbe_*.exe' -not -path "$OUT/AimProbes/*" -exec cp {} "$OUT/AimProbes/" \;
 cp "$ROOT/docs/LIB_PROBES.md" "$OUT/AimProbes/README.md"
 (cd "$OUT" && rm -f AimProbes-win64.zip && cmake -E tar cf AimProbes-win64.zip --format=zip AimProbes)
 ls -l "$OUT/AimProbes"
