@@ -61,7 +61,10 @@ add_library(aim_core STATIC
     src/core/flow.cpp
     src/core/game.cpp
     src/core/history.cpp
+    src/core/layout.cpp
+    src/core/menu.cpp
     src/core/modes.cpp
+    src/core/particles.cpp
     src/core/profile.cpp
     src/core/profile_file.cpp
     src/core/random.cpp
@@ -82,11 +85,15 @@ aim_own_code(aim_platform)
 # Программа: окно и главный цикл. WIN32 — без окна консоли; WinMain даёт
 # SDL_main.h.
 add_executable(AimTrainer WIN32
-    src/app/draw.cpp
+    src/app/canvas.cpp
+    src/app/effects.cpp
+    src/app/game_view.cpp
     src/app/main.cpp
+    src/app/menu_view.cpp
     src/app/player_files.cpp
     src/app/screens.cpp
-    src/app/text.cpp)
+    src/app/text.cpp
+    src/app/toast.cpp)
 target_link_libraries(AimTrainer PRIVATE aim_platform SDL3_ttf::SDL3_ttf)
 aim_own_code(AimTrainer)
 # Шрифт — рядом с программой, в fonts/ (D-22, D-31).

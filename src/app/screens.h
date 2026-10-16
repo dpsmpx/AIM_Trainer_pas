@@ -1,40 +1,61 @@
 #pragma once
 
-// Временные экраны шага «Время и ввод»: в C++-версию уже можно играть и мерить
-// реакцию. Меню, панели, HUD и эффекты образца — шаг «Экраны».
+// Экраны программы: что показать и что сделать по событиям переходов
+// (core/flow.h) и меню (core/menu.h) — эффекты попадания, след курсора,
+// уведомления, запись профиля и истории (app/player_files.h), смена
+// профиля, «История». Рисуют app/menu_view.h и app/game_view.h на холсте
+// app/canvas.h.
 
 #include <SDL3/SDL.h>
 
-#include <optional>
 #include <string>
 
+#include "app/canvas.h"
+#include "app/effects.h"
+#include "app/menu_view.h"
+#include "app/player_files.h"
 #include "app/text.h"
+#include "app/toast.h"
 #include "core/flow.h"
+#include "core/menu.h"
 #include "core/profile.h"
+#include "core/random.h"
 
 namespace aim::app {
 
-/// Меню: четыре кнопки режимов на месте кнопок образца (BTNS_* в
-/// archive/pascal/AIM_Trainer.pas); щелчок ЛКМ по кнопке запускает режим.
-class TempMenu final : public core::MenuInput {
+class Screens {
 public:
-    std::optional<core::GameMode> click(const core::ClickInput& click) override;
-    void key(const core::KeyInput& /*key*/) override {}
+    Screens(SDL_Renderer* renderer, Text& text, core::Profile& profile, PlayerFiles& files,
+            core::Random& rng, core::Menu& menu);
 
-    /// Кнопка режима под точкой окна.
-    static std::optional<core::GameMode> button_at(core::Vec2 p);
-    static SDL_FRect button_rect(core::GameMode mode);
+    /// Программа запущена в момент now: меню появляется.
+    void start(core::Nanoseconds now);
+    /// Уведомление вверху окна.
+    void message(std::string text) { toasts_.push(std::move(text)); }
+
+    /// До ввода кадра: в меню режим под курсором — выбранный.
+    void before_input(const core::Flow& flow, core::Vec2 mouse, core::Nanoseconds now);
+    /// После Flow::update: события переходов и меню — эффекты, файлы,
+    /// уведомления; след курсора и частицы.
+    void after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds now);
+    /// Нарисовать текущий экран на момент now.
+    void render(const core::Flow& flow, core::Vec2 mouse, int fps, core::Nanoseconds now);
+
+private:
+    void save();
+    void open_history();
+    [[nodiscard]] const core::Theme& theme() const;
+
+    Canvas canvas_;
+    core::Profile& profile_;
+    PlayerFiles& files_;
+    core::Random& rng_;
+    core::Menu& menu_;
+    MenuView menu_view_;
+    Effects effects_;
+    CursorTrail trail_;
+    Toasts toasts_;
+    HistoryView history_;
 };
-
-/// То, что кадр показывает сверх состояния игры.
-struct Overlay {
-    int fps = 0;
-    int profile = 1;  ///< номер профиля игрока
-    std::string toast;  ///< уведомление (достижение, ошибка файла), пусто — нет
-};
-
-/// Нарисовать текущий экран на момент now.
-void render(SDL_Renderer* renderer, Text& text, const core::Flow& flow,
-            const core::Profile& profile, core::Nanoseconds now, const Overlay& overlay);
 
 }  // namespace aim::app

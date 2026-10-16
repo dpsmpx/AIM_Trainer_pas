@@ -32,6 +32,10 @@ public:
     bool save(const core::Profile& profile, std::string& error);
     /// Дописать забег в историю (заголовок — если файла ещё нет).
     bool log_run(const core::GameSummary& summary, std::string& error);
+    /// История профиля целиком; нет файла — пусто.
+    [[nodiscard]] std::optional<std::string> read_history() const;
+    /// Имя файла истории профиля.
+    [[nodiscard]] std::string history_file_name() const;
 
     [[nodiscard]] int profile_number() const { return number_; }
     [[nodiscard]] bool available() const { return storage_.has_value(); }

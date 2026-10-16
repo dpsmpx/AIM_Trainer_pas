@@ -12,7 +12,9 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include "core/palette.h"
 
@@ -39,25 +41,40 @@ public:
     Text(const Text&) = delete;
     Text& operator=(const Text&) = delete;
 
-    /// Строка с левым верхним углом в (x, y) — TextOut.
+    /// Строка с левым верхним углом в (x, y).
     void out(float x, float y, std::string_view s, Font font, core::Rgba color);
-    /// По центру прямоугольника — DrawTextCentered(x, y, x1, y1).
-    void centered(const SDL_FRect& box, std::string_view s, Font font, core::Rgba color);
-    /// Ширина строки, px — TextWidth: округлённая ширина и ещё 1.
+    /// Ширина строки, px — TextWidth: ширина и ещё 1.
     int width(std::string_view s, Font font);
+    /// Ширина строки, px, — как MeasureString.
+    int measure(std::string_view s, Font font);
     /// Высота строки шрифта, px.
     int height(Font font);
+    /// Кадр показан: давно не рисованные надписи — из кэша.
+    void end_frame();
+    /// Строки текста по ширине max_width: перевод строки — новая строка,
+    /// перенос — по пробелам, слово длиннее строки — по знакам, как DrawString
+    /// в прямоугольнике. Пробелы на концах строк отброшены.
+    std::vector<std::string> wrap(std::string_view s, Font font, int max_width);
 
 private:
-    Text(SDL_Renderer* renderer, TTF_TextEngine* engine, std::string dir);
+    Text(TTF_TextEngine* engine, std::string dir);
     TTF_Font* font(Font font);
+    /// Продвижение знака, px, с дробью.
+    double advance(Font font);
     /// Нарисовать строку: левый верхний угол (x, y).
-    void draw(float x, float y, std::string_view s, TTF_Font* f, core::Rgba color);
+    void draw(float x, float y, std::string_view s, Font font, core::Rgba color);
 
-    SDL_Renderer* renderer_;
+    struct Cached {
+        TTF_Text* text = nullptr;
+        std::uint64_t frame = 0;  ///< кадр, в котором надпись рисовалась последней
+    };
+
     TTF_TextEngine* engine_;
     std::string dir_;
     std::map<std::pair<int, Weight>, TTF_Font*> fonts_;
+    std::map<std::pair<int, Weight>, double> advances_;
+    std::unordered_map<std::string, Cached> cache_;
+    std::uint64_t frame_ = 0;
 };
 
 }  // namespace aim::app

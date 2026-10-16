@@ -99,6 +99,15 @@ bool PlayerFiles::remember(std::string& error) {
     return true;
 }
 
+std::optional<std::string> PlayerFiles::read_history() const {
+    if (!storage_) return std::nullopt;
+    return storage_->read(core::sessions_file_name(number_));
+}
+
+std::string PlayerFiles::history_file_name() const {
+    return core::sessions_file_name(number_);
+}
+
 bool PlayerFiles::log_run(const core::GameSummary& summary, std::string& error) {
     if (!storage_) {
         error = "no player folder";

@@ -22,6 +22,8 @@ add_executable(aim_core_tests
     core/click_time_test.cpp
     core/flow_test.cpp
     core/game_test.cpp
+    core/menu_test.cpp
+    core/particles_test.cpp
     core/profile_file_test.cpp
     core/profile_test.cpp
     core/random_test.cpp
@@ -51,16 +53,20 @@ gtest_discover_tests(aim_app_tests DISCOVERY_MODE PRE_TEST
 # снимка — отдельный тест после неё. Драйвер offscreen есть в любой сборке
 # SDL3 и не требует X-сервера. Рендер — программный, кадровый буфер — без
 # ускорения: иначе SDL поднимает EGL и Mesa, а их утечки LeakSanitizer
-# приписывает программе (так же у TrueJointTileMaker).
+# приписывает программе (так же у TrueJointTileMaker). Папка игрока — своя
+# и пустая (D-30): первый запуск, туториал.
 set(_aim_frame "${CMAKE_CURRENT_BINARY_DIR}/app_frame.bmp")
+add_test(NAME app_data_reset COMMAND "${CMAKE_COMMAND}" -E rm -rf "${CMAKE_CURRENT_BINARY_DIR}/app_data")
+set_tests_properties(app_data_reset PROPERTIES FIXTURES_SETUP app_data)
 add_test(NAME app_offscreen_frames
          COMMAND AimTrainer --frames 3 --screenshot "${_aim_frame}")
 set_tests_properties(app_offscreen_frames PROPERTIES
-    ENVIRONMENT "SDL_VIDEODRIVER=offscreen;SDL_RENDER_DRIVER=software;SDL_FRAMEBUFFER_ACCELERATION=0"
+    ENVIRONMENT "SDL_VIDEODRIVER=offscreen;SDL_RENDER_DRIVER=software;SDL_FRAMEBUFFER_ACCELERATION=0;AIM_TRAINER_DATA_DIR=app_data"
+    FIXTURES_REQUIRED app_data
     FIXTURES_SETUP app_frame)
 
 add_executable(aim_frame_check app/frame_check.cpp)
 target_link_libraries(aim_frame_check PRIVATE aim_core SDL3::SDL3)
 aim_own_code(aim_frame_check)
-add_test(NAME app_frame_is_background COMMAND aim_frame_check "${_aim_frame}")
-set_tests_properties(app_frame_is_background PROPERTIES FIXTURES_REQUIRED app_frame)
+add_test(NAME app_frame_shows_tutorial COMMAND aim_frame_check "${_aim_frame}")
+set_tests_properties(app_frame_shows_tutorial PROPERTIES FIXTURES_REQUIRED app_frame)

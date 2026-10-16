@@ -1,9 +1,9 @@
 // Aim Trainer, C++-версия (D-08, D-25): окно 800×600 (D-02) и главный цикл.
 // Шаг «Время и ввод»: часы кадра — SDL_GetTicksNS; щелчок — точка из события
 // SDL и время из своего потока сырого ввода (D-24); клавиши — события, по
-// физическому положению; реакция — от показа кадра с целью (D-12). Экраны
-// пока временные (app/screens.h). Профиль и история — в папке игрока (D-11,
-// D-30; app/player_files.h).
+// физическому положению; реакция — от показа кадра с целью (D-12). Экраны —
+// app/screens.h; профиль и история — в папке игрока (D-11, D-30;
+// app/player_files.h).
 //
 //   AimTrainer [--frames N] [--screenshot файл.bmp]
 //
@@ -15,9 +15,7 @@
 
 #include <algorithm>
 #include <charconv>
-#include <cstddef>
 #include <cstdint>
-#include <deque>
 #include <format>
 #include <memory>
 #include <optional>
@@ -25,7 +23,6 @@
 #include <string_view>
 #include <system_error>
 #include <utility>
-#include <variant>
 #include <vector>
 
 #include "app/player_files.h"
@@ -33,6 +30,7 @@
 #include "app/text.h"
 #include "core/click_time.h"
 #include "core/flow.h"
+#include "core/menu.h"
 #include "core/profile.h"
 #include "core/random.h"
 #include "core/screen.h"
@@ -56,8 +54,6 @@ constexpr Nanoseconds kRawWaitNs = 2'000'000;
 // Предел частоты кадров — как у образца (TARGET_FPS = 240, LimitFrameRate):
 // цикл не жжёт ядро впустую, а кадр короче, чем у любого монитора.
 constexpr Nanoseconds kMinFrame = 1'000'000'000 / 240;
-// Уведомление — 3 с, как у образца; несколько — по очереди.
-constexpr Nanoseconds kToastTime = 3'000'000'000;
 
 struct Options {
     int frames = 0;  // 0 — до закрытия окна
@@ -208,7 +204,6 @@ int main(int argc, char* argv[]) {
         SDL_SetWindowTitle(window,
                            std::format("{} — C++: сырой ввод мыши {}", kTitle, raw_state).c_str());
 
-        std::deque<std::string> toasts;
         std::string problem;
         std::optional<aim::platform::Storage> storage =
             aim::platform::Storage::open_user_folder(problem);
@@ -216,15 +211,15 @@ int main(int argc, char* argv[]) {
         aim::app::PlayerFiles files(std::move(storage), problem);
         std::vector<std::string> messages;
         aim::core::Profile profile = files.load(messages);
-        toasts.insert(toasts.end(), messages.begin(), messages.end());
-        const auto save = [&] {
-            std::string error;
-            if (!files.save(profile, error)) toasts.push_back("Профиль не записан: " + error);
-        };
 
         aim::core::EngineRandom rng(SDL_GetPerformanceCounter());
-        aim::app::TempMenu menu;
+        // Туториал — при запуске, если профиль его ещё не видел (как образец).
+        aim::core::Menu menu(profile, files.profile_number(), !profile.tutorial_seen);
         aim::core::Flow flow(profile, rng, menu);
+        aim::app::Screens screens(renderer, *text, profile, files, rng, menu);
+        screens.start(SDL_GetTicksNS());
+        for (std::string& m : messages)
+            screens.message(std::move(m));
 
         ClickTimer clicks;
         std::vector<aim::core::RawPress> fresh;
@@ -250,9 +245,6 @@ int main(int argc, char* argv[]) {
         };
 
         FpsCounter fps;
-        aim::app::Overlay overlay;
-        overlay.profile = files.profile_number();
-        Nanoseconds toast_until = 0;
         std::vector<aim::core::Input> inputs;
         bool running = true;
         int frame = 0;
@@ -300,33 +292,12 @@ int main(int argc, char* argv[]) {
             float mx = 0;
             float my = 0;
             SDL_GetMouseState(&mx, &my);
+            const aim::core::Vec2 mouse{mx, my};
+            screens.before_input(flow, mouse, now);
             flow.input(inputs, now);
-            flow.update(now, {mx, my});
-            for (const aim::core::FlowEvent& e : flow.take_events()) {
-                if (const auto* a = std::get_if<aim::core::AchievementUnlocked>(&e)) {
-                    toasts.push_back(
-                        std::format("Достижение: {}",
-                                    aim::core::kAchievements.at(static_cast<std::size_t>(a->id)).name));
-                    // Как образец: достижение записывается сразу.
-                    save();
-                } else if (const auto* run = std::get_if<aim::core::RunFinished>(&e)) {
-                    std::string error;
-                    if (!files.log_run(run->summary, error))
-                        toasts.push_back("Забег не записан в историю: " + error);
-                    save();
-                }
-            }
-            if (now >= toast_until) {
-                overlay.toast.clear();
-                if (!toasts.empty()) {
-                    overlay.toast = std::move(toasts.front());
-                    toasts.pop_front();
-                    toast_until = now + kToastTime;
-                }
-            }
-            overlay.fps = fps.fps();
-
-            aim::app::render(renderer, *text, flow, profile, now, overlay);
+            flow.update(now, mouse);
+            screens.after_update(flow, mouse, now);
+            screens.render(flow, mouse, fps.fps(), now);
             ++frame;
             const bool last = options->frames > 0 && frame >= options->frames;
             if (last && !options->screenshot.empty() &&
@@ -335,6 +306,7 @@ int main(int argc, char* argv[]) {
                 status = 1;
             }
             SDL_RenderPresent(renderer);
+            text->end_frame();
             // Кадр нарисован на момент now и показан сейчас: отсюда реакция (D-12).
             flow.frame_presented(now, SDL_GetTicksNS());
             fps.frame(now);
