@@ -1,13 +1,14 @@
 #pragma once
 
 // Временные экраны шага «Время и ввод»: в C++-версию уже можно играть и мерить
-// реакцию. Меню, панели, HUD, эффекты и шрифт образца — шаг «Экраны».
+// реакцию. Меню, панели, HUD и эффекты образца — шаг «Экраны».
 
 #include <SDL3/SDL.h>
 
 #include <optional>
 #include <string>
 
+#include "app/text.h"
 #include "core/flow.h"
 #include "core/profile.h"
 
@@ -33,7 +34,7 @@ struct Overlay {
 };
 
 /// Нарисовать текущий экран на момент now.
-void render(SDL_Renderer* renderer, const core::Flow& flow, const core::Profile& profile,
-            core::Nanoseconds now, const Overlay& overlay);
+void render(SDL_Renderer* renderer, Text& text, const core::Flow& flow,
+            const core::Profile& profile, core::Nanoseconds now, const Overlay& overlay);
 
 }  // namespace aim::app

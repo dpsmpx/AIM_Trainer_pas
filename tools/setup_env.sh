@@ -13,12 +13,13 @@
 #      экрана; Wine — тесты Windows-сборки; Mono 6.8 с WinForms, libgdiplus,
 #      .NET SDK 10 и ImageMagick — эталон и его снимки.
 #   2. Набор llvm-mingw 20261006 (D-17) — кросс-сборка под Windows.
-#   3. Архив SDL 3.4.18 (D-18) — чтобы каждый пресет не качал его заново.
+#   3. Архивы SDL 3.4.18 (D-18), SDL3_ttf 3.2.2, FreeType 2.15.0 и шрифта
+#      DejaVu 2.37 (D-31) — чтобы каждый пресет не качал их заново.
 #   4. Эталон (D-26): компилятор PascalABC.NET из исходников на закреплённом
 #      коммите с заплаткой для Mono 6.8 и его стандартные модули (GraphABC).
 #      Сбой здесь установку не валит: C++-версии эталон не нужен.
 #
-# Оба архива сверяются по SHA-256 из решений; несовпадение — остановка.
+# Архивы сверяются по SHA-256 из решений; несовпадение — остановка.
 # Куда: $AIM_TOOLS_DIR, по умолчанию ~/.local/share/aim-trainer-tools; там же
 # env.sh с путями — его подключают tools/check_cpp.sh, tools/gui.sh и хук.
 # Повторный запуск ничего не качает и не собирает, если всё на месте.
@@ -34,6 +35,16 @@ LLVM_MINGW_SHA256="5f9c6ed95b2d4bdb2869a488c5fd5857fbdabcf288a0aa3eb1da43f6a08d8
 SDL3_ARCHIVE="SDL3-3.4.18.tar.gz"
 SDL3_URL="https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/$SDL3_ARCHIVE"
 SDL3_SHA256="9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3"
+# Текст (D-31) — суммы те же, что в tools/cmake/dependencies.cmake.
+SDL3_TTF_ARCHIVE="SDL3_ttf-3.2.2.tar.gz"
+SDL3_TTF_URL="https://github.com/libsdl-org/SDL_ttf/releases/download/release-3.2.2/$SDL3_TTF_ARCHIVE"
+SDL3_TTF_SHA256="63547d58d0185c833213885b635a2c0548201cc8f301e6587c0be1a67e1e045d"
+FREETYPE_ARCHIVE="freetype-2.15.0.tar.xz"
+FREETYPE_URL="https://download.savannah.gnu.org/releases/freetype/$FREETYPE_ARCHIVE"
+FREETYPE_SHA256="93cd47eb719c325107f2d3cf087d06299e944c3b48a40b55537302304dea1dd5"
+DEJAVU_ARCHIVE="dejavu-fonts-ttf-2.37.tar.bz2"
+DEJAVU_URL="https://github.com/dejavu-fonts/dejavu-fonts/releases/download/version_2_37/$DEJAVU_ARCHIVE"
+DEJAVU_SHA256="fa9ca4d13871dd122f61258a80d01751d603b4d3ee14095d65453b4e846e17d7"
 
 # Эталон (D-26): PascalABC.NET 4.0.0.3882. Заплатка проверена на этом коммите,
 # более свежий может с ней разойтись.
@@ -181,6 +192,9 @@ mkdir -p "$TOOLS_DIR" "$DEPS_DIR"
 [ "$SKIP_APT" -eq 1 ] || install_packages
 install_llvm_mingw
 fetch "$SDL3_URL" "$DEPS_DIR/$SDL3_ARCHIVE" "$SDL3_SHA256"
+fetch "$SDL3_TTF_URL" "$DEPS_DIR/$SDL3_TTF_ARCHIVE" "$SDL3_TTF_SHA256"
+fetch "$FREETYPE_URL" "$DEPS_DIR/$FREETYPE_ARCHIVE" "$FREETYPE_SHA256"
+fetch "$DEJAVU_URL" "$DEPS_DIR/$DEJAVU_ARCHIVE" "$DEJAVU_SHA256"
 write_env
 if [ "$SKIP_REF" -eq 0 ] && ! build_pabcnet; then
     log "эталон не собран — tools/gui.sh ref не заработает; C++-версии он не нужен"

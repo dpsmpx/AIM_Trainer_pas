@@ -15,9 +15,11 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <format>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -28,6 +30,7 @@
 
 #include "app/player_files.h"
 #include "app/screens.h"
+#include "app/text.h"
 #include "core/click_time.h"
 #include "core/flow.h"
 #include "core/profile.h"
@@ -182,6 +185,17 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    std::string font_problem;
+    std::unique_ptr<aim::app::Text> text = aim::app::Text::open(renderer, font_problem);
+    if (!text) {
+        // Без шрифта программе нечего показать (D-31): сказать и выйти.
+        SDL_Log("%s", font_problem.c_str());
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, kTitle, font_problem.c_str(), window);
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
 
     int status = 0;
     {
@@ -205,7 +219,7 @@ int main(int argc, char* argv[]) {
         toasts.insert(toasts.end(), messages.begin(), messages.end());
         const auto save = [&] {
             std::string error;
-            if (!files.save(profile, error)) toasts.push_back("Profile not saved: " + error);
+            if (!files.save(profile, error)) toasts.push_back("Профиль не записан: " + error);
         };
 
         aim::core::EngineRandom rng(SDL_GetPerformanceCounter());
@@ -290,14 +304,15 @@ int main(int argc, char* argv[]) {
             flow.update(now, {mx, my});
             for (const aim::core::FlowEvent& e : flow.take_events()) {
                 if (const auto* a = std::get_if<aim::core::AchievementUnlocked>(&e)) {
-                    toasts.push_back(std::format("Achievement unlocked: {} of {}", a->id + 1,
-                                                 aim::core::kAchievementCount));
+                    toasts.push_back(
+                        std::format("Достижение: {}",
+                                    aim::core::kAchievements.at(static_cast<std::size_t>(a->id)).name));
                     // Как образец: достижение записывается сразу.
                     save();
                 } else if (const auto* run = std::get_if<aim::core::RunFinished>(&e)) {
                     std::string error;
                     if (!files.log_run(run->summary, error))
-                        toasts.push_back("Game not added to history: " + error);
+                        toasts.push_back("Забег не записан в историю: " + error);
                     save();
                 }
             }
@@ -311,7 +326,7 @@ int main(int argc, char* argv[]) {
             }
             overlay.fps = fps.fps();
 
-            aim::app::render(renderer, flow, profile, now, overlay);
+            aim::app::render(renderer, *text, flow, profile, now, overlay);
             ++frame;
             const bool last = options->frames > 0 && frame >= options->frames;
             if (last && !options->screenshot.empty() &&
@@ -330,6 +345,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    text.reset();  // знаки шрифта — текстуры рендера: раньше него
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();

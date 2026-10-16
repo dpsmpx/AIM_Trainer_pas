@@ -85,9 +85,16 @@ add_executable(AimTrainer WIN32
     src/app/draw.cpp
     src/app/main.cpp
     src/app/player_files.cpp
-    src/app/screens.cpp)
-target_link_libraries(AimTrainer PRIVATE aim_platform)
+    src/app/screens.cpp
+    src/app/text.cpp)
+target_link_libraries(AimTrainer PRIVATE aim_platform SDL3_ttf::SDL3_ttf)
 aim_own_code(AimTrainer)
+# Шрифт — рядом с программой, в fonts/ (D-22, D-31).
+add_custom_command(TARGET AimTrainer POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:AimTrainer>/fonts"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different ${AIM_FONT_FILES}
+            "$<TARGET_FILE_DIR:AimTrainer>/fonts"
+    VERBATIM)
 
 if(BUILD_TESTING)
     add_subdirectory(tests)

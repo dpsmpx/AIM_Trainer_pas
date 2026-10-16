@@ -13,7 +13,6 @@ namespace {
 
 constexpr int kSegments = 64;
 constexpr auto kSegmentCount = static_cast<std::size_t>(kSegments);
-constexpr float kGlyph = 8.0F;  // SDL_DEBUG_TEXT_FONT_CHARACTER_SIZE
 
 SDL_FColor to_fcolor(core::Rgba c) {
     return {static_cast<float>(c.r) / 255.0F, static_cast<float>(c.g) / 255.0F,
@@ -97,24 +96,6 @@ void thick_line(SDL_Renderer* renderer, float x1, float y1, float x2, float y2, 
                                               {{x2 - nx, y2 - ny}, fc, {0, 0}}}};
     const std::array<int, 6> indices{0, 1, 2, 2, 1, 3};
     SDL_RenderGeometry(renderer, nullptr, vertices.data(), 4, indices.data(), 6);
-}
-
-float text_width(std::string_view text, float scale) {
-    return static_cast<float>(text.size()) * kGlyph * scale;
-}
-
-void text(SDL_Renderer* renderer, float x, float y, std::string_view line, float scale,
-          core::Rgba color) {
-    set_color(renderer, color);
-    const std::string copy(line);
-    SDL_SetRenderScale(renderer, scale, scale);
-    SDL_RenderDebugText(renderer, x / scale, y / scale, copy.c_str());
-    SDL_SetRenderScale(renderer, 1.0F, 1.0F);
-}
-
-void text_centered(SDL_Renderer* renderer, float center_x, float y, std::string_view line,
-                   float scale, core::Rgba color) {
-    text(renderer, center_x - text_width(line, scale) / 2.0F, y, line, scale, color);
 }
 
 }  // namespace aim::app

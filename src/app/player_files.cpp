@@ -43,12 +43,12 @@ core::Profile PlayerFiles::load(std::vector<std::string>& messages) {
 core::Profile PlayerFiles::open(int number, std::vector<std::string>& messages) {
     if (number >= 1 && number <= core::kProfileCount) number_ = number;
     if (!storage_) {
-        messages.push_back("No player folder, profile is not saved: " + problem_);
+        messages.push_back("Нет папки игрока, профиль не сохраняется: " + problem_);
         return {};
     }
     std::string error;
     const auto save_or_say = [&](const core::Profile& profile) {
-        if (!save(profile, error)) messages.push_back("Profile not saved: " + error);
+        if (!save(profile, error)) messages.push_back("Профиль не записан: " + error);
     };
 
     const std::optional<std::string> text = storage_->read(core::stats_file_name(number_));
@@ -62,16 +62,16 @@ core::Profile PlayerFiles::open(int number, std::vector<std::string>& messages) 
     if (loaded.corrupt) {
         // Как образец: копия повреждённого файла и всё по умолчанию.
         if (!storage_->write(core::corrupt_backup_file_name(number_), *text, error))
-            messages.push_back("Copy of damaged profile not saved: " + error);
+            messages.push_back("Копия повреждённого профиля не записана: " + error);
         messages.push_back(
-            std::format("Profile {} was damaged: reset to defaults, copy kept", number_));
+            std::format("Профиль {} повреждён: сброшен, копия сохранена", number_));
         save_or_say(loaded.profile);
     } else if (!loaded.reset_fields.empty()) {
-        messages.push_back(std::format("Profile {}: {} bad values reset to defaults", number_,
+        messages.push_back(std::format("Профиль {}: неверных значений сброшено — {}", number_,
                                        loaded.reset_fields.size()));
         save_or_say(loaded.profile);
     } else if (number_ != remembered_) {
-        if (!remember(error)) messages.push_back("Last profile not saved: " + error);
+        if (!remember(error)) messages.push_back("Номер профиля не записан: " + error);
     }
     return loaded.profile;
 }

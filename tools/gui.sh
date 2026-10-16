@@ -36,8 +36,10 @@ PABCNET_DIR="${PABCNET_DIR:-$TOOLS_DIR/pascalabcnet}"
 REF_DIR="$ROOT/build/ref"
 PORT_BIN="$ROOT/build/linux-gcc/AimTrainer"
 TITLE="Aim Trainer"
-PLAYER_FILES=(profile*_stats.ini profile*_sessions.csv profile*_corrupt_backup.txt
-              export_profile*.csv)
+# Шаблоны файлов игрока — для find -name: раскрывать их здесь, в текущем
+# каталоге, нельзя.
+PLAYER_FILES=('profile*_stats.ini' 'profile*_sessions.csv' 'profile*_corrupt_backup.txt'
+              'export_profile*.csv' 'aim_trainer.ini')
 
 die() { echo "gui.sh: $*" >&2; exit 1; }
 
@@ -139,8 +141,10 @@ cmd_clean() {
     local dir
     dir="$(player_dir)"
     [ -d "$dir" ] || return 0
-    # У C++-версии ещё aim_trainer.ini — номер последнего профиля (D-30).
-    (cd "$dir" && rm -f "${PLAYER_FILES[@]}" aim_trainer.ini)
+    # aim_trainer.ini — номер последнего профиля у C++-версии (D-30).
+    local args=() p
+    for p in "${PLAYER_FILES[@]}"; do args+=(-o -name "$p"); done
+    find "$dir" -maxdepth 1 -type f \( "${args[@]:1}" \) -delete
 }
 
 cmd_shot() {
