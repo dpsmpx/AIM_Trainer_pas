@@ -1,14 +1,15 @@
-// Aim Trainer, C++-версия (D-08, D-25): окно 800×600 (D-02) и главный цикл.
-// Шаг «Время и ввод»: часы кадра — SDL_GetTicksNS; щелчок — точка из события
-// SDL и время из своего потока сырого ввода (D-24); клавиши — события, по
-// физическому положению; реакция — от показа кадра с целью (D-12). Экраны —
-// app/screens.h; профиль и история — в папке игрока (D-11, D-30;
-// app/player_files.h).
+// DP AIM Trainer (D-08, D-25): окно и главный цикл. Окно — логические
+// 800×600, умноженные на масштаб монитора при запуске (D-42); кадр — с
+// частотой монитора (D-41); часы кадра — SDL_GetTicksNS; щелчок — точка из
+// события SDL и время из своего потока сырого ввода (D-24); клавиши —
+// события, по физическому положению; реакция — от показа кадра со стимулом
+// (D-12). Экраны — app/screens.h; файлы игрока — app/player_files.h.
 //
-//   AimTrainer [--frames N] [--screenshot файл.bmp]
+//   AimTrainer [--frames N] [--screenshot файл.bmp] [--debug-title]
 //
 // --frames N — выйти после N кадров; --screenshot — записать последний кадр в
-// BMP. Оба — для проверки без экрана (tests/CMakeLists.txt).
+// BMP. Оба — для проверки без экрана (tests/CMakeLists.txt). --debug-title —
+// в заголовке окна откуда взято время щелчка (сценарий 21, D-24).
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
@@ -46,19 +47,19 @@ using aim::core::ClickTimeSource;
 using aim::core::MouseButton;
 using aim::core::Nanoseconds;
 
-constexpr const char* kTitle = "Aim Trainer";
+constexpr const char* kTitle = "DP AIM Trainer";
 // Сырое нажатие и событие SDL приходят в разные потоки одновременно, и
 // изредка событие разбирается раньше, чем поток сырого ввода поставил метку
 // (под Wine — 2 клика из 300, метка позже на 0,1–0,9 мс). Тогда сырое нажатие
 // ждём, но не дольше этого и пока оно ещё может попасть в окно сопоставления.
 constexpr Nanoseconds kRawWaitNs = 2'000'000;
-// Предел частоты кадров — как у образца (TARGET_FPS = 240, LimitFrameRate):
-// цикл не жжёт ядро впустую, а кадр короче, чем у любого монитора.
-constexpr Nanoseconds kMinFrame = 1'000'000'000 / 240;
+// Частота монитора неизвестна — кадр как у монитора 60 Гц (D-41).
+constexpr float kFallbackRefreshHz = 60.0F;
 
 struct Options {
     int frames = 0;  // 0 — до закрытия окна
     std::string screenshot;
+    bool debug_title = false;
 };
 
 std::optional<Options> parse_options(int argc, char* argv[]) {
@@ -74,6 +75,8 @@ std::optional<Options> parse_options(int argc, char* argv[]) {
             }
         } else if (arg == "--screenshot" && i + 1 < argc) {
             options.screenshot = argv[++i];
+        } else if (arg == "--debug-title") {
+            options.debug_title = true;
         } else {
             return std::nullopt;
         }
@@ -132,6 +135,28 @@ std::string describe_click(MouseButton button, float x, float y, Nanoseconds eve
                               event_earlier ? "раньше" : "позже", to_ms(gap));
 }
 
+// Масштаб монитора для окна при запуске (D-42): масштаб главного монитора,
+// но окно не больше рабочей области; меньше 1 — не уменьшать.
+float startup_scale() {
+    const SDL_DisplayID display = SDL_GetPrimaryDisplay();
+    float scale = SDL_GetDisplayContentScale(display);
+    if (!(scale > 0.0F)) scale = 1.0F;
+    SDL_Rect usable{};
+    if (SDL_GetDisplayUsableBounds(display, &usable) && usable.w > 0 && usable.h > 0) {
+        const float fit_w = 0.95F * static_cast<float>(usable.w) / aim::core::kWindowWidth;
+        const float fit_h = 0.90F * static_cast<float>(usable.h) / aim::core::kWindowHeight;
+        scale = std::min({scale, fit_w, fit_h});
+    }
+    return std::max(scale, 1.0F);
+}
+
+// Период кадра — частота монитора, на котором окно (D-41).
+Nanoseconds frame_period(SDL_Window* window, float& hz) {
+    const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window));
+    hz = mode != nullptr && mode->refresh_rate > 0.0F ? mode->refresh_rate : kFallbackRefreshHz;
+    return static_cast<Nanoseconds>(1e9 / static_cast<double>(hz));
+}
+
 bool save_screenshot(SDL_Renderer* renderer, const std::string& path) {
     SDL_Surface* frame = SDL_RenderReadPixels(renderer, nullptr);
     if (frame == nullptr) return false;
@@ -174,13 +199,19 @@ int main(int argc, char* argv[]) {
     }
     SDL_Window* window = nullptr;
     SDL_Renderer* renderer = nullptr;
-    if (!SDL_CreateWindowAndRenderer(kTitle, aim::core::kWindowWidth, aim::core::kWindowHeight, 0,
-                                     &window, &renderer)) {
+    const float scale = startup_scale();
+    const auto scaled = [&](int v) {
+        return static_cast<int>(std::lround(static_cast<float>(v) * scale));
+    };
+    if (!SDL_CreateWindowAndRenderer(kTitle, scaled(aim::core::kWindowWidth),
+                                     scaled(aim::core::kWindowHeight), 0, &window, &renderer)) {
         SDL_Log("SDL_CreateWindowAndRenderer: %s", SDL_GetError());
         SDL_Quit();
         return 1;
     }
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+    // Рисуется логическое 800×600; масштаб — у рендера, у текста — свой.
+    SDL_SetRenderScale(renderer, scale, scale);
     std::string font_problem;
     std::unique_ptr<aim::app::Text> text = aim::app::Text::open(renderer, font_problem);
     if (!text) {
@@ -192,17 +223,21 @@ int main(int argc, char* argv[]) {
         SDL_Quit();
         return 1;
     }
+    text->set_scale(scale);
 
     int status = 0;
     {
         aim::platform::RawMouse raw_mouse;
         const std::string raw_state = raw_mouse.active() ? "есть" : "нет — " + raw_mouse.problem();
-        SDL_Log("SDL %d.%d.%d, рендер %s; сырой ввод мыши: %s",
+        float hz = 0;
+        Nanoseconds period = frame_period(window, hz);
+        SDL_Log("SDL %d.%d.%d, рендер %s; сырой ввод мыши: %s; масштаб %.2f; монитор %.1f Гц",
                 SDL_VERSIONNUM_MAJOR(SDL_GetVersion()), SDL_VERSIONNUM_MINOR(SDL_GetVersion()),
                 SDL_VERSIONNUM_MICRO(SDL_GetVersion()), SDL_GetRendererName(renderer),
-                raw_state.c_str());
-        SDL_SetWindowTitle(window,
-                           std::format("{} — C++: сырой ввод мыши {}", kTitle, raw_state).c_str());
+                raw_state.c_str(), static_cast<double>(scale), static_cast<double>(hz));
+        if (options->debug_title)
+            SDL_SetWindowTitle(
+                window, std::format("{} — C++: сырой ввод мыши {}", kTitle, raw_state).c_str());
 
         std::string problem;
         std::optional<aim::platform::Storage> storage =
@@ -251,13 +286,19 @@ int main(int argc, char* argv[]) {
         std::vector<aim::core::Input> inputs;
         bool running = true;
         int frame = 0;
+        Nanoseconds next_frame = SDL_GetTicksNS();
         while (running) {
-            const Nanoseconds frame_start = SDL_GetTicksNS();
             inputs.clear();
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
                 switch (event.type) {
                     case SDL_EVENT_QUIT: running = false; break;
+                    case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
+                    case SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED:
+                        // Другой монитор или режим — другая частота (D-41).
+                        period = frame_period(window, hz);
+                        SDL_Log("монитор %.1f Гц", static_cast<double>(hz));
+                        break;
                     case SDL_EVENT_KEY_DOWN: {
                         if (event.key.repeat) break;
                         if (const auto key = to_key(event.key.scancode))
@@ -266,6 +307,8 @@ int main(int argc, char* argv[]) {
                         break;
                     }
                     case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+                        // Точка — в логических 800×600 (D-42).
+                        SDL_ConvertEventToRenderCoordinates(renderer, &event);
                         const std::optional<MouseButton> button = to_button(event.button.button);
                         if (!button) break;
                         // Касание и перо приходят как мышь, но сырого нажатия мыши
@@ -275,10 +318,11 @@ int main(int argc, char* argv[]) {
                         const ClickTime click =
                             from_mouse ? click_time(*button, event.button.timestamp)
                                        : ClickTime{event.button.timestamp, ClickTimeSource::Event};
-                        SDL_SetWindowTitle(window,
-                                           describe_click(*button, event.button.x, event.button.y,
-                                                          event.button.timestamp, click)
-                                               .c_str());
+                        if (options->debug_title)
+                            SDL_SetWindowTitle(
+                                window, describe_click(*button, event.button.x, event.button.y,
+                                                       event.button.timestamp, click)
+                                            .c_str());
                         inputs.emplace_back(
                             aim::core::ClickInput{.button = *button,
                                                   .position = {event.button.x, event.button.y},
@@ -292,9 +336,12 @@ int main(int argc, char* argv[]) {
 
             const Nanoseconds now = SDL_GetTicksNS();
             clicks.forget_old(now);
-            float mx = 0;
-            float my = 0;
-            SDL_GetMouseState(&mx, &my);
+            float wx = 0;
+            float wy = 0;
+            SDL_GetMouseState(&wx, &wy);
+            float mx = wx;
+            float my = wy;
+            SDL_RenderCoordinatesFromWindow(renderer, wx, wy, &mx, &my);
             const aim::core::Vec2 mouse{mx, my};
             screens.before_input(flow, mouse, now);
             flow.input(inputs, now);
@@ -315,8 +362,15 @@ int main(int argc, char* argv[]) {
             fps.frame(now);
             if (last) running = false;
 
-            const Nanoseconds spent = SDL_GetTicksNS() - frame_start;
-            if (spent < kMinFrame) SDL_DelayPrecise(kMinFrame - spent);
+            // Следующий кадр — через период монитора от прошлого (D-41);
+            // отстали больше чем на кадр — не догонять пачкой.
+            next_frame += period;
+            const Nanoseconds after = SDL_GetTicksNS();
+            if (after < next_frame) {
+                SDL_DelayPrecise(next_frame - after);
+            } else if (after - next_frame > period) {
+                next_frame = after;
+            }
         }
     }
 

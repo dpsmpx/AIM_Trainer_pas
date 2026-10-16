@@ -26,7 +26,7 @@ std::unique_ptr<Text> Text::open(SDL_Renderer* renderer, std::string& problem) {
     for (const std::string_view file : {kRegularFile, kBoldFile}) {
         const std::string path = dir + std::string(file);
         if (!SDL_GetPathInfo(path.c_str(), nullptr)) {
-            problem = "Font file not found: " + path;
+            problem = "Нет файла шрифта: " + path;
             return nullptr;
         }
     }
@@ -40,7 +40,7 @@ std::unique_ptr<Text> Text::open(SDL_Renderer* renderer, std::string& problem) {
         TTF_Quit();
         return nullptr;
     }
-    std::unique_ptr<Text> text(new Text(engine, dir));
+    std::unique_ptr<Text> text(new Text(renderer, engine, dir));
     // Шрифт читается сейчас, а не на первом кадре: битый файл — тоже ошибка
     // запуска.
     for (const Weight w : {Weight::Normal, Weight::Bold}) {
@@ -52,34 +52,52 @@ std::unique_ptr<Text> Text::open(SDL_Renderer* renderer, std::string& problem) {
     return text;
 }
 
-Text::Text(TTF_TextEngine* engine, std::string dir) : engine_(engine), dir_(std::move(dir)) {}
+Text::Text(SDL_Renderer* renderer, TTF_TextEngine* engine, std::string dir)
+    : renderer_(renderer), engine_(engine), dir_(std::move(dir)) {}
 
 Text::~Text() {
     for (const auto& [key, cached] : cache_)
         TTF_DestroyText(cached.text);
     for (const auto& [key, f] : fonts_)
         TTF_CloseFont(f);
+    for (const auto& [key, f] : draw_fonts_)
+        TTF_CloseFont(f);
     TTF_DestroyRendererTextEngine(engine_);
     TTF_Quit();
+}
+
+TTF_Font* Text::open_font(Font font, float dpi) {
+    const std::string path =
+        dir_ + std::string(font.weight == Weight::Bold ? kBoldFile : kRegularFile);
+    TTF_Font* f = TTF_OpenFont(path.c_str(), static_cast<float>(font.size));
+    if (f == nullptr) return nullptr;
+    const auto d = static_cast<int>(std::lround(dpi));
+    if (!TTF_SetFontSizeDPI(f, static_cast<float>(font.size), d, d)) {
+        TTF_CloseFont(f);
+        return nullptr;
+    }
+    return f;
 }
 
 TTF_Font* Text::font(Font font) {
     const auto key = std::make_pair(font.size, font.weight);
     if (const auto it = fonts_.find(key); it != fonts_.end()) return it->second;
-    const std::string path =
-        dir_ + std::string(font.weight == Weight::Bold ? kBoldFile : kRegularFile);
-    TTF_Font* f = TTF_OpenFont(path.c_str(), static_cast<float>(font.size));
-    if (f == nullptr) return nullptr;
-    if (!TTF_SetFontSizeDPI(f, static_cast<float>(font.size), kDpi, kDpi)) {
-        TTF_CloseFont(f);
-        return nullptr;
-    }
-    fonts_.emplace(key, f);
+    TTF_Font* f = open_font(font, kDpi);
+    if (f != nullptr) fonts_.emplace(key, f);
+    return f;
+}
+
+TTF_Font* Text::draw_font(Font font) {
+    if (scale_ == 1.0F) return this->font(font);
+    const auto key = std::make_pair(font.size, font.weight);
+    if (const auto it = draw_fonts_.find(key); it != draw_fonts_.end()) return it->second;
+    TTF_Font* f = open_font(font, kDpi * scale_);
+    if (f != nullptr) draw_fonts_.emplace(key, f);
     return f;
 }
 
 void Text::draw(float x, float y, std::string_view s, Font font, core::Rgba color) {
-    TTF_Font* f = this->font(font);
+    TTF_Font* f = draw_font(font);
     if (f == nullptr || s.empty()) return;
     // Раскладка строки — из кэша: те же надписи рисуются каждый кадр.
     std::string key = std::to_string(font.size);
@@ -93,7 +111,26 @@ void Text::draw(float x, float y, std::string_view s, Font font, core::Rgba colo
     }
     it->second.frame = frame_;
     TTF_SetTextColor(it->second.text, color.r, color.g, color.b, color.a);
-    TTF_DrawRendererText(it->second.text, std::round(x), std::round(y));
+    if (scale_ == 1.0F) {
+        TTF_DrawRendererText(it->second.text, std::round(x), std::round(y));
+        return;
+    }
+    // Знаки — в пикселях экрана: масштаб рендера на время надписи — 1, а
+    // место и обрезка — в тех же пикселях.
+    SDL_Rect clip{};
+    const bool clipped =
+        SDL_RenderClipEnabled(renderer_) && SDL_GetRenderClipRect(renderer_, &clip);
+    SDL_SetRenderScale(renderer_, 1.0F, 1.0F);
+    if (clipped) {
+        const auto px = [&](int v) {
+            return static_cast<int>(std::lround(static_cast<float>(v) * scale_));
+        };
+        const SDL_Rect screen{px(clip.x), px(clip.y), px(clip.w), px(clip.h)};
+        SDL_SetRenderClipRect(renderer_, &screen);
+    }
+    TTF_DrawRendererText(it->second.text, std::round(x * scale_), std::round(y * scale_));
+    SDL_SetRenderScale(renderer_, scale_, scale_);
+    if (clipped) SDL_SetRenderClipRect(renderer_, &clip);
 }
 
 void Text::end_frame() {

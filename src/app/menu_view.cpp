@@ -105,7 +105,10 @@ void panel_footer(Canvas& c, const Rect& panel, std::string_view text) {
 }
 
 void render_help(Canvas& c) {
-    const Rect p{(kW - 460) / 2, (kH - 330) / 2, (kW - 460) / 2 + 460, (kH - 330) / 2 + 330};
+    // Строки справки — по одной на строку панели: ширина — под самую длинную.
+    constexpr int kPanelW = 620;
+    constexpr int kPanelH = 330;
+    const Rect p{(kW - kPanelW) / 2, (kH - kPanelH) / 2, (kW + kPanelW) / 2, (kH + kPanelH) / 2};
     panel_back(c, p);
     c.font.size = 20;
     c.font_color = kClWhite;
@@ -119,7 +122,7 @@ void render_help(Canvas& c) {
     };
     line("ЛКМ — выстрел; синие цели в «Двух кнопках»", 24);
     line("ПКМ — красные цели в «Двух кнопках»", 24);
-    line("Esc — закончить замер, R — заново, M — в меню", 34);
+    line("Esc — конец замера · R — заново · M — в меню", 34);
     line("Реакция — от показа стимула до щелчка", 24);
     line("Accuracy — % попаданий от всех выстрелов", 24);
     line("Precision — точность по центру круга", 24);

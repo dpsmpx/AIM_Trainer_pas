@@ -37,6 +37,10 @@ public:
     /// Шрифт для рендера renderer. Нет файла или SDL3_ttf не завёлся —
     /// пусто и problem: какого файла нет и где он ожидался.
     static std::unique_ptr<Text> open(SDL_Renderer* renderer, std::string& problem);
+    /// Масштаб монитора (D-42): раскладка — в логических пикселях, а знаки
+    /// растеризуются в пикселях экрана — текст чёткий. Задаётся при запуске,
+    /// до первой надписи.
+    void set_scale(float scale) { scale_ = scale; }
     ~Text();
     Text(const Text&) = delete;
     Text& operator=(const Text&) = delete;
@@ -57,8 +61,12 @@ public:
     std::vector<std::string> wrap(std::string_view s, Font font, int max_width);
 
 private:
-    Text(TTF_TextEngine* engine, std::string dir);
+    Text(SDL_Renderer* renderer, TTF_TextEngine* engine, std::string dir);
+    /// Шрифт для меры строк — в логических пикселях.
     TTF_Font* font(Font font);
+    /// Шрифт для рисования — в пикселях экрана (масштаб).
+    TTF_Font* draw_font(Font font);
+    TTF_Font* open_font(Font font, float dpi);
     /// Продвижение знака, px, с дробью.
     double advance(Font font);
     /// Нарисовать строку: левый верхний угол (x, y).
@@ -69,9 +77,12 @@ private:
         std::uint64_t frame = 0;  ///< кадр, в котором надпись рисовалась последней
     };
 
+    SDL_Renderer* renderer_;
     TTF_TextEngine* engine_;
     std::string dir_;
+    float scale_ = 1.0F;
     std::map<std::pair<int, Weight>, TTF_Font*> fonts_;
+    std::map<std::pair<int, Weight>, TTF_Font*> draw_fonts_;
     std::map<std::pair<int, Weight>, double> advances_;
     std::unordered_map<std::string, Cached> cache_;
     std::uint64_t frame_ = 0;

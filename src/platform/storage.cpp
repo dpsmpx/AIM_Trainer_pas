@@ -43,7 +43,7 @@ bool write_io(const std::string& path, std::string_view name, const char* mode,
 
 std::optional<Storage> Storage::open(std::string dir, std::string& problem) {
     if (dir.empty()) {
-        problem = "empty folder path";
+        problem = "пустой путь папки";
         return std::nullopt;
     }
     if (!dir.ends_with('/') && !dir.ends_with('\\')) dir += '/';
