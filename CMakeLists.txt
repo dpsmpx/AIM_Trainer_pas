@@ -58,6 +58,7 @@ endfunction()
 # Логика без окна: только стандартная библиотека, без SDL и ОС (D-20, D-25).
 add_library(aim_core STATIC
     src/core/click_time.cpp
+    src/core/flow.cpp
     src/core/game.cpp
     src/core/modes.cpp
     src/core/profile.cpp

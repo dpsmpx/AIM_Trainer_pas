@@ -20,6 +20,7 @@ endif()
 
 add_executable(aim_core_tests
     core/click_time_test.cpp
+    core/flow_test.cpp
     core/game_test.cpp
     core/profile_test.cpp
     core/random_test.cpp
