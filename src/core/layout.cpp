@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "core/help.h"
 #include "core/rounding.h"
 
 namespace aim::core {
@@ -53,6 +54,18 @@ Rect settings_reset() {
     const int x = settings_panel().x1 + (kSettingsW - 180) / 2;
     const int y = settings_row_y(kSettingsResetRow) + 4;
     return {x, y, x + 180, y + 32};
+}
+
+Rect help_panel() {
+    const int x = (kW - kHelpW) / 2;
+    const int y = (kH - kHelpH) / 2;
+    return {x, y, x + kHelpW, y + kHelpH};
+}
+
+Rect help_track() {
+    const Rect p = help_panel();
+    const int top = p.y1 + kHelpTop;
+    return {p.x2 - 22, top, p.x2 - 12, top + kHelpVisibleLines * kHelpLineH};
 }
 
 Rect history_panel() {

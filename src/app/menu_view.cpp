@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 
+#include "core/help.h"
 #include "core/layout.h"
 #include "core/profile_file.h"
 #include "core/records.h"
@@ -104,33 +105,41 @@ void panel_footer(Canvas& c, const Rect& panel, std::string_view text) {
     c.draw_text_centered(panel.x1, panel.y2 - 24, panel.x2, panel.y2 - 6, text);
 }
 
-void render_help(Canvas& c) {
-    // Строки справки — по одной на строку панели: ширина — под самую длинную.
-    constexpr int kPanelW = 620;
-    constexpr int kPanelH = 330;
-    const Rect p{(kW - kPanelW) / 2, (kH - kPanelH) / 2, (kW + kPanelW) / 2, (kH + kPanelH) / 2};
+// Справка: видимые строки с прокрутки и полоса прокрутки справа.
+void render_help(Canvas& c, int scroll) {
+    const Rect p = core::help_panel();
     panel_back(c, p);
-    c.font.size = 20;
-    c.font_color = kClWhite;
-    c.draw_text_centered(p.x1, p.y1 + 16, p.x2, p.y1 + 46, "Справка");
-    c.font.size = 13;
-    c.font_color = argb(230, 220, 220, 220);
-    int y = p.y1 + 64;
-    const auto line = [&](std::string_view s, int step) {
-        c.draw_text_centered(p.x1 + 20, y, p.x2 - 20, y + 20, s);
-        y += step;
-    };
-    line("ЛКМ — выстрел; синие цели в «Двух кнопках»", 24);
-    line("ПКМ — красные цели в «Двух кнопках»", 24);
-    line("Esc — конец замера · R — заново · M — в меню", 34);
-    line("Реакция — от показа стимула до щелчка", 24);
-    line("Accuracy — % попаданий от всех выстрелов", 24);
-    line("Precision — точность по центру круга", 24);
-    line("Score — очки: меньше круг — больше очков", 34);
-    line("Рекорд и среднее — у каждого набора свои", 24);
+    panel_title(c, p, 14, "Справка");
+    const int top = p.y1 + core::kHelpTop;
+    for (int i = 0; i < core::kHelpVisibleLines; ++i) {
+        const int at = scroll + i;
+        if (at >= static_cast<int>(core::kHelp.size())) break;
+        const core::HelpLine& line = core::kHelp.at(static_cast<std::size_t>(at));
+        const int y = top + i * core::kHelpLineH;
+        c.font.size = 13;
+        c.font.weight = line.heading ? Weight::Bold : Weight::Normal;
+        c.font_color = line.heading ? argb(255, 97, 207, 255) : argb(230, 220, 220, 220);
+        c.draw_text_centered(p.x1 + 20, y, p.x2 - 30, y + core::kHelpLineH, line.text);
+    }
+    c.font.weight = Weight::Normal;
+    // Полоса прокрутки: дорожка и бегунок — доля и место видимых строк.
+    const Rect track = core::help_track();
+    c.pen = argb(0, 0, 0, 0);
+    c.brush = argb(60, 255, 255, 255);
+    fill_round_rect(c, track, 6, 6);
+    const int track_h = track.y2 - track.y1;
+    const auto total = static_cast<double>(core::kHelp.size());
+    const int thumb_h = std::max(20, round_int(track_h * core::kHelpVisibleLines / total));
+    const int thumb_y =
+        track.y1 + (core::kHelpMaxScroll > 0 ? round_int(static_cast<double>(track_h - thumb_h) *
+                                                         scroll / core::kHelpMaxScroll)
+                                             : 0);
+    c.brush = argb(220, 97, 207, 255);
+    c.fill_round_rect(track.x1, thumb_y, track.x2, thumb_y + thumb_h, 6, 6);
     c.font.size = 11;
     c.font_color = argb(180, 180, 180, 180);
-    c.draw_text_centered(p.x1, p.y2 - 26, p.x2, p.y2 - 6, "Клик — закрыть");
+    c.draw_text_centered(p.x1, p.y2 - 26, p.x2, p.y2 - 6,
+                         "↑ ↓ и колёсико — листать · Esc или клик вне панели — закрыть");
 }
 
 // Путь, обрезанный слева до ширины width: «…\Roaming\AimTrainer\».
@@ -735,7 +744,7 @@ void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const
                          profile.settings.menu_effects ? "Effects: ON" : "Effects: OFF");
 
     switch (menu.panel()) {
-        case core::Panel::Help: render_help(c); break;
+        case core::Panel::Help: render_help(c, menu.help_scroll()); break;
         case core::Panel::Settings: render_settings(c, profile.settings, data_folder); break;
         case core::Panel::Records: render_records(c, profile); break;
         case core::Panel::Achievements: render_achievements(c, profile); break;

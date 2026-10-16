@@ -77,6 +77,10 @@ bool Flow::handle(const Input& event) {
                                        [&](const KeyInput& k) {
                                            menu_.key(k);
                                            return true;
+                                       },
+                                       [&](const WheelInput& w) {
+                                           menu_.wheel(w);
+                                           return true;
                                        }},
                               event);
         case Screen::Countdown:
@@ -98,7 +102,9 @@ bool Flow::handle(const Input& event) {
                 go(Screen::GameOver);
                 return false;
             }
-            const auto& k = std::get<KeyInput>(event);
+            const auto* key = std::get_if<KeyInput>(&event);
+            if (key == nullptr) return true;  // колёсико замер не читает
+            const KeyInput& k = *key;
             switch (k.key) {
                 case Key::R:  // заново, замер не записывается
                     start_countdown(now_);
@@ -113,7 +119,11 @@ bool Flow::handle(const Input& event) {
                     finish_run();
                     go(Screen::GameOver);
                     return false;
-                case Key::Space: return true;
+                case Key::Space:
+                case Key::Up:
+                case Key::Down:
+                case Key::PageUp:
+                case Key::PageDown: return true;
             }
             return true;
         }

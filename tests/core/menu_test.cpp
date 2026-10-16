@@ -10,6 +10,7 @@
 #include <variant>
 #include <vector>
 
+#include "core/help.h"
 #include "core/layout.h"
 
 namespace aim::core {
@@ -109,15 +110,72 @@ TEST_F(MenuTest, EmptySpaceTogglesEffectsRightClickDoesNothing) {
 }
 
 TEST_F(MenuTest, InformationPanelsCloseOnAnyClick) {
-    for (const auto& [button, panel] :
-         {std::pair{MiniButton::Help, Panel::Help}, std::pair{MiniButton::Records, Panel::Records},
-          std::pair{MiniButton::Achievements, Panel::Achievements}}) {
+    for (const auto& [button, panel] : {std::pair{MiniButton::Records, Panel::Records},
+                                        std::pair{MiniButton::Achievements, Panel::Achievements}}) {
         menu_.click(click_at(center(mini_button(button))));
         EXPECT_EQ(menu_.panel(), panel);
         // Щелчок по кнопке набора под панелью только закрывает её.
         EXPECT_EQ(menu_.click(click_at(center(preset_button(0, kLater)))), std::nullopt);
         EXPECT_EQ(menu_.panel(), Panel::None);
     }
+}
+
+TEST_F(MenuTest, HelpScrollsByArrowsWheelAndBar) {
+    menu_.click(click_at(center(mini_button(MiniButton::Help))));
+    ASSERT_EQ(menu_.panel(), Panel::Help);
+    EXPECT_EQ(menu_.help_scroll(), 0);
+    ASSERT_GT(kHelpMaxScroll, 0) << "справка длиннее панели — есть что листать";
+    menu_.key({.key = Key::Up, .time = kLater});
+    EXPECT_EQ(menu_.help_scroll(), 0) << "выше начала не листается";
+    menu_.key({.key = Key::Down, .time = kLater});
+    menu_.key({.key = Key::Down, .time = kLater});
+    EXPECT_EQ(menu_.help_scroll(), 2);
+    menu_.wheel({.y = -1, .time = kLater});  // к себе — вниз, три строки
+    EXPECT_EQ(menu_.help_scroll(), 5);
+    menu_.wheel({.y = 1, .time = kLater});
+    EXPECT_EQ(menu_.help_scroll(), 2);
+    menu_.key({.key = Key::PageDown, .time = kLater});
+    menu_.key({.key = Key::PageDown, .time = kLater});
+    EXPECT_EQ(menu_.help_scroll(), kHelpMaxScroll) << "ниже конца не листается";
+    // Полоса: щелчок по верху — к началу, по низу — к концу.
+    const Rect track = help_track();
+    menu_.click(click_at({center(track).x, static_cast<double>(track.y1)}));
+    EXPECT_EQ(menu_.help_scroll(), 0);
+    menu_.click(click_at({center(track).x, static_cast<double>(track.y2)}));
+    EXPECT_EQ(menu_.help_scroll(), kHelpMaxScroll);
+    // Щелчок по тексту справки её не закрывает; вне панели и Esc — закрывают.
+    menu_.click(click_at(center(help_panel())));
+    EXPECT_EQ(menu_.panel(), Panel::Help);
+    menu_.click(click_at({5, 5}));
+    EXPECT_EQ(menu_.panel(), Panel::None);
+    menu_.click(click_at(center(mini_button(MiniButton::Help))));
+    EXPECT_EQ(menu_.help_scroll(), 0) << "открыта заново — с начала";
+    menu_.key({.key = Key::Escape, .time = kLater});
+    EXPECT_EQ(menu_.panel(), Panel::None);
+}
+
+TEST_F(MenuTest, HelpThumbFollowsCursorWhileLeftHeld) {
+    menu_.click(click_at(center(mini_button(MiniButton::Help))));
+    const Rect track = help_track();
+    const double x = center(track).x;
+    menu_.drag({x, static_cast<double>(track.y2)}, true);
+    EXPECT_EQ(menu_.help_scroll(), 0) << "ЛКМ нажата не на полосе — не тянется";
+    menu_.click(click_at({x, static_cast<double>(track.y1)}));
+    menu_.drag({x, center(track).y}, true);
+    EXPECT_EQ(menu_.help_scroll(), (kHelpMaxScroll + 1) / 2);
+    menu_.drag({x + 200, static_cast<double>(track.y2 + 100)}, true);
+    EXPECT_EQ(menu_.help_scroll(), kHelpMaxScroll) << "курсор ушёл с полосы — тянется дальше";
+    menu_.drag({x, static_cast<double>(track.y1)}, false);
+    EXPECT_EQ(menu_.help_scroll(), kHelpMaxScroll) << "ЛКМ отпущена — ползунок стоит";
+    menu_.drag({x, static_cast<double>(track.y1)}, true);
+    EXPECT_EQ(menu_.help_scroll(), kHelpMaxScroll) << "новое нажатие — только щелчком по полосе";
+}
+
+TEST_F(MenuTest, WheelOutsideHelpDoesNothing) {
+    menu_.wheel({.y = -3, .time = kLater});
+    menu_.key({.key = Key::Down, .time = kLater});
+    EXPECT_EQ(menu_.help_scroll(), 0);
+    EXPECT_EQ(menu_.panel(), Panel::None);
 }
 
 TEST_F(MenuTest, HistoryOpensClosesOutside) {

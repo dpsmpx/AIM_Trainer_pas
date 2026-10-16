@@ -50,9 +50,13 @@ public:
     /// Курсор над меню: кнопка набора под ним — выбранный набор, если
     /// панелей и туториала нет.
     void hover(Vec2 cursor, Nanoseconds now);
+    /// Ползунок справки тянется, пока зажата ЛКМ, нажатая на полосе
+    /// прокрутки; left_held — состояние ЛКМ в кадре.
+    void drag(Vec2 cursor, bool left_held);
 
     std::optional<MeasureOptions> click(const ClickInput& click) override;
     void key(const KeyInput& key) override;
+    void wheel(const WheelInput& wheel) override;
 
     /// Профиль сменился (программа открыла другой файл).
     void set_profile_number(int number) { profile_number_ = number; }
@@ -62,6 +66,8 @@ public:
     [[nodiscard]] Panel panel() const { return panel_; }
     [[nodiscard]] bool tutorial_shown() const { return tutorial_; }
     [[nodiscard]] int tutorial_step() const { return tutorial_step_; }
+    /// Справка: первая видимая строка (0…kHelpMaxScroll).
+    [[nodiscard]] int help_scroll() const { return help_scroll_; }
     [[nodiscard]] int profile_number() const { return profile_number_; }
     [[nodiscard]] Nanoseconds entered_at() const { return entered_at_; }
 
@@ -71,6 +77,10 @@ private:
     [[nodiscard]] Nanoseconds since_entered(Nanoseconds t) const;
     void close_tutorial();
     void click_settings(Vec2 p);
+    void click_help(Vec2 p);
+    void scroll_help(int lines);
+    /// Прокрутка по высоте курсора на полосе: верх — начало, низ — конец.
+    void scroll_help_to(double y);
     /// Начать выбранный набор: он же — набор профиля.
     MeasureOptions start_selected();
 
@@ -80,6 +90,8 @@ private:
     int tutorial_step_ = 0;
     Panel panel_ = Panel::None;
     int selected_ = 0;
+    int help_scroll_ = 0;
+    bool dragging_help_ = false;  // ЛКМ нажата на полосе и ещё не отпущена
     Nanoseconds entered_at_ = 0;
     std::vector<MenuRequest> requests_;
 };

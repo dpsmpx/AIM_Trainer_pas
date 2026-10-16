@@ -35,7 +35,6 @@ TOOLS_DIR="${AIM_TOOLS_DIR:-$HOME/.local/share/aim-trainer-tools}"
 PABCNET_DIR="${PABCNET_DIR:-$TOOLS_DIR/pascalabcnet}"
 REF_DIR="$ROOT/build/ref"
 PORT_BIN="$ROOT/build/linux-gcc/AimTrainer"
-TITLE="Aim Trainer"
 # Шаблоны файлов игрока — для find -name: раскрывать их здесь, в текущем
 # каталоге, нельзя.
 # Обе программы: Pascal-версия — profileN_stats.ini и _sessions.csv,
@@ -208,8 +207,8 @@ fi
 TARGET="$1"
 shift || true
 case "$TARGET" in
-    ref) TARGET_DISPLAY="${AIM_REF_DISPLAY:-:97}" ;;
-    port) TARGET_DISPLAY="${AIM_PORT_DISPLAY:-:96}" ;;
+    ref) TARGET_DISPLAY="${AIM_REF_DISPLAY:-:97}"; TITLE="Aim Trainer" ;;
+    port) TARGET_DISPLAY="${AIM_PORT_DISPLAY:-:96}"; TITLE="DP AIM Trainer" ;;
     *) usage ;;
 esac
 STATE="$ROOT/build/gui/$TARGET"

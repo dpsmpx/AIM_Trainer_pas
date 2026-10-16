@@ -36,8 +36,10 @@ public:
     /// Уведомление вверху окна.
     void message(std::string text) { toasts_.push(std::move(text)); }
 
-    /// До ввода кадра: в меню набор под курсором — выбранный.
-    void before_input(const core::Flow& flow, core::Vec2 mouse, core::Nanoseconds now);
+    /// До ввода кадра: в меню набор под курсором — выбранный, ползунок
+    /// справки — за курсором, пока ЛКМ зажата (left_held).
+    void before_input(const core::Flow& flow, core::Vec2 mouse, bool left_held,
+                      core::Nanoseconds now);
     /// После Flow::update: события переходов и меню — эффекты, файлы,
     /// уведомления; след курсора и частицы.
     void after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds now);

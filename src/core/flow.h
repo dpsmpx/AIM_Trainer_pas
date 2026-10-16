@@ -37,7 +37,7 @@ namespace aim::core {
 enum class Screen : std::uint8_t { Menu, Countdown, Game, GameOver };
 
 /// Клавиши, которые читают экраны; остальные программа не передаёт.
-enum class Key : std::uint8_t { Escape, Space, R, M };
+enum class Key : std::uint8_t { Escape, Space, R, M, Up, Down, PageUp, PageDown };
 
 struct ClickInput {
     MouseButton button = MouseButton::Left;
@@ -50,7 +50,13 @@ struct KeyInput {
     Nanoseconds time = 0;
 };
 
-using Input = std::variant<ClickInput, KeyInput>;
+/// Колёсико мыши: y > 0 — от себя (вверх).
+struct WheelInput {
+    float y = 0;
+    Nanoseconds time = 0;
+};
+
+using Input = std::variant<ClickInput, KeyInput, WheelInput>;
 
 /// Меню: что делает щелчок или клавиша. Переходам нужно знать только,
 /// начат ли замер и с какими опциями.
@@ -65,8 +71,10 @@ public:
 
     /// Щелчок в меню; опции замера — если щелчок его запускает.
     virtual std::optional<MeasureOptions> click(const ClickInput& click) = 0;
-    /// Клавиша в меню (Esc закрывает панели).
+    /// Клавиша в меню (Esc закрывает панели, стрелки листают справку).
     virtual void key(const KeyInput& key) = 0;
+    /// Колёсико в меню (листает справку).
+    virtual void wheel(const WheelInput& wheel) = 0;
 };
 
 /// Длительность отсчёта перед игрой.

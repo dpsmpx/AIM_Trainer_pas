@@ -2,8 +2,10 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <utility>
 
+#include "core/help.h"
 #include "core/profile_file.h"
 
 namespace aim::core {
@@ -97,7 +99,7 @@ std::optional<MeasureOptions> Menu::click(const ClickInput& click) {
         return std::nullopt;
     }
     switch (panel_) {
-        case Panel::Help:
+        case Panel::Help: click_help(p); return std::nullopt;
         case Panel::Records:
         case Panel::Achievements:
             // Любой щелчок закрывает и дальше не идёт: набор под панелью не
@@ -133,6 +135,7 @@ std::optional<MeasureOptions> Menu::click(const ClickInput& click) {
     for (const auto& [button, panel] : kOpens) {
         if (mini_button(button).contains(p)) {
             panel_ = panel;
+            if (panel == Panel::Help) help_scroll_ = 0;
             return std::nullopt;
         }
     }
@@ -149,7 +152,56 @@ std::optional<MeasureOptions> Menu::click(const ClickInput& click) {
     return std::nullopt;
 }
 
+void Menu::scroll_help(int lines) {
+    help_scroll_ = std::clamp(help_scroll_ + lines, 0, kHelpMaxScroll);
+}
+
+void Menu::scroll_help_to(double y) {
+    const Rect track = help_track();
+    const double share = (y - track.y1) / (track.y2 - track.y1);
+    help_scroll_ =
+        std::clamp(static_cast<int>(std::lround(share * kHelpMaxScroll)), 0, kHelpMaxScroll);
+}
+
+void Menu::click_help(Vec2 p) {
+    if (help_track().contains(p)) {
+        // Полоса прокрутки: место щелчка — место в справке; дальше ползунок
+        // тянется за курсором, пока ЛКМ зажата.
+        scroll_help_to(p.y);
+        dragging_help_ = true;
+    } else if (!help_panel().contains(p)) {
+        panel_ = Panel::None;
+    }
+}
+
+void Menu::drag(Vec2 cursor, bool left_held) {
+    if (!left_held || panel_ != Panel::Help) {
+        dragging_help_ = false;
+        return;
+    }
+    if (dragging_help_) scroll_help_to(cursor.y);
+}
+
+void Menu::wheel(const WheelInput& wheel) {
+    if (panel_ != Panel::Help || tutorial_) return;
+    // Щелчок колёсика — три строки; от себя — вверх.
+    constexpr int kLinesPerNotch = 3;
+    scroll_help(-static_cast<int>(std::lround(wheel.y * kLinesPerNotch)));
+}
+
 void Menu::key(const KeyInput& key) {
+    if (panel_ == Panel::Help && !tutorial_) {
+        switch (key.key) {
+            case Key::Up: scroll_help(-1); return;
+            case Key::Down: scroll_help(1); return;
+            case Key::PageUp: scroll_help(-kHelpVisibleLines); return;
+            case Key::PageDown: scroll_help(kHelpVisibleLines); return;
+            case Key::Escape:
+            case Key::Space:
+            case Key::R:
+            case Key::M: break;
+        }
+    }
     if (key.key != Key::Escape) return;
     panel_ = Panel::None;
     // Туториал по Esc пропускается и помечается просмотренным.

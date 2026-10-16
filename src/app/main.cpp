@@ -103,6 +103,10 @@ std::optional<aim::core::Key> to_key(SDL_Scancode scancode) {
         case SDL_SCANCODE_SPACE: return aim::core::Key::Space;
         case SDL_SCANCODE_R: return aim::core::Key::R;
         case SDL_SCANCODE_M: return aim::core::Key::M;
+        case SDL_SCANCODE_UP: return aim::core::Key::Up;
+        case SDL_SCANCODE_DOWN: return aim::core::Key::Down;
+        case SDL_SCANCODE_PAGEUP: return aim::core::Key::PageUp;
+        case SDL_SCANCODE_PAGEDOWN: return aim::core::Key::PageDown;
         default: return std::nullopt;
     }
 }
@@ -299,8 +303,18 @@ int main(int argc, char* argv[]) {
                         period = frame_period(window, hz);
                         SDL_Log("монитор %.1f Гц", static_cast<double>(hz));
                         break;
+                    case SDL_EVENT_MOUSE_WHEEL: {
+                        float y = event.wheel.y;
+                        if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED) y = -y;
+                        inputs.emplace_back(
+                            aim::core::WheelInput{.y = y, .time = event.wheel.timestamp});
+                        break;
+                    }
                     case SDL_EVENT_KEY_DOWN: {
-                        if (event.key.repeat) break;
+                        // Автоповтор — только у стрелок: справка листается удержанием.
+                        const bool arrows = event.key.scancode == SDL_SCANCODE_UP ||
+                                            event.key.scancode == SDL_SCANCODE_DOWN;
+                        if (event.key.repeat && !arrows) break;
                         if (const auto key = to_key(event.key.scancode))
                             inputs.emplace_back(
                                 aim::core::KeyInput{.key = *key, .time = event.key.timestamp});
@@ -338,12 +352,12 @@ int main(int argc, char* argv[]) {
             clicks.forget_old(now);
             float wx = 0;
             float wy = 0;
-            SDL_GetMouseState(&wx, &wy);
+            const SDL_MouseButtonFlags held = SDL_GetMouseState(&wx, &wy);
             float mx = wx;
             float my = wy;
             SDL_RenderCoordinatesFromWindow(renderer, wx, wy, &mx, &my);
             const aim::core::Vec2 mouse{mx, my};
-            screens.before_input(flow, mouse, now);
+            screens.before_input(flow, mouse, (held & SDL_BUTTON_LMASK) != 0, now);
             flow.input(inputs, now);
             flow.update(now, mouse);
             screens.after_update(flow, mouse, now);

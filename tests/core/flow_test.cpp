@@ -32,10 +32,12 @@ public:
         return std::nullopt;
     }
     void key(const KeyInput& k) override { keys.push_back(k); }
+    void wheel(const WheelInput& w) override { wheels.push_back(w); }
 
     const Profile& profile;
     std::vector<ClickInput> clicks;
     std::vector<KeyInput> keys;
+    std::vector<WheelInput> wheels;
 };
 
 ClickInput click_at(double x, double y, Nanoseconds t, MouseButton b = MouseButton::Left) {
@@ -216,11 +218,24 @@ TEST(Flow, HitEventsAndAchievements) {
     EXPECT_EQ(std::get<ScreenChanged>(events[2]).to, Screen::GameOver);
 }
 
-TEST(Flow, MenuGetsKeys) {
+TEST(Flow, MenuGetsKeysAndWheel) {
     Fixture f;
-    f.send({key(Key::Escape, kT0)}, kT0);
+    f.send({key(Key::Escape, kT0), WheelInput{.y = -1, .time = kT0}}, kT0);
     ASSERT_EQ(f.menu.keys.size(), 1U);
     EXPECT_EQ(f.menu.keys[0].key, Key::Escape);
+    ASSERT_EQ(f.menu.wheels.size(), 1U);
+    EXPECT_FLOAT_EQ(f.menu.wheels[0].y, -1);
+}
+
+TEST(Flow, WheelAndArrowsDoNotTouchRun) {
+    Fixture f;
+    const Nanoseconds start = f.start_game(kT0);
+    f.send({WheelInput{.y = 1, .time = start + ms(10)}, key(Key::Up, start + ms(11)),
+            key(Key::PageDown, start + ms(12))},
+           start + ms(20));
+    EXPECT_EQ(f.flow.screen(), Screen::Game);
+    EXPECT_EQ(f.flow.game()->shots(), 0);
+    EXPECT_TRUE(f.menu.wheels.empty());
 }
 
 }  // namespace

@@ -75,6 +75,15 @@ Rect settings_plus(int row);
 Rect settings_toggle(int row);
 Rect settings_reset();
 
+// ---- Справка ----
+inline constexpr int kHelpW = 620;
+inline constexpr int kHelpH = 400;
+inline constexpr int kHelpTop = 56;  ///< от верха панели до первой строки
+inline constexpr int kHelpLineH = 22;  ///< строка справки
+Rect help_panel();
+/// Полоса прокрутки справки: щелчок по ней — прокрутка к месту.
+Rect help_track();
+
 // ---- История и профили ----
 inline constexpr int kHistoryW = 520;
 inline constexpr int kHistoryH = 460;

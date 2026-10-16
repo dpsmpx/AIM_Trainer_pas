@@ -73,8 +73,11 @@ void Screens::take_folder_choice() {
         message(std::move(m));
 }
 
-void Screens::before_input(const core::Flow& flow, core::Vec2 mouse, core::Nanoseconds now) {
-    if (flow.screen() == core::Screen::Menu) menu_.hover(mouse, now);
+void Screens::before_input(const core::Flow& flow, core::Vec2 mouse, bool left_held,
+                           core::Nanoseconds now) {
+    if (flow.screen() != core::Screen::Menu) return;
+    menu_.hover(mouse, now);
+    menu_.drag(mouse, left_held);
 }
 
 void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds now) {
