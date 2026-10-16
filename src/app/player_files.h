@@ -1,8 +1,9 @@
 #pragma once
 
-// Файлы игрока программы: профиль, история замеров, экспорт, реплеи,
-// последний профиль и папка сохранений (D-30, D-33, D-38, D-39) — текст из
-// core/profile_file.h, core/runs.h и core/replay.h, файлы —
+// Файлы игрока программы: профиль, история замеров, экспорт, реплеи, темы,
+// последний профиль и папка сохранений (D-30, D-33, D-38, D-39, D-44) —
+// текст из core/profile_file.h, core/runs.h, core/replay.h и core/theme.h,
+// файлы —
 // platform/storage.h. Ошибки записи не молчат (AUD-17): каждая — строка для
 // уведомления игроку.
 //
@@ -62,12 +63,18 @@ public:
     /// У набора options профиля есть реплей.
     [[nodiscard]] bool has_replay(const core::MeasureOptions& options) const;
 
+    /// Темы игрока (D-44): ИМЯ из themes/ИМЯ.ini папки сохранений, по
+    /// алфавиту.
+    [[nodiscard]] const std::vector<std::string>& themes() const { return themes_; }
+    /// Текст темы игрока name; нет файла — пусто.
+    [[nodiscard]] std::optional<std::string> read_theme(std::string_view name) const;
+
     /// «Экспорт в CSV»: копия истории — export_profileN_ГГГГММДД.csv в папке
     /// сохранений (D-33). Истории нет — false и error «нет данных».
     bool export_history(const core::LocalTime& when, std::string& file_name, std::string& error);
 
     /// Сменить папку сохранений на dir (D-33, D-35): файлы игрока прежней
-    /// папки и её реплеи копируются в новую; файл новой папки с тем же именем и другим
+    /// папки, её реплеи и темы копируются в новую; файл новой папки с тем же именем и другим
     /// содержимым сперва уходит в её подпапку backup_ГГГГММДД_ЧЧММ (when).
     /// Прежняя папка не трогается. Удалось — профиль текущего номера из новой
     /// папки; нет — пусто, папка прежняя. messages — что сказать игроку.
@@ -82,8 +89,9 @@ public:
 private:
     /// Записать aim_trainer.ini, если номер профиля или папка изменились.
     bool remember(std::string& error);
-    /// Перечитать, какие реплеи есть в папке сохранений.
+    /// Перечитать, какие реплеи и темы есть в папке сохранений.
     void scan_replays();
+    void scan_themes();
     /// Файлы игрока из from — в target (change_folder).
     static bool copy_saves(const platform::Storage& from, const platform::Storage& target,
                            const core::LocalTime& when, std::vector<std::string>& messages);
@@ -99,6 +107,7 @@ private:
     core::AppState remembered_;  ///< что записано в aim_trainer.ini
     std::string data_dir_;  ///< выбранная папка; пусто — по умолчанию
     std::set<std::string, std::less<>> replays_;  ///< файлы папки реплеев
+    std::vector<std::string> themes_;
 };
 
 }  // namespace aim::app

@@ -2,10 +2,14 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
+#include <array>
 #include <format>
+#include <string_view>
 #include <utility>
 
 #include "core/profile_file.h"
+#include "core/theme.h"
 
 namespace aim::app {
 
@@ -91,7 +95,27 @@ core::Profile PlayerFiles::open(int number, std::vector<std::string>& messages) 
                                            number_, skipped));
     }
     scan_replays();
+    scan_themes();
     return profile;
+}
+
+void PlayerFiles::scan_themes() {
+    themes_.clear();
+    if (!storage_ || !storage_->exists(core::kThemeFolder)) return;
+    std::string error;
+    const platform::Storage folder(storage_->path(core::kThemeFolder) + "/");
+    if (const std::optional<std::vector<std::string>> names = folder.files(error)) {
+        for (const std::string& file : *names)
+            if (std::optional<std::string> name = core::theme_name_of_file(file))
+                themes_.push_back(std::move(*name));
+    }
+    std::sort(themes_.begin(), themes_.end());
+}
+
+std::optional<std::string> PlayerFiles::read_theme(std::string_view name) const {
+    if (!storage_) return std::nullopt;
+    const platform::Storage folder(storage_->path(core::kThemeFolder) + "/");
+    return folder.read(std::string(name) + ".ini");
 }
 
 void PlayerFiles::scan_replays() {
@@ -265,18 +289,23 @@ bool PlayerFiles::copy_saves(const platform::Storage& from, const platform::Stor
         return true;
     };
     if (!copy_folder(from, target, core::is_player_file, {})) return false;
-    // Реплеи (D-39) — в своей подпапке; её нет — копировать нечего.
-    if (from.exists(core::kReplayFolder)) {
+    // Реплеи (D-39) и темы (D-44) — в своих подпапках; нет подпапки —
+    // копировать нечего.
+    const std::array<std::pair<std::string_view, bool (*)(std::string_view)>, 2> kSubfolders{{
+        {core::kReplayFolder, core::is_replay_file},
+        {core::kThemeFolder, core::is_theme_file},
+    }};
+    for (const auto& [sub, wanted] : kSubfolders) {
+        if (!from.exists(sub)) continue;
         std::string error;
-        const platform::Storage from_replays(from.path(core::kReplayFolder) + "/");
-        const std::optional<platform::Storage> to_replays =
-            platform::Storage::open(target.path(core::kReplayFolder), error);
-        if (!to_replays) {
-            messages.push_back(std::format("Папка реплеев не создана: {} — папка прежняя", error));
+        const platform::Storage from_sub(from.path(sub) + "/");
+        const std::optional<platform::Storage> to_sub =
+            platform::Storage::open(target.path(sub), error);
+        if (!to_sub) {
+            messages.push_back(std::format("Папка {} не создана: {} — папка прежняя", sub, error));
             return false;
         }
-        if (!copy_folder(from_replays, *to_replays, core::is_replay_file, core::kReplayFolder))
-            return false;
+        if (!copy_folder(from_sub, *to_sub, wanted, sub)) return false;
     }
     // Два уведомления, а не одно: длинная строка шире окна.
     messages.push_back(std::format("Папка сохранений сменилась, файлов скопировано: {}", copied));

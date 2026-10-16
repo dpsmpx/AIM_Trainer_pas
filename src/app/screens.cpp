@@ -12,6 +12,7 @@
 #include "core/palette.h"
 #include "core/rounding.h"
 #include "core/rules.h"
+#include "core/theme.h"
 
 namespace aim::app {
 
@@ -41,8 +42,27 @@ void Screens::start(core::Nanoseconds now) {
     menu_view_.enter(rng_, now);
 }
 
-const core::Theme& Screens::theme() const {
-    return core::kThemes.at(static_cast<std::size_t>(std::clamp(profile_.settings.theme, 0, 2)));
+const core::Theme& Screens::theme() {
+    const std::string& name = profile_.settings.theme;
+    std::string key = files_.folder() + '\n' + name;
+    if (key == theme_for_) return theme_;
+    theme_for_ = std::move(key);
+    const core::BuiltinTheme& fallback = core::kThemes.front();
+    if (const core::BuiltinTheme* b = core::builtin_theme(name)) {
+        theme_ = b->theme;
+        return theme_;
+    }
+    const std::optional<std::string> text = files_.read_theme(name);
+    if (!text) {
+        theme_ = fallback.theme;
+        message(std::format("Тема «{}» не найдена — «{}»", name, fallback.name));
+        return theme_;
+    }
+    const core::ParsedTheme parsed = core::read_theme(*text);
+    theme_ = parsed.theme;
+    if (parsed.bad_lines > 0)
+        message(std::format("Тема «{}»: неверных строк — {}", name, parsed.bad_lines));
+    return theme_;
 }
 
 void Screens::save() {
@@ -103,7 +123,7 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
                 [&](const core::GameEvent& g) {
                     const int x = core::round_half_even(g.position.x);
                     const int y = core::round_half_even(g.position.y);
-                    const core::Rgba color = th.circles.at(static_cast<std::size_t>(g.color));
+                    const core::Rgba color = th.target(g.color);
                     const bool screen = flow.options().stimulus == core::Stimulus::Screen;
                     switch (g.kind) {
                         case core::GameEventKind::Hit:
@@ -112,19 +132,19 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
                                 // Замер на цвет: реакция — надписью посреди окна.
                                 effects_.label(core::kWindowWidth / 2, core::kWindowHeight / 2,
                                                std::format("{:.0f} мс", core::to_ms(g.reaction)),
-                                               core::kWhite, now);
+                                               th.text, now);
                                 break;
                             }
-                            effects_.hit(x, y, color, g.points, rng_, now);
+                            effects_.hit(x, y, color, th.text, g.points, rng_, now);
                             if (g.accuracy >= core::kPreciseHit) effects_.precise_flash(now);
                             break;
                         case core::GameEventKind::FalseStart:
                             play(core::kMissBeep);
                             effects_.label(core::kWindowWidth / 2, core::kWindowHeight / 2,
-                                           "Фальстарт", core::Rgba{255, 120, 100, 255}, now);
+                                           "Фальстарт", th.warn, now);
                             break;
                         case core::GameEventKind::Tracked:
-                            effects_.hit(x, y, color, g.points, rng_, now);
+                            effects_.hit(x, y, color, th.text, g.points, rng_, now);
                             play(core::kHitBeep);
                             break;
                         case core::GameEventKind::Bomb: effects_.bomb_flash(now); break;
@@ -177,6 +197,11 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
                        [&](const core::ChooseDataFolder&) {
                            folder_picker_.show(window_, files_.folder());
                        },
+                       [&](const core::NextTheme&) {
+                           profile_.settings.theme =
+                               core::next_theme(profile_.settings.theme, files_.themes());
+                           save();
+                       },
                        [&](const core::PlayReplay& p) {
                            std::string error;
                            std::optional<core::Replay> replay =
@@ -220,19 +245,19 @@ void Screens::render(const core::Flow& flow, core::Vec2 mouse, int fps, core::Na
             if (const core::Game* g = flow.game()) {
                 const bool hud = profile_.settings.hud;
                 render_game(canvas_, th, *g, effects_, trail_, fps, now, hud);
-                if (hud) toasts_.render(canvas_, now);
+                if (hud) toasts_.render(canvas_, th, now);
             }
             break;
         case core::Screen::GameOver:
             if (const core::Game* g = flow.game()) {
                 render_game_over(canvas_, th, *g, flow.last_run(), profile_);
-                toasts_.render(canvas_, now);
+                toasts_.render(canvas_, th, now);
             }
             break;
         case core::Screen::Replay:
             if (const core::ReplayPlayer* r = flow.replay()) {
                 render_replay(canvas_, th, *r, effects_, trail_, fps, now);
-                toasts_.render(canvas_, now);
+                toasts_.render(canvas_, th, now);
             }
             break;
     }

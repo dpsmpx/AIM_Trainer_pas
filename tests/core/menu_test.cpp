@@ -208,8 +208,9 @@ TEST_F(MenuTest, HelpScrollsByArrowsWheelAndBar) {
     EXPECT_EQ(menu_.help_scroll(), 5);
     menu_.wheel({.y = 1, .time = kLater});
     EXPECT_EQ(menu_.help_scroll(), 2);
-    menu_.key({.key = Key::PageDown, .time = kLater});
-    menu_.key({.key = Key::PageDown, .time = kLater});
+    // Страниц — с запасом: справка растёт, а ниже конца не листается.
+    for (int i = 0; i <= kHelpMaxScroll / kHelpVisibleLines + 1; ++i)
+        menu_.key({.key = Key::PageDown, .time = kLater});
     EXPECT_EQ(menu_.help_scroll(), kHelpMaxScroll) << "ниже конца не листается";
     // Полоса: щелчок по верху — к началу, по низу — к концу.
     const Rect track = help_track();
@@ -281,9 +282,10 @@ TEST_F(MenuTest, SettingsStepToggleResetAndClose) {
     EXPECT_EQ(profile_.settings.preset.ending, Ending::Time);
     menu_.click(click_at(center(settings_toggle(kSettingsSoundRow))));
     EXPECT_FALSE(profile_.settings.sound);
-    for (int i = 0; i < 3; ++i)
-        menu_.click(click_at(center(settings_toggle(kSettingsThemeRow))));
-    EXPECT_EQ(profile_.settings.theme, 0) << "три темы по кругу";
+    // Тему по кругу листает программа: темы игрока знает она (D-44).
+    menu_.click(click_at(center(settings_toggle(kSettingsThemeRow))));
+    EXPECT_EQ(count<NextTheme>(menu_.take_requests()), 1);
+    EXPECT_EQ(profile_.settings.theme, "dark");
     menu_.click(click_at(center(settings_toggle(kSettingsFontRow))));
     EXPECT_EQ(profile_.settings.font, 1) << "Condensed → Mono (D-43)";
     menu_.click(click_at(center(settings_toggle(kSettingsFontRow))));
@@ -292,7 +294,7 @@ TEST_F(MenuTest, SettingsStepToggleResetAndClose) {
     EXPECT_FALSE(profile_.settings.hud);
     menu_.click(click_at(center(settings_toggle(kSettingsReplaysRow))));
     EXPECT_FALSE(profile_.settings.replays);
-    EXPECT_EQ(count<SaveProfile>(menu_.take_requests()), 12);
+    EXPECT_EQ(count<SaveProfile>(menu_.take_requests()), 4);
     menu_.click(click_at(center(settings_reset())));
     EXPECT_EQ(profile_.settings.preset.target_size, 40);
     EXPECT_EQ(profile_.settings.preset.ending, Ending::Lives);

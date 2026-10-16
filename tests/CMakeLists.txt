@@ -32,6 +32,7 @@ add_executable(aim_core_tests
     core/replay_test.cpp
     core/runs_test.cpp
     core/target_test.cpp
+    core/theme_test.cpp
     core/tone_test.cpp)
 target_link_libraries(aim_core_tests PRIVATE aim_core GTest::gtest_main)
 aim_own_code(aim_core_tests)

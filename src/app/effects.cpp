@@ -17,12 +17,6 @@ int round_int(double v) {
     return core::round_half_even(v);
 }
 
-core::Rgba with_alpha(core::Rgba c, int alpha) {
-    // ARGB образца принимает byte: значение уже в 0…255 — у эффектов t < 1.
-    c.a = static_cast<std::uint8_t>(alpha);
-    return c;
-}
-
 }  // namespace
 
 void Effects::spawn(Kind kind, double x, double y, double vx, double vy, int duration_ms,
@@ -43,7 +37,7 @@ void Effects::spawn(Kind kind, double x, double y, double vx, double vy, int dur
     next_ = (next_ + 1) % kSlots;
 }
 
-void Effects::hit(int x, int y, core::Rgba color, int points, core::Random& rng,
+void Effects::hit(int x, int y, core::Rgba color, core::Rgba text, int points, core::Random& rng,
                   core::Nanoseconds now) {
     spawn(Kind::Flash, x, y, 0, 0, 250, color, {}, now);
     spawn(Kind::Wave, x, y, 0, 0, 400, color, {}, now);
@@ -54,7 +48,7 @@ void Effects::hit(int x, int y, core::Rgba color, int points, core::Random& rng,
         const double vy = std::sin(angle) * (60 + rng.between(0, 39));
         spawn(Kind::Shard, x, y, vx, vy, 500, color, {}, now);
     }
-    spawn(Kind::Points, x, y, 0, -30, 700, core::kWhite, "+" + std::to_string(points), now);
+    spawn(Kind::Points, x, y, 0, -30, 700, text, "+" + std::to_string(points), now);
 }
 
 void Effects::label(int x, int y, std::string text, core::Rgba color, core::Nanoseconds now,
@@ -65,11 +59,11 @@ void Effects::label(int x, int y, std::string text, core::Rgba color, core::Nano
 }
 
 void Effects::precise_flash(core::Nanoseconds now) {
-    spawn(Kind::WhiteScreen, 0, 0, 0, 0, 200, core::kWhite, {}, now);
+    spawn(Kind::WhiteScreen, 0, 0, 0, 0, 200, {}, {}, now);
 }
 
 void Effects::bomb_flash(core::Nanoseconds now) {
-    spawn(Kind::RedScreen, 0, 0, 0, 0, 350, core::kWhite, {}, now);
+    spawn(Kind::RedScreen, 0, 0, 0, 0, 350, {}, {}, now);
 }
 
 void Effects::clear() {
@@ -78,7 +72,7 @@ void Effects::clear() {
     next_ = 0;
 }
 
-void Effects::render(Canvas& c, core::Nanoseconds now) {
+void Effects::render(Canvas& c, const core::Theme& theme, core::Nanoseconds now) {
     for (Effect& e : effects_) {
         if (!e.active) continue;
         if (now - e.start >= e.duration) {
@@ -93,7 +87,7 @@ void Effects::render(Canvas& c, core::Nanoseconds now) {
                 break;
             case Kind::Wave:
                 // Circle образца ещё и заливает текущей кистью — как у него.
-                c.pen = with_alpha(core::kWhite, round_int(160 * (1 - t)));
+                c.pen = with_alpha(theme.wave, round_int(160 * (1 - t)));
                 c.pen_width = 2;
                 c.circle(round_int(e.x), round_int(e.y), round_int(10 + 50 * t));
                 break;
@@ -111,11 +105,11 @@ void Effects::render(Canvas& c, core::Nanoseconds now) {
                 break;
             }
             case Kind::WhiteScreen:
-                c.brush = {255, 255, 255, static_cast<std::uint8_t>(round_int(70 * (1 - t)))};
+                c.brush = with_alpha(theme.flash_hit, round_int(70 * (1 - t)));
                 c.fill_rect(0, 0, core::kWindowWidth, core::kWindowHeight);
                 break;
             case Kind::RedScreen:
-                c.brush = {200, 30, 20, static_cast<std::uint8_t>(round_int(140 * (1 - t)))};
+                c.brush = with_alpha(theme.flash_bomb, round_int(140 * (1 - t)));
                 c.fill_rect(0, 0, core::kWindowWidth, core::kWindowHeight);
                 break;
         }
@@ -133,13 +127,13 @@ void CursorTrail::clear() {
     next_ = 0;
 }
 
-void CursorTrail::render(Canvas& c) const {
+void CursorTrail::render(Canvas& c, const core::Theme& theme) const {
     constexpr auto n = static_cast<double>(kLength);
     for (std::size_t i = 0; i < kLength; ++i) {
         const std::size_t idx = (next_ + 2 * kLength - 1 - i) % kLength;
         if (!filled_[idx]) continue;
         const double share = 1 - static_cast<double>(i) / n;
-        c.brush = {200, 220, 255, static_cast<std::uint8_t>(round_int(140 * share))};
+        c.brush = with_alpha(theme.trail, round_int(140 * share));
         c.fill_circle(points_[idx].x, points_[idx].y, round_int(5 * share) + 1);
     }
 }

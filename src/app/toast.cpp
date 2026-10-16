@@ -20,7 +20,7 @@ void Toasts::push(std::string text) {
     queue_.push_back(std::move(text));
 }
 
-void Toasts::render(Canvas& c, core::Nanoseconds now) {
+void Toasts::render(Canvas& c, const core::Theme& theme, core::Nanoseconds now) {
     if (active_ && now - start_ > kShown) active_ = false;
     if (!active_) {
         if (queue_.empty()) return;
@@ -39,7 +39,6 @@ void Toasts::render(Canvas& c, core::Nanoseconds now) {
                                       static_cast<double>(kFade));
     }
     alpha = std::clamp(alpha, 0, 255);
-    const auto a = [](int v) { return static_cast<std::uint8_t>(v); };
 
     constexpr int kW = core::kWindowWidth;
     constexpr int kPad = 20;
@@ -47,11 +46,12 @@ void Toasts::render(Canvas& c, core::Nanoseconds now) {
     // Не шире окна (D-43): длинное — переносом, плашка — по строкам.
     const int tw = std::clamp(c.text_width(text_) + 2 * kPad, 240, kW - 40);
     const int th = std::max(40, c.text_lines(text_, tw - 2 * kPad) * c.line_height() + 16);
-    c.brush = {60, 50, 20, a(core::round_half_even(220.0 * alpha / 255))};
-    c.pen = {255, 210, 90, a(alpha)};
+    const double share = alpha / 255.0;
+    c.brush = faded(theme.toast, share);
+    c.pen = faded(theme.gold, share);
     c.pen_width = 2;
     c.fill_round_rect((kW - tw) / 2, 20, (kW + tw) / 2, 20 + th, 10, 10);
-    c.font_color = {255, 230, 160, a(alpha)};
+    c.font_color = faded(theme.toast_text, share);
     c.draw_text_centered((kW - tw) / 2 + kPad, 20, (kW + tw) / 2 - kPad, 20 + th, text_);
 }
 

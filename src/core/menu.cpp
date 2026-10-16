@@ -78,8 +78,7 @@ void Menu::click_settings(Vec2 p) {
         s.sound = !s.sound;
         requests_.emplace_back(SaveProfile{});
     } else if (settings_toggle(kSettingsThemeRow).contains(p)) {
-        s.theme = (s.theme + 1) % kThemeCount;
-        requests_.emplace_back(SaveProfile{});
+        requests_.emplace_back(NextTheme{});
     } else if (settings_toggle(kSettingsFontRow).contains(p)) {
         s.font = (s.font + 1) % kFontCount;
         requests_.emplace_back(SaveProfile{});

@@ -16,7 +16,7 @@ class Toasts {
 public:
     void push(std::string text);
     /// Нарисовать текущее уведомление; кончилось — взять следующее.
-    void render(Canvas& canvas, core::Nanoseconds now);
+    void render(Canvas& canvas, const core::Theme& theme, core::Nanoseconds now);
 
 private:
     std::deque<std::string> queue_;

@@ -19,7 +19,7 @@ TEST(ProfileFile, WriteThenReadKeepsEverything) {
     p.settings.average_runs = 100;
     p.settings.sound = false;
     p.settings.menu_effects = false;
-    p.settings.theme = 2;
+    p.settings.theme = "моя тема";
     p.settings.hud = false;
     p.settings.replays = false;
     p.settings.font = 1;
@@ -93,7 +93,7 @@ TEST(ProfileFile, BadValuesResetOthersKept) {
     EXPECT_EQ(p.settings.preset.lives, 15);
     EXPECT_TRUE(p.settings.sound);
     EXPECT_EQ(p.settings.preset.target_size, 50);
-    EXPECT_EQ(p.settings.theme, 1);
+    EXPECT_EQ(p.settings.theme, "neon") << "номер первых сборок — встроенная тема";
     EXPECT_TRUE(p.achievements[5]);
 }
 

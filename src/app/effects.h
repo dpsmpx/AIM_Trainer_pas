@@ -19,8 +19,9 @@ namespace aim::app {
 class Effects {
 public:
     /// Попадание в точке (x, y) цветом цели: вспышка, волна, восемь осколков
-    /// и «+очки» — SpawnHitEffects.
-    void hit(int x, int y, core::Rgba color, int points, core::Random& rng, core::Nanoseconds now);
+    /// и «+очки» цветом text — SpawnHitEffects.
+    void hit(int x, int y, core::Rgba color, core::Rgba text, int points, core::Random& rng,
+             core::Nanoseconds now);
     /// Белая вспышка экрана — точное попадание (точность от 95 %).
     void precise_flash(core::Nanoseconds now);
     /// Красная вспышка экрана — подрыв на бомбе.
@@ -35,7 +36,8 @@ public:
     /// частицы и вспышки остаются (интерфейс замера, D-45).
     void show_text(bool on) { text_ = on; }
 
-    void render(Canvas& canvas, core::Nanoseconds now);
+    /// Волна и вспышки экрана — цветами темы (D-44).
+    void render(Canvas& canvas, const core::Theme& theme, core::Nanoseconds now);
 
 private:
     enum class Kind : unsigned char { Flash, Wave, Shard, Points, WhiteScreen, RedScreen };
@@ -68,7 +70,7 @@ public:
     /// Кадр игры (не на паузе): запомнить курсор.
     void add(int x, int y);
     void clear();
-    void render(Canvas& canvas) const;
+    void render(Canvas& canvas, const core::Theme& theme) const;
 
 private:
     static constexpr std::size_t kLength = 12;

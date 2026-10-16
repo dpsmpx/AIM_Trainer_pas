@@ -19,13 +19,6 @@ namespace {
 
 constexpr int kW = core::kWindowWidth;
 constexpr int kH = core::kWindowHeight;
-constexpr core::Rgba kClWhite{255, 255, 255, 255};
-
-core::Rgba argb(int a, int r, int g, int b) {
-    const auto byte = [](int v) { return static_cast<std::uint8_t>(v); };
-    return {byte(r), byte(g), byte(b), byte(a)};
-}
-
 int round_int(double v) {
     return core::round_half_even(v);
 }
@@ -44,16 +37,16 @@ void render_target(Canvas& c, const core::Theme& theme, const core::Game& game,
     const int x = round_int(t.center().x);
     const int y = round_int(t.center().y);
     if (t.is_bomb()) {
-        c.brush = core::kBombFill;
+        c.brush = theme.bomb;
         c.fill_circle(x, y, r);
-        c.pen = kClWhite;
+        c.pen = theme.bomb_cross;
         c.pen_width = 3;
         const int cross = round_int(r * 0.5);
         c.line(x - cross, y - cross, x + cross, y + cross);
         c.line(x - cross, y + cross, x + cross, y - cross);
         return;
     }
-    c.brush = theme.circles.at(static_cast<std::size_t>(t.color()));
+    c.brush = theme.target(t.color());
     c.fill_circle(x, y, r);
     if (game.options().action == core::Action::Hover) {
         // Кольцо наводки: чем ближе к засчитыванию, тем ярче.
@@ -61,20 +54,20 @@ void render_target(Canvas& c, const core::Theme& theme, const core::Game& game,
             const int progress = std::min(round_int(255.0 * core::to_ms(t.hover_progress()) /
                                                     core::to_ms(core::kTrackingHold)),
                                           255);
-            c.pen = argb(progress, 255, 255, 255);
+            c.pen = with_alpha(theme.text, progress);
             c.pen_width = 3;
             c.circle(x, y, r + 6);
         }
     } else if (r > 8) {
         // Зоны точности на 50 % и 25 % радиуса.
-        c.pen = argb(90, 255, 255, 255);
+        c.pen = faded(theme.text, 90.0 / 255);
         c.pen_width = 1;
         c.circle(x, y, round_int(r * 0.5));
         c.circle(x, y, round_int(r * 0.25));
     }
 }
 
-void render_heatmap(Canvas& c, const core::Game& game) {
+void render_heatmap(Canvas& c, const core::Theme& theme, const core::Game& game) {
     const core::MissHeatmap& map = game.miss_heatmap();
     int most = 1;
     for (const auto& column : map)
@@ -86,9 +79,9 @@ void render_heatmap(Canvas& c, const core::Game& game) {
     constexpr int kCellH = 100 / core::kHeatmapRows;
 
     c.font.size = kTextSize;
-    c.font_color = argb(180, 200, 200, 200);
+    c.font_color = theme.text_dim;
     c.draw_text_centered(kOriginX, kOriginY - 22, kOriginX + 200, kOriginY, "Промахи");
-    c.brush = argb(80, 30, 30, 35);
+    c.brush = theme.graph;
     c.fill_round_rect(kOriginX, kOriginY, kOriginX + 200, kOriginY + 100, 4, 4);
     for (int cx = 0; cx < core::kHeatmapCols; ++cx) {
         for (int cy = 0; cy < core::kHeatmapRows; ++cy) {
@@ -97,7 +90,7 @@ void render_heatmap(Canvas& c, const core::Game& game) {
             const int alpha = std::max(round_int(220.0 * n / most), 40);
             const int gx = kOriginX + cx * kCellW;
             const int gy = kOriginY + cy * kCellH;
-            c.brush = argb(alpha, 255, 90, 70);
+            c.brush = with_alpha(theme.target_right, alpha);
             c.fill_round_rect(gx, gy, gx + kCellW, gy + kCellH, 1, 1);
         }
     }
@@ -110,7 +103,7 @@ void render_countdown(Canvas& c, const core::Theme& theme, const core::Flow& flo
     c.clear_window(theme.background);
     const core::MeasureOptions& o = flow.options();
     c.font.size = kTitleSize;
-    c.font_color = argb(200, 230, 230, 230);
+    c.font_color = theme.text;
     c.draw_text_centered(0, kH / 2 - 154, kW, kH / 2 - 120, core::combo_name(o));
     c.font.size = kTextSize;
     c.draw_text_centered(40, kH / 2 - 118, kW - 40, kH / 2 - 96, core::describe_short(o));
@@ -157,7 +150,7 @@ std::array<HudCell, 5> hud_cells(const core::Game& game, int fps, core::Nanoseco
 }
 
 // Панель замера внизу: ячейки по ширине текста, посередине окна.
-void render_hud(Canvas& c, const std::array<HudCell, 5>& cells) {
+void render_hud(Canvas& c, const core::Theme& theme, const std::array<HudCell, 5>& cells) {
     constexpr int kPad = 10;   // от края ячейки до текста
     constexpr int kGap = 8;    // между подписью и значением
     constexpr int kSpace = 8;  // между ячейками
@@ -177,13 +170,13 @@ void render_hud(Canvas& c, const std::array<HudCell, 5>& cells) {
     for (std::size_t i = 0; i < cells.size(); ++i) {
         const HudCell& cell = cells.at(i);
         const int w = widths.at(i);
-        c.brush = argb(220, 60, 60, 65);
+        c.brush = theme.hud;
         c.fill_round_rect(x, y, x + w, y + h, 12, 12);
-        c.brush = argb(0, 0, 0, 0);
+        c.brush = core::Rgba{0, 0, 0, 0};
         const int ty = y + (h - line_h) / 2;
-        c.font_color = argb(255, 170, 175, 185);
+        c.font_color = theme.label;
         c.text_out(x + kPad, ty, cell.label);
-        c.font_color = kClWhite;
+        c.font_color = theme.text;
         c.text_out(x + w - kPad - c.text_width(cell.value), ty, cell.value);
         x += w + kSpace;
     }
@@ -195,36 +188,36 @@ void render_game(Canvas& c, const core::Theme& theme, const core::Game& game, Ef
     // Замер на цвет: окно целиком — фон или сигнал (D-37).
     c.clear_window(screen && game.signal_lit(now) ? theme.signal : theme.background);
     if (!screen) {
-        trail.render(c);
+        trail.render(c, theme);
         render_target(c, theme, game, now);
     }
-    effects.render(c, now);
+    effects.render(c, theme, now);
     if (!hud) return;  // интерфейс замера выключен (D-45)
 
     const int old_size = c.font.size;
     const core::MeasureOptions& o = game.options();
-    render_hud(c, hud_cells(game, fps, now));
+    render_hud(c, theme, hud_cells(game, fps, now));
     c.font.size = old_size;
 
     if (!screen && o.action == core::Action::Click && o.color_buttons) {
         // Подсказка «какой цвет какой кнопкой»; цели под ней не появляются.
-        c.brush = argb(160, 40, 40, 45);
+        c.brush = theme.overlay;
         c.fill_round_rect(10, 8, 190, 44, 8, 8);
-        c.brush = theme.circles[0];
+        c.brush = theme.target_left;
         c.fill_circle(26, 26, 7);
-        c.brush = theme.circles[1];
+        c.brush = theme.target_right;
         c.fill_circle(106, 26, 7);
         c.font.size = kTextSize;
-        c.font_color = kClWhite;
+        c.font_color = theme.text;
         c.draw_text_centered(36, 15, 96, 37, "ЛКМ");
         c.draw_text_centered(116, 15, 180, 37, "ПКМ");
         c.font.size = old_size;
     }
     if (game.combo() >= 2) {
-        c.brush = argb(160, 40, 40, 45);
+        c.brush = theme.overlay;
         c.fill_round_rect(kW - 130, 10, kW - 10, 40, 8, 8);
         c.font.size = kTextSize;
-        c.font_color = game.combo() >= 10 ? argb(255, 255, 210, 90) : kClWhite;
+        c.font_color = game.combo() >= 10 ? theme.gold : theme.text;
         c.draw_text_centered(kW - 130, 10, kW - 10, 40, std::format("Серия x{}", game.combo()));
         c.font.size = old_size;
     }
@@ -246,32 +239,32 @@ void render_game_over(Canvas& c, const core::Theme& theme, const core::Game& gam
     }
     // Верх окна (20–60) — место уведомлений: заголовок ниже.
     c.font.size = kHeadlineSize;
-    c.font_color = kClWhite;
+    c.font_color = theme.text;
     c.draw_text_centered(0, 60, kW, 114, title);
     c.font.size = kTextSize;
-    c.font_color = argb(220, 220, 220, 220);
+    c.font_color = theme.text_dim;
     c.draw_text_centered(0, 112, kW, 132,
                          std::format("{} — Space: в меню, R: заново", core::combo_name(o)));
 
     // Слева — параметры замера (D-38).
     c.font.size = kTextSize;
     int y = 150;
-    c.font_color = argb(200, 160, 200, 255);
+    c.font_color = theme.accent;
     c.draw_text_centered(40, y, 380, y + 20, "Параметры");
     y += 26;
     for (const std::string& line : core::describe(o)) {
-        c.pair_centered(40, y, 380, y + 20, line, kLabelColor, argb(255, 220, 220, 220));
+        c.pair_centered(40, y, 380, y + 20, line, theme.label, theme.text);
         y += 22;
     }
 
     // Справа — меры, по одной на строку: строка не шире столбца.
     y = 150;
-    c.font_color = argb(200, 160, 200, 255);
+    c.font_color = theme.accent;
     c.draw_text_centered(420, y, 760, y + 20, "Результат");
     y += 26;
     // Подпись — приглушённо, значение — ярко (D-43).
-    const auto row = [&](const std::string& text, core::Rgba value = kClWhite) {
-        c.pair_centered(420, y, 760, y + 20, text, kLabelColor, value);
+    const auto row = [&](const std::string& text, std::optional<core::Rgba> value = {}) {
+        c.pair_centered(420, y, 760, y + 20, text, theme.label, value.value_or(theme.text));
         y += 22;
     };
     if (o.stimulus == core::Stimulus::Target && o.action == core::Action::Hover) {
@@ -303,19 +296,19 @@ void render_game_over(Canvas& c, const core::Theme& theme, const core::Game& gam
     y += 10;
     if (run && run->new_best) {
         c.font.weight = Weight::Bold;
-        c.font_color = argb(255, 255, 210, 90);
+        c.font_color = theme.gold;
         c.draw_text_centered(420, y, 760, y + 24, "Новый рекорд набора!");
         c.font.weight = Weight::Normal;
         y += 30;
     }
-    const core::Rgba gold = argb(255, 255, 210, 90);
+    const core::Rgba gold = theme.gold;
     if (st.best)
         row("Рекорд набора: " + primary(core::primary_value(profile.runs.at(*st.best).summary)),
             gold);
     if (st.average.runs > 0)
         row(std::format("Среднее за {}: {}", st.average.runs, primary(st.average.primary)), gold);
 
-    if (!game.screen_stimulus()) render_heatmap(c, game);
+    if (!game.screen_stimulus()) render_heatmap(c, theme, game);
 }
 
 void render_replay(Canvas& c, const core::Theme& theme, const core::ReplayPlayer& replay,
@@ -325,7 +318,7 @@ void render_replay(Canvas& c, const core::Theme& theme, const core::ReplayPlayer
     // Курсор игрока из записи: кольцо с крестом — свой курсор зрителя другой.
     const int x = core::round_half_even(replay.cursor().x);
     const int y = core::round_half_even(replay.cursor().y);
-    c.pen = argb(230, 255, 255, 255);
+    c.pen = theme.text;
     c.pen_width = 2;
     c.draw_circle(x, y, 8);
     c.line(x - 14, y, x - 4, y);
@@ -339,16 +332,16 @@ void render_replay(Canvas& c, const core::Theme& theme, const core::ReplayPlayer
     const bool finished = replay.done() && game.over();
     constexpr int kX1 = 200;
     constexpr int kX2 = kW - 140;
-    c.brush = argb(190, 40, 40, 45);
+    c.brush = theme.overlay;
     c.fill_round_rect(kX1, 6, kX2, 56, 8, 8);
     c.font.size = kTextSize;
-    c.font_color = argb(255, 120, 220, 140);
+    c.font_color = theme.good;
     c.draw_text_centered(kX1, 8, kX2, 30,
                          std::format("РЕПЛЕЙ · {} · {:02}.{:02}.{:04} {:02}:{:02}",
                                      core::combo_name(run.summary.options), w.day, w.month, w.year,
                                      w.hour, w.minute));
     c.font.size = kTextSize;
-    c.font_color = argb(220, 220, 220, 220);
+    c.font_color = theme.text_dim;
     c.draw_text_centered(
         kX1, 31, kX2, 53,
         finished ? "Реплей окончен · Esc, Space или M — в меню" : "Esc, Space или M — в меню");

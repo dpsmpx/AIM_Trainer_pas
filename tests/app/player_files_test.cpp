@@ -59,7 +59,7 @@ TEST_F(PlayerFilesTest, NewProfileIsWrittenWithDefaults) {
 TEST_F(PlayerFilesTest, SavedProfileIsReadBack) {
     core::Profile p;
     p.preset = 4;
-    p.settings.theme = 2;
+    p.settings.theme = "minimal";
     {
         PlayerFiles f = files();
         f.load(messages_);
@@ -69,7 +69,7 @@ TEST_F(PlayerFilesTest, SavedProfileIsReadBack) {
     const core::Profile read = again.load(messages_);
     EXPECT_TRUE(messages_.empty());
     EXPECT_EQ(read.preset, 4);
-    EXPECT_EQ(read.settings.theme, 2);
+    EXPECT_EQ(read.settings.theme, "minimal");
 }
 
 TEST_F(PlayerFilesTest, ForeignProfileIsCopiedAndReset) {
@@ -273,6 +273,25 @@ TEST_F(PlayerFilesTest, ChangeFolderCopiesReplaysKeepingTheirs) {
         << "реплеи прежней папки — в новой";
     EXPECT_EQ(platform::Storage(other + "backup_20261016_1532/replays/").read(name), theirs_text)
         << "заменённый реплей не потерян";
+}
+
+TEST_F(PlayerFilesTest, PlayerThemesAreListedReadAndMoved) {
+    ASSERT_TRUE(SDL_CreateDirectory((dir_ + "themes").c_str()));
+    const platform::Storage themes(dir_ + "themes/");
+    ASSERT_TRUE(themes.write("лес.ini", "background=#002000\n", error_)) << error_;
+    ASSERT_TRUE(themes.write("дождь.ini", "base=neon\n", error_)) << error_;
+    ASSERT_TRUE(themes.write("заметки.txt", "не тема", error_)) << error_;
+    PlayerFiles f = files();
+    f.load(messages_);
+    EXPECT_EQ(f.themes(), (std::vector<std::string>{"дождь", "лес"})) << "только .ini, по алфавиту";
+    EXPECT_EQ(f.read_theme("лес"), "background=#002000\n");
+    EXPECT_FALSE(f.read_theme("нет такой"));
+    // Темы переезжают вместе с сохранениями (D-44).
+    const std::string other = dir_ + "other/";
+    ASSERT_TRUE(f.change_folder(other, kWhen, messages_).has_value());
+    EXPECT_EQ(f.themes(), (std::vector<std::string>{"дождь", "лес"}));
+    EXPECT_TRUE(platform::Storage(other + "themes/").exists("лес.ini"));
+    EXPECT_FALSE(platform::Storage(other + "themes/").exists("заметки.txt"));
 }
 
 TEST_F(PlayerFilesTest, SecondChangeInAMinuteGetsItsOwnBackup) {

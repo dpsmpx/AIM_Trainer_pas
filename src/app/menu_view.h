@@ -44,7 +44,8 @@ public:
                 core::Nanoseconds now) const;
 
 private:
-    void render_particles(Canvas& canvas, const core::Profile& profile, core::Vec2 mouse) const;
+    void render_particles(Canvas& canvas, const core::Theme& theme, const core::Profile& profile,
+                          core::Vec2 mouse) const;
     /// Плашка-превью: заголовок title, анимация набора kind (kPresets).
     void render_plate(Canvas& canvas, const core::Theme& theme, std::string_view title, int kind,
                       core::Vec2 mouse) const;

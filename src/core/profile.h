@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -22,7 +23,6 @@ namespace aim::core {
 /// конструкторе (D-37); жизнь цели — до множителя набора (D-21).
 inline constexpr int kMinBaseLifetimeMs = 500;
 inline constexpr int kMaxBaseLifetimeMs = 2000;
-inline constexpr int kThemeCount = 3;  ///< 0 — Тёмная, 1 — Неон, 2 — Минимализм
 /// Шрифт (D-43): 0 — DejaVu Sans Condensed, 1 — DejaVu Sans Mono.
 inline constexpr int kFontCount = 2;
 /// Ступени «Среднее за N».
@@ -33,7 +33,9 @@ struct Settings {
     int average_runs = kDefaultAverageRuns;  ///< N у «среднего за N» (D-38)
     bool sound = true;
     bool menu_effects = true;  ///< частицы меню, «Effects: ON/OFF»
-    int theme = 0;
+    /// Тема (D-44): слово встроенной (dark, neon, minimal) или имя файла
+    /// themes/ИМЯ.ini игрока.
+    std::string theme = "dark";
     int font = 0;         ///< kFontCount: 0 — Condensed (D-43)
     bool hud = true;      ///< панели и надписи в окне замера (D-45)
     bool replays = true;  ///< писать вход замера и реплей рекорда (D-45)

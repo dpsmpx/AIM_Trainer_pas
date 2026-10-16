@@ -12,7 +12,10 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <set>
 #include <span>
@@ -31,8 +34,19 @@ inline constexpr int kTextSize = 12;
 inline constexpr int kTitleSize = 20;
 inline constexpr int kHeadlineSize = 32;
 inline constexpr int kCountdownSize = 120;
-/// Подпись у пары «подпись: значение» — приглушённо (D-43).
-inline constexpr core::Rgba kLabelColor{165, 170, 180, 255};
+/// Цвет темы с прозрачностью a (0…255): мигание и угасание по своему закону.
+inline core::Rgba with_alpha(core::Rgba c, int a) {
+    c.a = static_cast<std::uint8_t>(std::clamp(a, 0, 255));
+    return c;
+}
+
+/// Цвет темы с прозрачностью, умноженной на share (0…1): мигание, угасание,
+/// появление (D-44).
+inline core::Rgba faded(core::Rgba c, double share) {
+    const double a = static_cast<double>(c.a) * std::clamp(share, 0.0, 1.0);
+    c.a = static_cast<std::uint8_t>(std::lround(a));
+    return c;
+}
 
 struct IntPoint {
     int x = 0;

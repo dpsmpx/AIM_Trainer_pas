@@ -57,7 +57,9 @@ private:
     void take_folder_choice();
     /// Звук, если он включён в настройках.
     void play(core::Beep beep);
-    [[nodiscard]] const core::Theme& theme() const;
+    /// Тема из настроек (D-44): встроенная или файл игрока; перечитывается,
+    /// когда меняется имя темы или папка сохранений.
+    const core::Theme& theme();
 
     SDL_Window* window_;
     Canvas canvas_;
@@ -71,6 +73,8 @@ private:
     CursorTrail trail_;
     Toasts toasts_;
     platform::FolderPicker folder_picker_;
+    core::Theme theme_ = core::kThemes.front().theme;
+    std::string theme_for_;  ///< папка и имя темы, по которым прочитана theme_
 };
 
 }  // namespace aim::app

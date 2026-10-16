@@ -152,8 +152,8 @@ cmd_clean() {
     local args=() p
     for p in "${PLAYER_FILES[@]}"; do args+=(-o -name "$p"); done
     find "$dir" -maxdepth 1 -type f \( "${args[@]:1}" \) -delete
-    # Реплеи C++-версии — в своей подпапке (D-39).
-    rm -rf -- "${dir:?}/replays"
+    # Реплеи и темы C++-версии — в своих подпапках (D-39, D-44).
+    rm -rf -- "${dir:?}/replays" "${dir:?}/themes"
 }
 
 cmd_shot() {

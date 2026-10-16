@@ -72,6 +72,7 @@ add_library(aim_core STATIC
     src/core/runs.cpp
     src/core/target.cpp
     src/core/text.cpp
+    src/core/theme.cpp
     src/core/tone.cpp)
 target_include_directories(aim_core PUBLIC src)
 aim_own_code(aim_core)

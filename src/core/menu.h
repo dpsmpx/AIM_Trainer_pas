@@ -43,13 +43,16 @@ struct ExportHistory {};
 struct OpenDataFolder {};
 /// Выбрать папку сохранений системным диалогом (D-33).
 struct ChooseDataFolder {};
+/// Следующая тема по кругу: встроенные, затем темы игрока — их знает
+/// программа (D-44).
+struct NextTheme {};
 /// Реплей лучшего замера набора — щелчок по строке «Рекордов наборов»
 /// (D-39); есть ли он — знает программа.
 struct PlayReplay {
     MeasureOptions options;
 };
 using MenuRequest = std::variant<SaveProfile, SwitchProfile, ExportHistory, OpenDataFolder,
-                                 ChooseDataFolder, PlayReplay>;
+                                 ChooseDataFolder, PlayReplay, NextTheme>;
 
 /// Шагов туториала первого запуска.
 inline constexpr int kTutorialSteps = 4;

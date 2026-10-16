@@ -105,7 +105,9 @@
       "environment": {
         "WINEPREFIX": "${sourceDir}/build/wineprefix",
         "WINEDEBUG": "-all",
-        "WINEDLLOVERRIDES": "mscoree,mshtml="
+        "WINEDLLOVERRIDES": "mscoree,mshtml=",
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8"
       }
     }
   ]

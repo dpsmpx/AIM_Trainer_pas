@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 
+#include "core/palette.h"
 #include "core/text.h"
 
 namespace aim::core {
@@ -97,7 +98,16 @@ bool apply(std::string_view key, std::string_view value, Profile& p) {
     if (key == "average_runs") return as_int(s.average_runs);
     if (key == "sound") return as_bool(s.sound);
     if (key == "menu_effects") return as_bool(s.menu_effects);
-    if (key == "theme") return as_int(s.theme);
+    if (key == "theme") {
+        // Номер — профиль первых сборок v1: 0–2 — встроенные темы.
+        if (const std::optional<int> n = parse_int(value)) {
+            if (*n < 0 || *n >= static_cast<int>(kThemes.size())) return false;
+            s.theme = std::string(kThemes.at(static_cast<std::size_t>(*n)).id);
+            return true;
+        }
+        s.theme = std::string(value);
+        return !s.theme.empty() && s.theme.find_first_of("/\\") == std::string::npos;
+    }
     if (key == "font") {
         if (value != "condensed" && value != "mono") return false;
         s.font = value == "mono" ? 1 : 0;

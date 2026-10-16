@@ -89,7 +89,10 @@ int reset_out_of_range(Settings& settings) {
     check(p.lifetime_ms, kMinBaseLifetimeMs, kMaxBaseLifetimeMs, defaults.preset.lifetime_ms);
     check(p.lives, kMinLives, kMaxLives, defaults.preset.lives);
     check(settings.average_runs, kMinAverageRuns, kMaxAverageRuns, defaults.average_runs);
-    check(settings.theme, 0, kThemeCount - 1, defaults.theme);
+    if (settings.theme.empty()) {
+        settings.theme = defaults.theme;
+        ++reset;
+    }
     check(settings.font, 0, kFontCount - 1, defaults.font);
     return reset;
 }

@@ -109,7 +109,10 @@ cmake --preset linux-gcc && cmake --build --preset linux-gcc && ctest --preset l
   (`frame_check.cpp`). Остальная отрисовка тестами не проверяется
   (AUD-49).
 
-Тесты Windows-сборки идут под Wine без экрана. Окно Windows-сборки в
+Тесты Windows-сборки идут под Wine без экрана, с локалью `C.UTF-8`
+(`CMakePresets.json`): в локали «C» Wine не переводит кириллицу имён файлов
+в имена Linux, и файл «лес.ini» не создаётся — у Windows такой беды нет,
+SDL пишет через широкие функции. Окно Windows-сборки в
 сессии можно открыть под Xvfb: `DISPLAY=:99 wine
 build/windows-cross/AimTrainer.exe`; клик — `xdotool`.
 

@@ -14,6 +14,9 @@ namespace aim::core {
 /// пропускается, пустая последняя строка после финального перевода — нет.
 std::vector<std::string_view> split_lines(std::string_view text);
 
+/// Строка без пробельных знаков по краям.
+std::string_view trim(std::string_view s);
+
 /// Поля строки через разделитель.
 std::vector<std::string_view> split(std::string_view line, char separator);
 

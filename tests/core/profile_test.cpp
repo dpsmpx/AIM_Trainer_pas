@@ -61,7 +61,7 @@ TEST(Settings, ResetKeepsThemeAndEffects) {
     s.average_runs = 200;
     s.sound = false;
     s.menu_effects = false;
-    s.theme = 1;
+    s.theme = "neon";
     s.hud = false;
     s.replays = false;
     s.font = 1;
@@ -75,7 +75,7 @@ TEST(Settings, ResetKeepsThemeAndEffects) {
     EXPECT_TRUE(s.hud) << "интерфейс замера — снова включён (D-45)";
     EXPECT_TRUE(s.replays);
     EXPECT_FALSE(s.menu_effects);
-    EXPECT_EQ(s.theme, 1);
+    EXPECT_EQ(s.theme, "neon");
     EXPECT_EQ(s.font, 1) << "шрифт сброс не трогает, как тему";
 }
 
@@ -84,12 +84,12 @@ TEST(Settings, OutOfRangeFromFileGoesToDefault) {
     s.preset.target_size = 7;
     s.preset.lifetime_ms = 9000;
     s.average_runs = 0;
-    s.theme = 9;
+    s.theme.clear();
     EXPECT_EQ(reset_out_of_range(s), 4);
     EXPECT_EQ(s.preset.target_size, 40);
     EXPECT_EQ(s.preset.lifetime_ms, 1000);
     EXPECT_EQ(s.average_runs, 50);
-    EXPECT_EQ(s.theme, 0);
+    EXPECT_EQ(s.theme, "dark");
     EXPECT_EQ(reset_out_of_range(s), 0);
 }
 
