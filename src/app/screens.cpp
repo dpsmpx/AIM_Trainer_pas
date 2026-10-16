@@ -91,8 +91,9 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
                     }
                 },
                 [&](const core::AchievementUnlocked& a) {
-                    message("Достижение: " +
-                            std::string(core::kAchievements.at(static_cast<std::size_t>(a.id)).name));
+                    message(
+                        "Достижение: " +
+                        std::string(core::kAchievements.at(static_cast<std::size_t>(a.id)).name));
                     // Как образец: достижение записывается сразу.
                     save();
                 },

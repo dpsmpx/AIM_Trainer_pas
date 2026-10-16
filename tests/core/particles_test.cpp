@@ -50,12 +50,11 @@ TEST(Particles, LinkAlphaFadesWithoutJump) {
     // У образца прозрачность линии к курсору за 100 px оборачивалась и
     // становилась яркой (AUD-13): здесь — гаснет до нуля к пределу.
     int previous = 255;
-    for (double d = 0; d < kCursorLink; d += 1) {
-        const std::optional<int> a = link_alpha(d, kCursorLink);
-        ASSERT_TRUE(a.has_value());
-        EXPECT_LE(*a, previous) << d;
-        EXPECT_GE(*a, 0);
-        previous = *a;
+    for (int d = 0; d < static_cast<int>(kCursorLink); ++d) {
+        const int a = link_alpha(d, kCursorLink).value_or(-1);
+        EXPECT_LE(a, previous) << d;
+        EXPECT_GE(a, 0) << d;
+        previous = a;
     }
     EXPECT_EQ(link_alpha(0, kParticleLink), 120);
     EXPECT_EQ(link_alpha(kCursorLink, kCursorLink), std::nullopt);

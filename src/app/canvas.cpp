@@ -35,9 +35,7 @@ public:
         vertices_.push_back({{p.x, p.y}, c, {0, 0}});
         return static_cast<int>(vertices_.size()) - 1;
     }
-    void triangle(int a, int b, int c) {
-        indices_.insert(indices_.end(), {a, b, c});
-    }
+    void triangle(int a, int b, int c) { indices_.insert(indices_.end(), {a, b, c}); }
     void quad(int a, int b, int c, int d) {  // a-b — одна сторона, d-c — другая
         triangle(a, b, c);
         triangle(a, c, d);
@@ -62,8 +60,8 @@ std::vector<Pt> ellipse_points(float cx, float cy, float rx, float ry) {
     pts.reserve(static_cast<std::size_t>(n));
     for (int i = 0; i < n; ++i) {
         const double a = 2.0 * std::numbers::pi * i / n;
-        pts.push_back({cx + rx * static_cast<float>(std::cos(a)),
-                       cy + ry * static_cast<float>(std::sin(a))});
+        pts.push_back(
+            {cx + rx * static_cast<float>(std::cos(a)), cy + ry * static_cast<float>(std::sin(a))});
     }
     return pts;
 }
@@ -234,8 +232,8 @@ void Canvas::fill_round_rect(int x1, int y1, int x2, int y2, int w, int h) {
 }
 
 void Canvas::draw_round_rect(int x1, int y1, int x2, int y2, int w, int h) {
-    stroke_closed(renderer_, round_rect_points(x1, y1, x2, y2, w, h),
-                  static_cast<float>(pen_width), pen);
+    stroke_closed(renderer_, round_rect_points(x1, y1, x2, y2, w, h), static_cast<float>(pen_width),
+                  pen);
 }
 
 void Canvas::fill_circle(int x, int y, int r) {
@@ -248,8 +246,7 @@ void Canvas::fill_circle(int x, int y, int r) {
 void Canvas::draw_circle(int x, int y, int r) {
     if (r <= 0) return;
     const Pt c = gdi(x, y);
-    stroke_closed(renderer_,
-                  ellipse_points(c.x, c.y, static_cast<float>(r), static_cast<float>(r)),
+    stroke_closed(renderer_, ellipse_points(c.x, c.y, static_cast<float>(r), static_cast<float>(r)),
                   static_cast<float>(pen_width), pen);
 }
 
@@ -269,8 +266,8 @@ void Canvas::polyline(std::span<const IntPoint> points) {
     if (points.size() < 2 || pen.a == 0) return;
     Mesh mesh;
     for (std::size_t i = 0; i + 1 < points.size(); ++i)
-        stroke_segment(mesh, gdi(points[i].x, points[i].y),
-                       gdi(points[i + 1].x, points[i + 1].y), static_cast<float>(pen_width), pen);
+        stroke_segment(mesh, gdi(points[i].x, points[i].y), gdi(points[i + 1].x, points[i + 1].y),
+                       static_cast<float>(pen_width), pen);
     mesh.draw(renderer_);
 }
 
@@ -291,14 +288,20 @@ void Canvas::draw_text_centered(int x, int y, int x1, int y1, std::string_view s
     const int line_h = text_.height(font);
     const int block = line_h * static_cast<int>(lines.size());
     const float top = static_cast<float>(box.y) + static_cast<float>(box.h - block) / 2.0F;
-    SDL_SetRenderClipRect(renderer_, &box);
+    // Обрезка — только если текст выходит за прямоугольник: смена области
+    // обрезки рвёт пакет отрисовки SDL.
+    int widest = 0;
+    for (const std::string& line : lines)
+        widest = std::max(widest, text_.measure(line, font));
+    const bool clip = block > box.h || widest > box.w;
+    if (clip) SDL_SetRenderClipRect(renderer_, &box);
     for (std::size_t i = 0; i < lines.size(); ++i) {
         const int w = text_.measure(lines[i], font);
         text_.out(static_cast<float>(box.x) + static_cast<float>(box.w - w) / 2.0F,
                   top + static_cast<float>(line_h) * static_cast<float>(i), lines[i], font,
                   font_color);
     }
-    SDL_SetRenderClipRect(renderer_, nullptr);
+    if (clip) SDL_SetRenderClipRect(renderer_, nullptr);
 }
 
 int Canvas::text_width(std::string_view s) {

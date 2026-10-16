@@ -68,9 +68,9 @@ void render_target(Canvas& c, const core::Theme& theme, const core::Game& game,
     if (game.mode() == core::GameMode::Tracking) {
         // Кольцо наводки: чем ближе к засчитыванию, тем ярче.
         if (t.hover_progress() > 0) {
-            const int progress = std::min(
-                round_int(255.0 * core::to_ms(t.hover_progress()) / core::to_ms(core::kTrackingHold)),
-                255);
+            const int progress = std::min(round_int(255.0 * core::to_ms(t.hover_progress()) /
+                                                    core::to_ms(core::kTrackingHold)),
+                                          255);
             c.pen = argb(progress, 255, 255, 255);
             c.pen_width = 3;
             c.circle(x, y, r + 6);
@@ -121,9 +121,9 @@ void render_countdown(Canvas& c, const core::Theme& theme, const core::Flow& flo
     // Цвет шрифта образец здесь не задаёт — остаётся от прошлого экрана.
     c.clear_window(theme.background);
     c.font.size = 20;
-    c.draw_text_centered(0, kH / 2 - 140, kW, kH / 2 - 120,
-                         core::kModeLooks.at(static_cast<std::size_t>(core::mode_index(flow.mode())))
-                             .title);
+    c.draw_text_centered(
+        0, kH / 2 - 140, kW, kH / 2 - 120,
+        core::kModeLooks.at(static_cast<std::size_t>(core::mode_index(flow.mode()))).title);
     c.font.size = 120;
     c.draw_text_centered(0, kH / 2 - 100, kW, kH / 2 + 100,
                          std::to_string(flow.countdown_value(now)));

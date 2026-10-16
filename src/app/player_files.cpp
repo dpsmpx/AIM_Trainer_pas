@@ -63,8 +63,7 @@ core::Profile PlayerFiles::open(int number, std::vector<std::string>& messages) 
         // Как образец: копия повреждённого файла и всё по умолчанию.
         if (!storage_->write(core::corrupt_backup_file_name(number_), *text, error))
             messages.push_back("Копия повреждённого профиля не записана: " + error);
-        messages.push_back(
-            std::format("Профиль {} повреждён: сброшен, копия сохранена", number_));
+        messages.push_back(std::format("Профиль {} повреждён: сброшен, копия сохранена", number_));
         save_or_say(loaded.profile);
     } else if (!loaded.reset_fields.empty()) {
         messages.push_back(std::format("Профиль {}: неверных значений сброшено — {}", number_,

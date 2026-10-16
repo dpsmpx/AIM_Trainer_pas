@@ -34,7 +34,7 @@ void Menu::close_tutorial() {
     requests_.emplace_back(SaveProfile{});
 }
 
-std::optional<GameMode> Menu::start_selected() {
+std::optional<GameMode> Menu::start_selected() const {
     return kAllModes.at(static_cast<std::size_t>(selected_));
 }
 
@@ -95,11 +95,8 @@ std::optional<GameMode> Menu::click(const ClickInput& click) {
             }
             if (!profiles_panel().contains(p)) panel_ = Panel::None;
             return std::nullopt;
-        case Panel::Settings:
-            click_settings(p);
-            return std::nullopt;
-        case Panel::None:
-            break;
+        case Panel::Settings: click_settings(p); return std::nullopt;
+        case Panel::None: break;
     }
     constexpr std::array<std::pair<MiniButton, Panel>, 6> kOpens{{
         {MiniButton::Help, Panel::Help},

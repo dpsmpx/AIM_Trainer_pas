@@ -247,17 +247,18 @@ void render_history(Canvas& c, const HistoryView& h) {
     for (std::size_t i = 0; i < kBuckets.size(); ++i) {
         c.font_color = argb(220, 220, 220, 220);
         const core::TimeOfDayScore& b = h.by_time_of_day.at(i);
-        const std::string text =
-            b.games > 0 ? std::format("{}: средний счёт {} ({} игр)", kBuckets.at(i),
-                                      one_decimal(b.average_score), b.games)
-                        : std::format("{}: нет данных", kBuckets.at(i));
+        const std::string text = b.games > 0
+                                     ? std::format("{}: средний счёт {} ({} игр)", kBuckets.at(i),
+                                                   one_decimal(b.average_score), b.games)
+                                     : std::format("{}: нет данных", kBuckets.at(i));
         c.draw_text_centered(p.x1 + 20, y, p.x1 + 500, y + 22, text);
         y += 26;
     }
 
     c.font.size = 12;
     c.font_color = argb(200, 200, 200, 200);
-    c.draw_text_centered(p.x1 + 20, y + 8, p.x1 + 500, y + 26, "Средняя реакция по последним играм:");
+    c.draw_text_centered(p.x1 + 20, y + 8, p.x1 + 500, y + 26,
+                         "Средняя реакция по последним играм:");
     y += 32;
     const int gx = p.x1 + 20;
     const int gy = y;
@@ -273,9 +274,9 @@ void render_history(Canvas& c, const HistoryView& h) {
         std::vector<IntPoint> pts;
         for (int i = 0; i < count; ++i) {
             const int v = round_int(h.recent_reactions[static_cast<std::size_t>(i)]);
-            pts.push_back({gx + round_int(i * kGraphW / (count - 1 + 0.0001)),
-                           gy + kGraphH - round_int(static_cast<double>(v) * (kGraphH - 10) / most) -
-                               5});
+            pts.push_back(
+                {gx + round_int(i * kGraphW / (count - 1 + 0.0001)),
+                 gy + kGraphH - round_int(static_cast<double>(v) * (kGraphH - 10) / most) - 5});
         }
         if (count >= 2) {
             draw_smooth_curve(c, pts, argb(255, 97, 207, 255), 2);
@@ -391,12 +392,12 @@ void draw_smooth_curve(Canvas& c, std::span<const IntPoint> pts, core::Rgba colo
         const IntPoint p0 = pts[i];
         const IntPoint p1 = pts[i + 1];
         // Касательные; деление целых — с отбрасыванием, как div образца.
-        const IntPoint t0 = i == 0 ? IntPoint{p1.x - p0.x, p1.y - p0.y}
-                                   : IntPoint{(pts[i + 1].x - pts[i - 1].x) / 2,
-                                              (pts[i + 1].y - pts[i - 1].y) / 2};
-        const IntPoint t1 = i == n - 2 ? IntPoint{p1.x - p0.x, p1.y - p0.y}
-                                       : IntPoint{(pts[i + 2].x - pts[i].x) / 2,
-                                                  (pts[i + 2].y - pts[i].y) / 2};
+        const IntPoint t0 =
+            i == 0 ? IntPoint{p1.x - p0.x, p1.y - p0.y}
+                   : IntPoint{(pts[i + 1].x - pts[i - 1].x) / 2, (pts[i + 1].y - pts[i - 1].y) / 2};
+        const IntPoint t1 =
+            i == n - 2 ? IntPoint{p1.x - p0.x, p1.y - p0.y}
+                       : IntPoint{(pts[i + 2].x - pts[i].x) / 2, (pts[i + 2].y - pts[i].y) / 2};
         bezier(c, p0, {p0.x + t0.x / 3, p0.y + t0.y / 3}, {p1.x - t1.x / 3, p1.y - t1.y / 3}, p1,
                color, width);
     }
@@ -526,7 +527,7 @@ void MenuView::render_plate(Canvas& c, int mode, core::Vec2 mouse) const {
             for (int i = 1; i <= 6; ++i) {
                 const int trail_alpha = 60 - i * 10;
                 const int trail_off =
-                    round_int(55 * std::sin(static_cast<double>(timer - i * 40) / 700));
+                    round_int(55 * std::sin(static_cast<double>(timer - 40LL * i) / 700));
                 c.brush = with_alpha(look.circle, trail_alpha);
                 c.fill_circle(ax + trail_off, ay, kR - i * 2);
             }
@@ -662,8 +663,9 @@ void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const
     // Кнопки внизу (DrawMiniButton).
     c.font.size = 10;
     c.font_color = argb(170, 200, 200, 200);
-    const std::array<std::string, 6> labels{"Справка", "Настройки", "Рекорды", "Награды", "История",
-                                            std::format("Профиль {}", menu.profile_number())};
+    const std::array<std::string, 6> labels{
+        "Справка", "Настройки", "Рекорды",
+        "Награды", "История",   std::format("Профиль {}", menu.profile_number())};
     for (std::size_t i = 0; i < core::kMiniButtons.size(); ++i) {
         const Rect b = core::mini_button(core::kMiniButtons.at(i));
         c.pen = argb(200, 255, 255, 255);

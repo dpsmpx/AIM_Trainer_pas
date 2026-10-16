@@ -181,7 +181,8 @@ std::vector<std::string> Text::wrap(std::string_view s, Font font, int max_width
             // Слово длиннее строки — по знакам UTF-8.
             for (std::size_t i = 0; i < word.size();) {
                 std::size_t next = i + 1;
-                while (next < word.size() && (static_cast<unsigned char>(word[next]) & 0xC0U) == 0x80U)
+                while (next < word.size() &&
+                       (static_cast<unsigned char>(word[next]) & 0xC0U) == 0x80U)
                     ++next;
                 const std::string piece(word.substr(i, next - i));
                 if (!line.empty() && !fits(line + piece)) {

@@ -33,8 +33,7 @@ struct HistoryView {
 
 /// Плавная кривая через точки — DrawSmoothCurve образца (кубические кривые
 /// Безье, DrawBezierLine из Base.pas).
-void draw_smooth_curve(Canvas& canvas, std::span<const IntPoint> points, core::Rgba color,
-                       int width);
+void draw_smooth_curve(Canvas& c, std::span<const IntPoint> pts, core::Rgba color, int width);
 
 class MenuView {
 public:
@@ -48,6 +47,7 @@ public:
     void render(Canvas& canvas, Toasts& toasts, const core::Theme& theme, const core::Menu& menu,
                 const core::Profile& profile, const HistoryView& history, core::Vec2 mouse,
                 core::Nanoseconds now) const;
+
 private:
     void render_particles(Canvas& canvas, const core::Profile& profile, core::Vec2 mouse) const;
     void render_plate(Canvas& canvas, int mode, core::Vec2 mouse) const;

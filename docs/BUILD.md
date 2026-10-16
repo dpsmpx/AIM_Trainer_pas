@@ -2,7 +2,7 @@
 
 Как собрать C++-версию Aim Trainer у автора на Windows и в облачной сессии.
 Решения: C++20 (D-16), llvm-mingw (D-17), SDL 3.4.18 (D-18), CMake, Ninja и
-GoogleTest (D-19), раскладка и проверка (D-20, D-25). Pascal-версия —
+GoogleTest (D-19), раскладка и проверка (D-20, D-25), текст и шрифт (D-31). Pascal-версия —
 образец в `archive/pascal/` (D-28) — собирается под Mono в сессии, §5.
 
 ## 1. На Windows — у автора
@@ -41,9 +41,11 @@ cmake --preset windows
 cmake --build --preset windows
 ```
 
-Первая настройка качает SDL 3.4.18 с GitHub и сверяет SHA-256 (D-18) —
-нужен интернет; следующие — нет. Итог — `build\windows\AimTrainer.exe`:
-один файл без DLL рядом (D-17). Что проверить — сценарий 21
+Первая настройка качает SDL 3.4.18, SDL3_ttf 3.2.2, FreeType 2.15.0 и
+шрифт DejaVu 2.37 и сверяет SHA-256 (D-18, D-31) — нужен интернет;
+следующие — нет. Итог — `build\windows\AimTrainer.exe` без DLL рядом
+(D-17) и каталог `build\windows\fonts\` со шрифтом (D-31): программу
+переносить вместе с ним. Что проверить — сценарий 21
 `docs/MANUAL_CHECKS.md`.
 
 Не собирается — в PR или в сессию: вывод обеих команд и строки
@@ -137,6 +139,8 @@ ref build` начинает с чистого каталога, `tools/gui.sh Ц
 | что | откуда | как закреплено |
 |---|---|---|
 | SDL 3.4.18 | архив выпуска `libsdl-org/SDL`; в сессии — `$AIM_DEPS_DIR` | SHA-256 (D-18), `tools/cmake/dependencies.cmake` |
+| SDL3_ttf 3.2.2, FreeType 2.15.0 | архивы выпусков `libsdl-org/SDL_ttf` и `download.savannah.gnu.org`; в сессии — `$AIM_DEPS_DIR` | SHA-256 и подписи авторов (D-31), `tools/cmake/dependencies.cmake` |
+| шрифт DejaVu Sans Mono 2.37 | архив выпуска `dejavu-fonts/dejavu-fonts`; в сессии — `$AIM_DEPS_DIR` | SHA-256 (D-31); сборка кладёт файлы в `fonts/` рядом с программой |
 | GoogleTest 1.14.0 | пакет Ubuntu 24.04; иначе — тег `v1.14.0` | версия пакета; коммит `f8d7d77c0693` |
 | llvm-mingw 20261006 | выпуск `mstorsjo/llvm-mingw` | SHA-256 (D-17), `tools/setup_env.sh` и раздел 1 |
 

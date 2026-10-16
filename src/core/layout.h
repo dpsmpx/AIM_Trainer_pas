@@ -8,8 +8,8 @@
 
 #include <array>
 
-#include "core/target.h"
 #include "core/screen.h"
+#include "core/target.h"
 #include "core/time.h"
 
 namespace aim::core {

@@ -66,7 +66,7 @@ private:
     [[nodiscard]] Nanoseconds since_entered(Nanoseconds t) const;
     void close_tutorial();
     void click_settings(Vec2 p);
-    std::optional<GameMode> start_selected();
+    [[nodiscard]] std::optional<GameMode> start_selected() const;
 
     Profile& profile_;
     int profile_number_;

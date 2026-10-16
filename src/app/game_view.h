@@ -19,8 +19,8 @@ void render_countdown(Canvas& canvas, const core::Theme& theme, const core::Flow
 
 /// Кадр забега без уведомления: след, цель, эффекты, HUD, подсказка Dual,
 /// серия.
-void render_game(Canvas& canvas, const core::Theme& theme, const core::Game& game,
-                 Effects& effects, const CursorTrail& trail, int fps, core::Nanoseconds now);
+void render_game(Canvas& canvas, const core::Theme& theme, const core::Game& game, Effects& effects,
+                 const CursorTrail& trail, int fps, core::Nanoseconds now);
 
 /// Затемнение и «PAUSE» поверх кадра забега.
 void render_pause(Canvas& canvas);
