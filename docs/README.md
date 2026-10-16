@@ -16,7 +16,8 @@
 | зачем правила и откуда | [`PROCESS.md`](PROCESS.md) |
 | откуда код и на каком основании | [`PROVENANCE.md`](PROVENANCE.md) |
 | вехи истории | [`CHANGELOG.md`](CHANGELOG.md) |
-| аудит и ревью 13 октября 2026 | [`audits/PROJECT_AUDIT.md`](audits/PROJECT_AUDIT.md) |
+| аудит и ревью 13 октября 2026 — Pascal-версия | [`audits/PROJECT_AUDIT.md`](audits/PROJECT_AUDIT.md) |
+| аудит 16 октября 2026 — C++-версия: интерфейс, производительность, смысл тренажёра, код | [`audits/CPP_AUDIT.md`](audits/CPP_AUDIT.md) |
 | описание для игрока | [`README.md`](../README.md) — витрина, не источник истины (D-06) |
 
 Проверка документов: `python3 tools/check_docs.py`; C++-версии —
