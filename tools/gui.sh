@@ -85,6 +85,8 @@ ensure_display() {
     fi
 }
 
+# Номер окна. Звать как wid="$(window_id)": тогда set -e остановит скрипт,
+# если окна нет, — import с пустым номером ждал бы щелчка мышью.
 window_id() {
     local wid
     wid="$(xdotool search --name "^$TITLE" 2>/dev/null | head -1 || true)"
@@ -128,7 +130,9 @@ cmd_clean() {
 
 cmd_shot() {
     [ $# -eq 1 ] || die "shot FILE.png"
-    import -window "$(window_id)" "$1"
+    local wid
+    wid="$(window_id)"
+    import -window "$wid" "$1"
 }
 
 cmd_key() {
@@ -136,7 +140,7 @@ cmd_key() {
     wid="$(window_id)"
     # Фокус окну и нажатие через XTEST: синтетические события XSendEvent
     # WinForms под Mono может не принять.
-    xdotool windowfocus --sync "$wid" 2>/dev/null || true
+    xdotool windowfocus "$wid" 2>/dev/null || true
     for k in "$@"; do
         xdotool key "$k"
         sleep 0.15
@@ -145,13 +149,17 @@ cmd_key() {
 
 cmd_move() {
     [ $# -eq 2 ] || die "move X Y"
-    xdotool mousemove --window "$(window_id)" "$1" "$2"
+    local wid
+    wid="$(window_id)"
+    xdotool mousemove --window "$wid" "$1" "$2"
     sleep 0.05
 }
 
 cmd_click() {
     [ $# -ge 2 ] || die "click X Y [BTN]"
-    xdotool mousemove --window "$(window_id)" "$1" "$2" sleep 0.05 click "${3:-1}"
+    local wid
+    wid="$(window_id)"
+    xdotool mousemove --window "$wid" "$1" "$2" sleep 0.05 click "${3:-1}"
     sleep 0.15
 }
 
@@ -193,7 +201,7 @@ case "$cmd" in
     stop) cmd_stop ;;
     clean) cmd_clean ;;
     shot) cmd_shot "$@" ;;
-    title) xdotool getwindowname "$(window_id)" ;;
+    title) wid="$(window_id)" && xdotool getwindowname "$wid" ;;
     key) cmd_key "$@" ;;
     move) cmd_move "$@" ;;
     click) cmd_click "$@" ;;

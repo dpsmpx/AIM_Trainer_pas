@@ -103,7 +103,7 @@ fi
 # ---- Скрипты ----
 # Локаль UTF-8 обязательна: без неё shellcheck спотыкается о кириллицу.
 if command -v shellcheck >/dev/null 2>&1; then
-    if LC_ALL=C.UTF-8 shellcheck -x tools/*.sh tools/lib_probes/*.sh .claude/hooks/*.sh \
+    if LC_ALL=C.UTF-8 shellcheck -x tools/*.sh tools/lib_probes/*.sh tools/helpers/*.sh .claude/hooks/*.sh \
         >"$LOGS/shellcheck.log" 2>&1; then
         result "скрипты (shellcheck)" "зелёное"
     else
