@@ -33,6 +33,7 @@
 #include "app/text.h"
 #include "core/click_time.h"
 #include "core/flow.h"
+#include "core/frame_budget.h"
 #include "core/menu.h"
 #include "core/profile.h"
 #include "core/random.h"
@@ -299,7 +300,10 @@ int main(int argc, char* argv[]) {
         bool running = true;
         int frame = 0;
         Nanoseconds next_frame = SDL_GetTicksNS();
+        aim::core::FrameBudget budget;  // работа кадров замера (D-41)
+        bool measuring = false;
         while (running) {
+            const Nanoseconds frame_begin = SDL_GetTicksNS();
             inputs.clear();
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
@@ -384,6 +388,20 @@ int main(int argc, char* argv[]) {
             fps.frame(now);
             if (last) running = false;
 
+            // Запас кадра в замере (D-41): работа кадра — от разбора событий
+            // до показа; по концу замера — сводка в журнал и, с --debug-title,
+            // в заголовок.
+            const bool in_run = flow.screen() == aim::core::Screen::Game;
+            if (in_run && !measuring) budget.start(period);
+            if (in_run) budget.add(SDL_GetTicksNS() - frame_begin);
+            if (!in_run && measuring && !budget.empty()) {
+                const std::string report = aim::core::describe(budget.report());
+                SDL_Log("%s", report.c_str());
+                if (options->debug_title)
+                    SDL_SetWindowTitle(window, std::format("{} — {}", kTitle, report).c_str());
+            }
+            measuring = in_run;
+
             // Следующий кадр — через период монитора от прошлого (D-41);
             // отстали больше чем на кадр — не догонять пачкой.
             next_frame += period;
@@ -394,6 +412,7 @@ int main(int argc, char* argv[]) {
                 next_frame = after;
             }
         }
+        screens.shutdown();
         if (options->text_check && screens.clipped_texts() > 0) {
             SDL_Log("не поместилось надписей: %zu", screens.clipped_texts());
             if (status == 0) status = 3;

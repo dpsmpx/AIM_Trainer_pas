@@ -59,6 +59,7 @@ endfunction()
 add_library(aim_core STATIC
     src/core/click_time.cpp
     src/core/flow.cpp
+    src/core/frame_budget.cpp
     src/core/game.cpp
     src/core/layout.cpp
     src/core/measure.cpp

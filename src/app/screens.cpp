@@ -37,6 +37,11 @@ Screens::Screens(SDL_Window* window, SDL_Renderer* renderer, Text& text, core::P
     canvas_.font.size = kTextSize;
 }
 
+void Screens::shutdown() {
+    in_run_ = false;
+    if (save_pending_) save();
+}
+
 void Screens::start(core::Nanoseconds now) {
     menu_.enter(now);
     menu_view_.enter(rng_, now);
@@ -66,6 +71,11 @@ const core::Theme& Screens::theme() {
 }
 
 void Screens::save() {
+    if (in_run_) {
+        save_pending_ = true;
+        return;
+    }
+    save_pending_ = false;
     std::string error;
     if (!files_.save(profile_, error)) message("Профиль не записан: " + error);
 }
@@ -109,6 +119,9 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
         std::visit(
             Overload{
                 [&](const core::ScreenChanged& s) {
+                    // Замер кончился — отложенная запись профиля (AUD-40).
+                    in_run_ = s.to == core::Screen::Game;
+                    if (!in_run_ && save_pending_) save();
                     if (s.to == core::Screen::Menu) {
                         menu_.enter(now);
                         menu_view_.enter(rng_, now);

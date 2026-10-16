@@ -46,12 +46,16 @@ public:
     void after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds now);
     /// Нарисовать текущий экран на момент now.
     void render(const core::Flow& flow, core::Vec2 mouse, int fps, core::Nanoseconds now);
+    /// Программа закрывается: отложенная запись профиля — сейчас.
+    void shutdown();
     /// Проверка текста (--text-check, D-43): не поместившиеся надписи — в
     /// журнал.
     void check_text(bool on) { canvas_.check_text(on); }
     [[nodiscard]] std::size_t clipped_texts() const { return canvas_.clipped_texts(); }
 
 private:
+    /// Записать профиль; посреди замера — по его концу (AUD-40): запись в
+    /// кадре замера отнимала бы время у кадра.
     void save();
     /// Ответ диалога выбора папки сохранений (D-33): перейти на неё.
     void take_folder_choice();
@@ -73,6 +77,8 @@ private:
     CursorTrail trail_;
     Toasts toasts_;
     platform::FolderPicker folder_picker_;
+    bool in_run_ = false;        ///< идёт замер: профиль не пишется
+    bool save_pending_ = false;  ///< профиль ждёт конца замера
     core::Theme theme_ = core::kThemes.front().theme;
     std::string theme_for_;  ///< папка и имя темы, по которым прочитана theme_
 };
