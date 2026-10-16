@@ -66,7 +66,9 @@ TrueJointTileMaker с PascalABC.NET на C++
 - [ ] Эталон: оригинал собирается и запускается в сессии (Mono с WinForms,
   PascalABC.NET из исходников, Xvfb — как у TrueJointTileMaker) и у автора
   на Windows; результаты сценариев и частота кадров оригинала записаны
-  (AUD-25, AUD-29) — `Т`
+  (AUD-25, AUD-29) — `Т`. В сессии — сделано 16 октября 2026: D-26,
+  `tools/gui.sh`, прогон — `docs/MANUAL_CHECKS.md`, «Эталон под Mono»;
+  осталось у автора — `TODO.md`
 - [ ] Документ переноса в `docs/` по образцу
   `TrueJointTileMaker:docs/porting.md`: что где, сборка, сверка с
   эталоном и поведение, которое легко потерять (`Round` банковское,

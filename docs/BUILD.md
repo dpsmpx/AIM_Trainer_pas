@@ -100,7 +100,36 @@ cmake --preset linux-gcc && cmake --build --preset linux-gcc && ctest --preset l
 сессии можно открыть под Xvfb: `DISPLAY=:99 wine
 build/windows-cross/AimTrainer.exe`; клик — `xdotool`.
 
-## 5. Откуда зависимости
+## 5. Эталон — оригинал под Mono
+
+Оригинал на PascalABC.NET собирается и запускается в сессии (D-26):
+компилятор 4.0.0.3882 из исходников с заплаткой для Mono 6.8 ставит
+`tools/setup_env.sh`, сборкой и окном управляет `tools/gui.sh`:
+
+```sh
+tools/gui.sh ref build              # *.pas корня → build/ref/AIM_Trainer.exe
+tools/gui.sh ref start              # запуск в своём Xvfb (:97)
+tools/gui.sh ref click 585 57       # ЛКМ по «Classic Mode»; 3-й аргумент — кнопка
+tools/gui.sh ref key Escape space   # клавиши
+tools/gui.sh ref shot menu.png      # снимок окна 800×600
+tools/gui.sh ref stop
+tools/gui.sh compare a.png b.png    # число несовпавших пикселей
+```
+
+То же с `port` вместо `ref` — C++-версия (пресет `linux-gcc`, экран `:96`).
+Оригинал пишет файлы профиля в `build/ref` (AUD-17); `tools/gui.sh ref
+build` начинает с чистого каталога, `tools/gui.sh ref clean` — удаляет
+только файлы игрока.
+
+Вспомогательные скрипты сессий — `tools/helpers/` (D-27):
+
+| скрипт | что делает |
+|---|---|
+| `ref_bot.py` | играет по снимкам окна: находит цели и бомбы, щёлкает или наводит курсор; правила — в шапке |
+| `wine_clicks.sh` | щелчки по Windows-сборке под Wine: сколько получили время из сырого ввода (D-24) |
+| `click_debug_log.patch` | временный журнал времени клика в `main.cpp` — для разбора, не для коммита |
+
+## 6. Откуда зависимости
 
 | что | откуда | как закреплено |
 |---|---|---|

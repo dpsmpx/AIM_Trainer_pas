@@ -107,10 +107,13 @@ cmd_start() {
         xdotool search --name "^$TITLE" >/dev/null 2>&1 && break
         sleep 0.1
     done
-    window_id >/dev/null
+    local wid
+    wid="$(window_id)"
     # Окно появляется раньше, чем нарисован первый кадр.
     sleep 1.5
-    echo "$TARGET запущен на $DISPLAY, окно $(window_id)"
+    xdotool getwindowname "$wid" >/dev/null 2>&1 ||
+        die "$TARGET закрылся сразу после запуска — $STATE/run.log"
+    echo "$TARGET запущен на $DISPLAY, окно $wid"
 }
 
 cmd_stop() {

@@ -35,6 +35,7 @@ import numpy as np
 from PIL import Image
 
 HUD_TOP = 565  # HUD внизу окна: в нём цели не ищутся
+LEGEND_RIGHT, LEGEND_BOTTOM = 130, 40  # подсказка кнопок Dual слева вверху
 
 
 def _components(mask, min_area):
@@ -68,6 +69,9 @@ def find(path):
     out = []
     for pts in _components((hi - lo > 60) & (hi > 90), 12):
         cy, cx = pts.mean(axis=0)
+        # Точки легенды «LMB/RMB» Dual слева вверху — не цели.
+        if cy < LEGEND_BOTTOM and cx < LEGEND_RIGHT and len(pts) < 200:
+            continue
         col = img[pts[:, 0], pts[:, 1]].mean(axis=0)
         kind = "blue" if col[2] > col[0] + 40 else "red" if col[0] > col[2] + 40 else "other"
         out.append((kind, int(cx), int(cy), len(pts), *map(int, col)))

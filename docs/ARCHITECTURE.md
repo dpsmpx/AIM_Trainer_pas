@@ -268,7 +268,8 @@ AIM_Trainer.pas  (программа)
 
 Сверено по исходникам `bin/Lib/PABCSystem.pas` и `bin/Lib/GraphABC.pas`
 (3.9.0.3422 и 4.0.0.3886). Опираясь на поведение библиотеки, сверять его
-с исходником нужной версии, а не с памятью (`CLAUDE.md`).
+с исходником нужной версии, а не с памятью (`CLAUDE.md`). Исходники
+4.0.0.3882 эталона в сессии — `$PABCNET_DIR/bin/Lib` (D-26).
 
 | что | как на деле |
 |---|---|
@@ -280,6 +281,7 @@ AIM_Trainer.pas  (программа)
 | события GraphABC | в потоке окна (`MainFormThread`), не в главном |
 | кодировка исходников | UTF-8 без BOM распознаётся компилятором по содержимому |
 | `Console.Beep` | синхронный: поток стоит всё время звука |
+| `FillRoundRect`, `DrawRoundRect` | скругления — дуги `GraphicsPath.AddArc` размером `w`×`h` (`CreatePathForDrawRoundRect`, `GraphABCHelper.pas`); при `w` или `h` = 0 GDI+ отвечает `InvalidParameter` → `ArgumentException`: под Mono — прогоном, на Windows — по тесту `AddArc_ZeroWidthHeight_ThrowsArgumentException` (dotnet/winforms). Оригинал рисует так три экрана — сценарий 22 `docs/MANUAL_CHECKS.md` |
 
 ## 12. C++-версия — каркас
 
