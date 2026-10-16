@@ -24,8 +24,13 @@ struct Overload : Fs... {
 }  // namespace
 
 Screens::Screens(SDL_Renderer* renderer, Text& text, core::Profile& profile, PlayerFiles& files,
-                 core::Random& rng, core::Menu& menu)
-    : canvas_(renderer, text), profile_(profile), files_(files), rng_(rng), menu_(menu) {
+                 core::Random& rng, core::Menu& menu, platform::Sound& sound)
+    : canvas_(renderer, text),
+      profile_(profile),
+      files_(files),
+      rng_(rng),
+      menu_(menu),
+      sound_(sound) {
     // Как образец при запуске: шрифт Consolas 14 (здесь — DejaVu, D-22).
     canvas_.font.size = 14;
 }
@@ -42,6 +47,10 @@ const core::Theme& Screens::theme() const {
 void Screens::save() {
     std::string error;
     if (!files_.save(profile_, error)) message("Профиль не записан: " + error);
+}
+
+void Screens::play(core::Beep beep) {
+    if (profile_.settings.sound) sound_.beep(beep);
 }
 
 void Screens::open_history() {
@@ -71,6 +80,8 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
                         // InitGameState образца: эффекты и след — заново.
                         effects_.clear();
                         trail_.clear();
+                    } else if (s.to == core::Screen::GameOver) {
+                        play(core::kGameOverBeep);  // PlayGameOverSound
                     }
                 },
                 [&](const core::GameEvent& g) {
@@ -80,13 +91,15 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
                     switch (g.kind) {
                         case core::GameEventKind::Hit:
                             effects_.hit(x, y, color, g.points, rng_, now);
+                            play(core::kHitBeep);
                             if (g.accuracy >= core::kPreciseHit) effects_.precise_flash(now);
                             break;
                         case core::GameEventKind::Tracked:
                             effects_.hit(x, y, color, g.points, rng_, now);
+                            play(core::kHitBeep);
                             break;
                         case core::GameEventKind::Bomb: effects_.bomb_flash(now); break;
-                        case core::GameEventKind::Miss:
+                        case core::GameEventKind::Miss: play(core::kMissBeep); break;
                         case core::GameEventKind::Expired: break;
                     }
                 },

@@ -35,6 +35,7 @@
 #include "core/random.h"
 #include "core/screen.h"
 #include "platform/raw_mouse.h"
+#include "platform/sound.h"
 #include "platform/storage.h"
 
 namespace {
@@ -216,7 +217,9 @@ int main(int argc, char* argv[]) {
         // Туториал — при запуске, если профиль его ещё не видел (как образец).
         aim::core::Menu menu(profile, files.profile_number(), !profile.tutorial_seen);
         aim::core::Flow flow(profile, rng, menu);
-        aim::app::Screens screens(renderer, *text, profile, files, rng, menu);
+        aim::platform::Sound sound;
+        if (!sound.active()) SDL_Log("звука нет: %s", sound.problem().c_str());
+        aim::app::Screens screens(renderer, *text, profile, files, rng, menu, sound);
         screens.start(SDL_GetTicksNS());
         for (std::string& m : messages)
             screens.message(std::move(m));

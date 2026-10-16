@@ -2,7 +2,7 @@
 
 // Экраны программы: что показать и что сделать по событиям переходов
 // (core/flow.h) и меню (core/menu.h) — эффекты попадания, след курсора,
-// уведомления, запись профиля и истории (app/player_files.h), смена
+// звук, уведомления, запись профиля и истории (app/player_files.h), смена
 // профиля, «История». Рисуют app/menu_view.h и app/game_view.h на холсте
 // app/canvas.h.
 
@@ -20,13 +20,15 @@
 #include "core/menu.h"
 #include "core/profile.h"
 #include "core/random.h"
+#include "core/tone.h"
+#include "platform/sound.h"
 
 namespace aim::app {
 
 class Screens {
 public:
     Screens(SDL_Renderer* renderer, Text& text, core::Profile& profile, PlayerFiles& files,
-            core::Random& rng, core::Menu& menu);
+            core::Random& rng, core::Menu& menu, platform::Sound& sound);
 
     /// Программа запущена в момент now: меню появляется.
     void start(core::Nanoseconds now);
@@ -43,6 +45,8 @@ public:
 
 private:
     void save();
+    /// Звук, если он включён в настройках.
+    void play(core::Beep beep);
     void open_history();
     [[nodiscard]] const core::Theme& theme() const;
 
@@ -51,6 +55,7 @@ private:
     PlayerFiles& files_;
     core::Random& rng_;
     core::Menu& menu_;
+    platform::Sound& sound_;
     MenuView menu_view_;
     Effects effects_;
     CursorTrail trail_;

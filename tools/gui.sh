@@ -74,7 +74,10 @@ launch() {
             [ -x "$PORT_BIN" ] || build_port >/dev/null
             mkdir -p "$PORT_DATA"
             # Программный кадровый буфер: Xvfb всё равно рисует без GPU.
-            AIM_TRAINER_DATA_DIR="$PORT_DATA" SDL_FRAMEBUFFER_ACCELERATION=0 exec "$PORT_BIN" ;;
+            # Звуковой карты в сессии нет: звук — в драйвер dummy, без шума
+            # ALSA в журнале.
+            AIM_TRAINER_DATA_DIR="$PORT_DATA" SDL_FRAMEBUFFER_ACCELERATION=0 \
+                SDL_AUDIO_DRIVER="${SDL_AUDIO_DRIVER:-dummy}" exec "$PORT_BIN" ;;
     esac
 }
 

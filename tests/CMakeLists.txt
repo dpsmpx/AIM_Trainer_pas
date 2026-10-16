@@ -27,7 +27,8 @@ add_executable(aim_core_tests
     core/profile_file_test.cpp
     core/profile_test.cpp
     core/random_test.cpp
-    core/target_test.cpp)
+    core/target_test.cpp
+    core/tone_test.cpp)
 target_link_libraries(aim_core_tests PRIVATE aim_core GTest::gtest_main)
 aim_own_code(aim_core_tests)
 gtest_discover_tests(aim_core_tests DISCOVERY_MODE PRE_TEST
@@ -36,6 +37,7 @@ gtest_discover_tests(aim_core_tests DISCOVERY_MODE PRE_TEST
 add_executable(aim_platform_tests
     platform/raw_mouse_test.cpp
     platform/sdl_version_test.cpp
+    platform/sound_test.cpp
     platform/storage_test.cpp)
 target_link_libraries(aim_platform_tests PRIVATE aim_platform GTest::gtest_main)
 aim_own_code(aim_platform_tests)
@@ -61,7 +63,7 @@ set_tests_properties(app_data_reset PROPERTIES FIXTURES_SETUP app_data)
 add_test(NAME app_offscreen_frames
          COMMAND AimTrainer --frames 3 --screenshot "${_aim_frame}")
 set_tests_properties(app_offscreen_frames PROPERTIES
-    ENVIRONMENT "SDL_VIDEODRIVER=offscreen;SDL_RENDER_DRIVER=software;SDL_FRAMEBUFFER_ACCELERATION=0;AIM_TRAINER_DATA_DIR=app_data"
+    ENVIRONMENT "SDL_VIDEODRIVER=offscreen;SDL_RENDER_DRIVER=software;SDL_FRAMEBUFFER_ACCELERATION=0;SDL_AUDIO_DRIVER=dummy;AIM_TRAINER_DATA_DIR=app_data"
     FIXTURES_REQUIRED app_data
     FIXTURES_SETUP app_frame)
 
