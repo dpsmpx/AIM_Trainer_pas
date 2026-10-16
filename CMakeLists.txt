@@ -68,6 +68,7 @@ add_library(aim_core STATIC
     src/core/profile_file.cpp
     src/core/random.cpp
     src/core/records.cpp
+    src/core/replay.cpp
     src/core/runs.cpp
     src/core/target.cpp
     src/core/text.cpp

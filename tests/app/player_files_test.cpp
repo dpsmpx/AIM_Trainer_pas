@@ -1,7 +1,7 @@
 // Файлы игрока программы (D-11, D-30): новый профиль сразу записан, как у
 // образца; повреждённый — копия и умолчания; последний профиль запоминается
 // (AUD-21); у истории один заголовок; экспорт и смена папки сохранений
-// (D-33, D-35). Каталоги — временные в текущем.
+// (D-33, D-35); реплеи в replays/ (D-39). Каталоги — временные в текущем.
 
 #include "app/player_files.h"
 
@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "core/profile_file.h"
+#include "core/replay.h"
 #include "core/runs.h"
 #include "core/text.h"
 
@@ -206,6 +207,72 @@ TEST_F(PlayerFilesTest, ChangeFolderReplacesSavesThereKeepingCopies) {
     EXPECT_FALSE(backup.exists("profile3.ini"));
     ASSERT_GE(messages_.size(), 2U);
     EXPECT_NE(messages_[1].find("backup_20261016_1532"), std::string::npos) << messages_[1];
+}
+
+// Реплей набора preset с одним шагом: курсор в (x, 0).
+core::Replay replay_of(int preset, double x) {
+    core::Replay r;
+    r.run.summary.options = core::preset_options(preset, {});
+    r.steps = {{.kind = core::ReplayStepKind::Update, .at = 1, .time = 1, .point = {x, 0}}};
+    return r;
+}
+
+TEST_F(PlayerFilesTest, ReplayIsSavedReplacedAndReadBack) {
+    const core::MeasureOptions classic = core::preset_options(1, {});
+    {
+        PlayerFiles f = files();
+        f.load(messages_);
+        EXPECT_FALSE(f.has_replay(classic));
+        EXPECT_FALSE(f.load_replay(classic, error_)) << "реплея ещё нет";
+        EXPECT_FALSE(error_.empty());
+        ASSERT_TRUE(f.save_replay(replay_of(1, 10), error_)) << error_;
+        ASSERT_TRUE(f.save_replay(replay_of(1, 20), error_)) << error_;
+        EXPECT_TRUE(f.has_replay(classic));
+        EXPECT_FALSE(f.has_replay(core::preset_options(4, {})));
+    }
+    const platform::Storage replays(dir_ + "replays/");
+    EXPECT_TRUE(replays.exists(core::replay_file_name(1, classic)));
+    // Перезапуск: реплей найден; новый лучший заменил прежний.
+    PlayerFiles again = files();
+    again.load(messages_);
+    ASSERT_TRUE(again.has_replay(classic));
+    const std::optional<core::Replay> read = again.load_replay(classic, error_);
+    ASSERT_TRUE(read.has_value()) << error_;
+    EXPECT_EQ(read.value_or(core::Replay{}).steps.at(0).point.x, 20);
+    // У другого профиля — свои реплеи.
+    again.open(2, messages_);
+    EXPECT_FALSE(again.has_replay(classic));
+}
+
+TEST_F(PlayerFilesTest, BrokenReplayIsReported) {
+    PlayerFiles f = files();
+    f.load(messages_);
+    ASSERT_TRUE(f.save_replay(replay_of(1, 10), error_)) << error_;
+    const platform::Storage replays(dir_ + "replays/");
+    const std::string name = core::replay_file_name(1, core::preset_options(1, {}));
+    ASSERT_TRUE(replays.write(name, "broken", error_));
+    EXPECT_FALSE(f.load_replay(core::preset_options(1, {}), error_));
+    EXPECT_NE(error_.find("повреждён"), std::string::npos) << error_;
+}
+
+TEST_F(PlayerFilesTest, ChangeFolderCopiesReplaysKeepingTheirs) {
+    const std::string other = dir_ + "theirs/";
+    const std::string name = core::replay_file_name(1, core::preset_options(1, {}));
+    const std::string theirs_text = core::write_replay(replay_of(1, 99), platform::kNewline);
+    ASSERT_TRUE(SDL_CreateDirectory((other + "replays").c_str()));
+    ASSERT_TRUE(platform::Storage(other + "replays/").write(name, theirs_text, error_)) << error_;
+    PlayerFiles f = files();
+    f.load(messages_);
+    ASSERT_TRUE(f.save_replay(replay_of(1, 10), error_)) << error_;
+    ASSERT_TRUE(f.save_replay(replay_of(4, 30), error_)) << error_;
+    ASSERT_TRUE(f.change_folder(other, kWhen, messages_).has_value());
+    EXPECT_TRUE(f.has_replay(core::preset_options(4, {})));
+    const std::optional<core::Replay> mine = f.load_replay(core::preset_options(1, {}), error_);
+    ASSERT_TRUE(mine.has_value()) << error_;
+    EXPECT_EQ(mine.value_or(core::Replay{}).steps.at(0).point.x, 10)
+        << "реплеи прежней папки — в новой";
+    EXPECT_EQ(platform::Storage(other + "backup_20261016_1532/replays/").read(name), theirs_text)
+        << "заменённый реплей не потерян";
 }
 
 TEST_F(PlayerFilesTest, SecondChangeInAMinuteGetsItsOwnBackup) {

@@ -7,8 +7,11 @@
 //    │                   └──────────┘──────────────────────────────────┘
 //    └──── M (с записью) из замера; Space или M из итога
 //
+//   меню ──реплей набора──► реплей ──Esc, Space, M──► меню
+//
 // Паузы нет: замер идёт непрерывно (D-40). У каждого замера — свой
-// генератор случайных чисел с записанным началом (D-39).
+// генератор случайных чисел с записанным началом, а вход замера пишется:
+// реплей проигрывает его заново (D-39, core/replay.h).
 //
 // Ввод — события по порядку их времени (щелчки со временем из D-24, клавиши).
 // Событие достаётся экрану, активному в момент разбора; после смены экрана
@@ -29,12 +32,13 @@
 #include "core/mouse.h"
 #include "core/profile.h"
 #include "core/random.h"
+#include "core/replay.h"
 #include "core/target.h"
 #include "core/time.h"
 
 namespace aim::core {
 
-enum class Screen : std::uint8_t { Menu, Countdown, Game, GameOver };
+enum class Screen : std::uint8_t { Menu, Countdown, Game, GameOver, Replay };
 
 /// Клавиши, которые читают экраны; остальные программа не передаёт.
 enum class Key : std::uint8_t { Escape, Space, R, M, Up, Down, PageUp, PageDown };
@@ -92,13 +96,9 @@ struct AchievementUnlocked {
 struct RunFinished {
     RunRecord record;
     bool new_best = false;  ///< лучший замер своего набора (D-38)
+    std::shared_ptr<const Replay> replay;  ///< вход замера (D-39)
 };
 using FlowEvent = std::variant<ScreenChanged, GameEvent, AchievementUnlocked, RunFinished>;
-
-/// Генератор случайных чисел замера по его началу.
-using RandomFactory = std::function<std::unique_ptr<Random>(std::uint64_t seed)>;
-/// EngineRandom(seed).
-std::unique_ptr<Random> engine_random(std::uint64_t seed);
 
 class Flow {
 public:
@@ -114,11 +114,16 @@ public:
     void update(Nanoseconds now, Vec2 cursor);
     /// Кадр на момент frame_time показан в presented_at (D-12).
     void frame_presented(Nanoseconds frame_time, Nanoseconds presented_at);
+    /// Из меню — реплей с момента now (D-39); не в меню — ничего.
+    void start_replay(std::shared_ptr<const Replay> replay, Nanoseconds now);
 
     [[nodiscard]] Screen screen() const { return screen_; }
     [[nodiscard]] const MeasureOptions& options() const { return options_; }
-    /// Замер — в игре и на итоге (итоги и тепловая карта); иначе нет.
+    /// Замер — в игре, на итоге (итоги и тепловая карта) и в реплее; иначе
+    /// нет.
     [[nodiscard]] const Game* game() const;
+    /// Реплей — на его экране; иначе нет.
+    [[nodiscard]] const ReplayPlayer* replay() const;
     /// Итог последнего записанного замера; нет — пусто.
     [[nodiscard]] const std::optional<RunFinished>& last_run() const { return last_run_; }
     /// Отсчёт: 3, 2, 1 на момент now; вне отсчёта — 0.
@@ -148,6 +153,8 @@ private:
     std::uint64_t seed_ = 0;
     std::unique_ptr<Random> run_random_;  // раньше game_: замер держит ссылку
     std::optional<Game> game_;
+    std::optional<ReplayRecorder> recorder_;  // вход замера game_
+    std::optional<ReplayPlayer> player_;
     std::optional<RunFinished> last_run_;
     std::vector<FlowEvent> events_;
 };

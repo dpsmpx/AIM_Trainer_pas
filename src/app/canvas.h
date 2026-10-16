@@ -47,6 +47,9 @@ public:
     void draw_round_rect(int x1, int y1, int x2, int y2, int w, int h);
     /// FillCircle: заливка кистью.
     void fill_circle(int x, int y, int r);
+    /// FillPolygon: выпуклый многоугольник кистью; вершины — по часовой
+    /// стрелке на экране.
+    void fill_polygon(std::span<const IntPoint> points);
     /// DrawCircle: контур пером.
     void draw_circle(int x, int y, int r);
     /// Circle: заливка кистью и контур пером.

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <format>
+#include <memory>
 #include <optional>
 #include <utility>
 #include <variant>
@@ -89,7 +90,7 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
                     if (s.to == core::Screen::Menu) {
                         menu_.enter(now);
                         menu_view_.enter(rng_, now);
-                    } else if (s.to == core::Screen::Game) {
+                    } else if (s.to == core::Screen::Game || s.to == core::Screen::Replay) {
                         // Новый замер: эффекты и след — заново.
                         effects_.clear();
                         trail_.clear();
@@ -140,6 +141,9 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
                     std::string error;
                     if (!files_.log_run(run.record, error))
                         message("Замер не записан в историю: " + error);
+                    // Лучший замер набора — реплеем вместо прежнего (D-39).
+                    if (run.new_best && run.replay && !files_.save_replay(*run.replay, error))
+                        message("Реплей не записан: " + error);
                     save();
                 },
             },
@@ -171,6 +175,17 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
                        [&](const core::ChooseDataFolder&) {
                            folder_picker_.show(window_, files_.folder());
                        },
+                       [&](const core::PlayReplay& p) {
+                           std::string error;
+                           std::optional<core::Replay> replay =
+                               files_.load_replay(p.options, error);
+                           if (!replay) {
+                               message(error);
+                               return;
+                           }
+                           flow.start_replay(
+                               std::make_shared<const core::Replay>(std::move(*replay)), now);
+                       },
                    },
                    r);
     }
@@ -179,6 +194,12 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
         case core::Screen::Menu: menu_view_.update(now); break;
         case core::Screen::Game:
             trail_.add(core::round_half_even(mouse.x), core::round_half_even(mouse.y));
+            break;
+        case core::Screen::Replay:
+            // След — курсора игрока из записи.
+            if (const core::ReplayPlayer* r = flow.replay())
+                trail_.add(core::round_half_even(r->cursor().x),
+                           core::round_half_even(r->cursor().y));
             break;
         case core::Screen::Countdown:
         case core::Screen::GameOver: break;
@@ -189,7 +210,7 @@ void Screens::render(const core::Flow& flow, core::Vec2 mouse, int fps, core::Na
     const core::Theme& th = theme();
     switch (flow.screen()) {
         case core::Screen::Menu:
-            menu_view_.render(canvas_, toasts_, th, menu_, profile_, files_.folder(), mouse, now);
+            menu_view_.render(canvas_, toasts_, th, menu_, profile_, files_, mouse, now);
             break;
         case core::Screen::Countdown: render_countdown(canvas_, th, flow, now); break;
         case core::Screen::Game:
@@ -201,6 +222,12 @@ void Screens::render(const core::Flow& flow, core::Vec2 mouse, int fps, core::Na
         case core::Screen::GameOver:
             if (const core::Game* g = flow.game()) {
                 render_game_over(canvas_, th, *g, flow.last_run(), profile_);
+                toasts_.render(canvas_, now);
+            }
+            break;
+        case core::Screen::Replay:
+            if (const core::ReplayPlayer* r = flow.replay()) {
+                render_replay(canvas_, th, *r, effects_, trail_, fps, now);
                 toasts_.render(canvas_, now);
             }
             break;

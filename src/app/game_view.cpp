@@ -123,8 +123,7 @@ void render_countdown(Canvas& c, const core::Theme& theme, const core::Flow& flo
     const core::MeasureOptions& o = flow.options();
     c.font.size = 20;
     c.font_color = argb(200, 230, 230, 230);
-    c.draw_text_centered(0, kH / 2 - 150, kW, kH / 2 - 120,
-                         core::preset_name(o).value_or("Свой набор"));
+    c.draw_text_centered(0, kH / 2 - 150, kW, kH / 2 - 120, core::combo_name(o));
     c.font.size = 12;
     c.draw_text_centered(40, kH / 2 - 118, kW - 40, kH / 2 - 100, core::describe_short(o));
     c.font.size = 120;
@@ -224,9 +223,8 @@ void render_game_over(Canvas& c, const core::Theme& theme, const core::Game& gam
     c.draw_text_centered(0, 66, kW, 110, title);
     c.font.size = 14;
     c.font_color = argb(220, 220, 220, 220);
-    c.draw_text_centered(
-        0, 112, kW, 132,
-        std::format("{} — Space: в меню, R: заново", core::preset_name(o).value_or("Свой набор")));
+    c.draw_text_centered(0, 112, kW, 132,
+                         std::format("{} — Space: в меню, R: заново", core::combo_name(o)));
 
     // Слева — параметры замера (D-38).
     c.font.size = 13;
@@ -291,6 +289,42 @@ void render_game_over(Canvas& c, const core::Theme& theme, const core::Game& gam
         row(std::format("Среднее за {}: {}", st.average.runs, primary(st.average.primary)));
 
     if (!game.screen_stimulus()) render_heatmap(c, game);
+}
+
+void render_replay(Canvas& c, const core::Theme& theme, const core::ReplayPlayer& replay,
+                   Effects& effects, const CursorTrail& trail, int fps, core::Nanoseconds now) {
+    const core::Game& game = replay.game();
+    render_game(c, theme, game, effects, trail, fps, now);
+    // Курсор игрока из записи: кольцо с крестом — свой курсор зрителя другой.
+    const int x = core::round_half_even(replay.cursor().x);
+    const int y = core::round_half_even(replay.cursor().y);
+    c.pen = argb(230, 255, 255, 255);
+    c.pen_width = 2;
+    c.draw_circle(x, y, 8);
+    c.line(x - 14, y, x - 4, y);
+    c.line(x + 4, y, x + 14, y);
+    c.line(x, y - 14, x, y - 4);
+    c.line(x, y + 4, x, y + 14);
+    c.pen_width = 1;
+    // Плашка сверху: что проигрывается и как выйти.
+    const core::RunRecord& run = replay.replay().run;
+    const core::LocalTime& w = run.when;
+    const bool finished = replay.done() && game.over();
+    constexpr int kX1 = 200;
+    constexpr int kX2 = kW - 140;
+    c.brush = argb(190, 40, 40, 45);
+    c.fill_round_rect(kX1, 8, kX2, 50, 8, 8);
+    c.font.size = 12;
+    c.font_color = argb(255, 120, 220, 140);
+    c.draw_text_centered(kX1, 10, kX2, 28,
+                         std::format("РЕПЛЕЙ · {} · {:02}.{:02}.{:04} {:02}:{:02}",
+                                     core::combo_name(run.summary.options), w.day, w.month, w.year,
+                                     w.hour, w.minute));
+    c.font.size = 11;
+    c.font_color = argb(220, 220, 220, 220);
+    c.draw_text_centered(
+        kX1, 29, kX2, 47,
+        finished ? "Реплей окончен · Esc, Space или M — в меню" : "Esc, Space или M — в меню");
 }
 
 }  // namespace aim::app

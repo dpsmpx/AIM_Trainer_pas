@@ -84,6 +84,15 @@ Rect help_panel();
 /// Полоса прокрутки справки: щелчок по ней — прокрутка к месту.
 Rect help_track();
 
+// ---- Рекорды наборов ----
+inline constexpr int kRecordsW = 760;
+inline constexpr int kRecordsH = 470;
+inline constexpr int kRecordsRows = 10;  ///< строк наборов на панели
+Rect records_panel();
+/// Строка набора i (0…kRecordsRows − 1), свежие сверху: щелчок — реплей
+/// лучшего замера набора (D-39).
+Rect records_row(int i);
+
 // ---- История и профили ----
 inline constexpr int kHistoryW = 520;
 inline constexpr int kHistoryH = 460;

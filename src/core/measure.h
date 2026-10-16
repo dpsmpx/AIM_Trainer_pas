@@ -98,6 +98,8 @@ MeasureOptions preset_options(int index, const PresetSettings& settings);
 /// Имя набора, к которому относится замер (по стимулу, действию, кнопкам,
 /// движению, появлению и бомбам); не набор — пусто.
 std::optional<std::string_view> preset_name(const MeasureOptions& options);
+/// Имя набора для игрока: набор или «Свой набор».
+std::string_view combo_name(const MeasureOptions& options);
 
 /// Как живёт и засчитывается цель — из опций.
 struct TargetRules {

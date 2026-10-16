@@ -243,6 +243,14 @@ void Canvas::fill_circle(int x, int y, int r) {
                 brush);
 }
 
+void Canvas::fill_polygon(std::span<const IntPoint> points) {
+    std::vector<Pt> pts;
+    pts.reserve(points.size());
+    for (const IntPoint& p : points)
+        pts.push_back(gdi(p.x, p.y));
+    fill_convex(renderer_, pts, brush);
+}
+
 void Canvas::draw_circle(int x, int y, int r) {
     if (r <= 0) return;
     const Pt c = gdi(x, y);

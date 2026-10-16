@@ -17,10 +17,6 @@ Overload(F...) -> Overload<F...>;
 
 }  // namespace
 
-std::unique_ptr<Random> engine_random(std::uint64_t seed) {
-    return std::make_unique<EngineRandom>(seed);
-}
-
 Flow::Flow(Profile& profile, Random& seeds, MenuInput& menu, RandomFactory make_random,
            std::function<LocalTime()> clock)
     : profile_(profile),
@@ -37,6 +33,7 @@ void Flow::go(Screen to) {
 
 void Flow::start_countdown(Nanoseconds now) {
     game_.reset();
+    recorder_.reset();
     countdown_started_ = now;
     go(Screen::Countdown);
 }
@@ -59,7 +56,10 @@ void Flow::finish_run() {
     const FinishResult result = finish_game(profile_, run);
     for (const int id : result.unlocked)
         events_.emplace_back(AchievementUnlocked{.id = id});
-    last_run_ = RunFinished{.record = std::move(run), .new_best = result.new_best};
+    std::shared_ptr<const Replay> replay = recorder_ ? recorder_->take(run) : nullptr;
+    recorder_.reset();
+    last_run_ = RunFinished{
+        .record = std::move(run), .new_best = result.new_best, .replay = std::move(replay)};
     events_.emplace_back(*last_run_);
 }
 
@@ -95,6 +95,7 @@ bool Flow::handle(const Input& event) {
             // Ссылка — до смены экрана: start_countdown сбрасывает забег.
             Game& game = *game_;
             if (const auto* c = std::get_if<ClickInput>(&event)) {
+                if (recorder_) recorder_->click(c->button, c->position, c->time, now_);
                 game.click(c->button, c->position, c->time);
                 pass_game_events();
                 if (!game.over()) return true;
@@ -110,11 +111,13 @@ bool Flow::handle(const Input& event) {
                     start_countdown(now_);
                     return false;
                 case Key::M:  // в меню, замер записывается
+                    if (recorder_) recorder_->finish(EndReason::ToMenu, k.time, now_);
                     game.finish(EndReason::ToMenu, k.time);
                     finish_run();
                     go(Screen::Menu);
                     return false;
                 case Key::Escape:  // конец попытки (D-40)
+                    if (recorder_) recorder_->finish(EndReason::GaveUp, k.time, now_);
                     game.finish(EndReason::GaveUp, k.time);
                     finish_run();
                     go(Screen::GameOver);
@@ -136,6 +139,17 @@ bool Flow::handle(const Input& event) {
             }
             if (k->key == Key::R) {
                 start_countdown(now_);
+                return false;
+            }
+            return true;
+        }
+        case Screen::Replay: {
+            // Реплей только смотрят: щелчки и колёсико — мимо.
+            const auto* k = std::get_if<KeyInput>(&event);
+            if (k == nullptr) return true;
+            if (k->key == Key::Escape || k->key == Key::Space || k->key == Key::M) {
+                player_.reset();
+                go(Screen::Menu);
                 return false;
             }
             return true;
@@ -163,6 +177,7 @@ void Flow::update(Nanoseconds now, Vec2 cursor) {
                         static_cast<std::uint64_t>(seeds_.between(0, INT_MAX));
                 run_random_ = make_random_(seed_);
                 game_.emplace(options_, *run_random_, countdown_started_ + kCountdown);
+                recorder_.emplace(options_, seed_, countdown_started_ + kCountdown);
                 finished_ = false;
                 go(Screen::Game);
             }
@@ -170,6 +185,7 @@ void Flow::update(Nanoseconds now, Vec2 cursor) {
         case Screen::Game: {
             if (!game_) break;
             Game& game = *game_;
+            if (recorder_) recorder_->update(now, cursor);
             game.update(now, cursor);
             pass_game_events();
             if (game.over()) {
@@ -178,18 +194,40 @@ void Flow::update(Nanoseconds now, Vec2 cursor) {
             }
             break;
         }
+        case Screen::Replay:
+            if (player_) {
+                player_->advance(now);
+                // События — эффектам и звуку; достижений и записи нет.
+                for (const GameEvent& e : player_->game().take_events())
+                    events_.emplace_back(e);
+            }
+            break;
         case Screen::Menu:
         case Screen::GameOver: break;
     }
 }
 
 void Flow::frame_presented(Nanoseconds frame_time, Nanoseconds presented_at) {
-    if (screen_ == Screen::Game && game_) game_->frame_presented(frame_time, presented_at);
+    if (screen_ != Screen::Game || !game_) return;
+    if (recorder_) recorder_->shown(frame_time, presented_at);
+    game_->frame_presented(frame_time, presented_at);
+}
+
+void Flow::start_replay(std::shared_ptr<const Replay> replay, Nanoseconds now) {
+    if (screen_ != Screen::Menu || !replay) return;
+    options_ = replay->run.summary.options;
+    player_.emplace(std::move(replay), make_random_, now);
+    go(Screen::Replay);
 }
 
 const Game* Flow::game() const {
+    if (screen_ == Screen::Replay) return player_ ? &player_->game() : nullptr;
     if ((screen_ == Screen::Game || screen_ == Screen::GameOver) && game_) return &*game_;
     return nullptr;
+}
+
+const ReplayPlayer* Flow::replay() const {
+    return screen_ == Screen::Replay && player_ ? &*player_ : nullptr;
 }
 
 int Flow::countdown_value(Nanoseconds now) const {

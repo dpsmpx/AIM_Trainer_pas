@@ -90,7 +90,55 @@ core::Profile PlayerFiles::open(int number, std::vector<std::string>& messages) 
             messages.push_back(std::format("История профиля {}: испорченных строк пропущено — {}",
                                            number_, skipped));
     }
+    scan_replays();
     return profile;
+}
+
+void PlayerFiles::scan_replays() {
+    replays_.clear();
+    if (!storage_ || !storage_->exists(core::kReplayFolder)) return;
+    // Папка не читается — реплеев как будто нет: щелчок по набору скажет,
+    // что файла нет.
+    std::string error;
+    const platform::Storage folder(storage_->path(core::kReplayFolder) + "/");
+    if (const std::optional<std::vector<std::string>> names = folder.files(error))
+        replays_.insert(names->begin(), names->end());
+}
+
+bool PlayerFiles::save_replay(const core::Replay& replay, std::string& error) {
+    if (!storage_) {
+        error = "нет папки игрока";
+        return false;
+    }
+    const std::optional<platform::Storage> folder =
+        platform::Storage::open(storage_->path(core::kReplayFolder), error);
+    const std::string name = core::replay_file_name(number_, replay.run.summary.options);
+    if (!folder || !folder->write(name, core::write_replay(replay, platform::kNewline), error))
+        return false;
+    replays_.insert(name);
+    return true;
+}
+
+std::optional<core::Replay> PlayerFiles::load_replay(const core::MeasureOptions& options,
+                                                     std::string& error) const {
+    const std::string name = core::replay_file_name(number_, options);
+    if (!storage_ || !replays_.contains(name)) {
+        error = "Реплея нет: он пишется при новом рекорде набора";
+        return std::nullopt;
+    }
+    const platform::Storage folder(storage_->path(core::kReplayFolder) + "/");
+    const std::optional<std::string> text = folder.read(name);
+    if (!text) {
+        error = "Реплей набора не читается";
+        return std::nullopt;
+    }
+    std::optional<core::Replay> replay = core::read_replay(*text);
+    if (!replay) error = "Реплей набора повреждён";
+    return replay;
+}
+
+bool PlayerFiles::has_replay(const core::MeasureOptions& options) const {
+    return replays_.contains(core::replay_file_name(number_, options));
 }
 
 bool PlayerFiles::save(const core::Profile& profile, std::string& error) {
@@ -175,37 +223,60 @@ bool PlayerFiles::copy_saves(const platform::Storage& from, const platform::Stor
     std::optional<platform::Storage> backup;
     std::string backup_name;
     int copied = 0;
-    std::string error;
-    // Список не прочитан — не «0 файлов»: иначе новая папка без сохранений
-    // выглядела бы потерей прогресса.
-    const std::optional<std::vector<std::string>> names = from.files(error);
-    if (!names) {
-        messages.push_back(std::format("Папка сохранений не читается: {} — папка прежняя", error));
-        return false;
-    }
-    for (const std::string& name : *names) {
-        if (!core::is_player_file(name)) continue;
-        const std::optional<std::string> data = from.read(name);
-        if (!data) {
-            messages.push_back(std::format("Файл {} не читается — папка прежняя", name));
+    // Файлы src, которые wanted, — в dst; sub — подпапка (реплеи), та же и
+    // в backup_….
+    const auto copy_folder = [&](const platform::Storage& src, const platform::Storage& dst,
+                                 bool (*wanted)(std::string_view), std::string_view sub) {
+        std::string error;
+        // Список не прочитан — не «0 файлов»: иначе новая папка без
+        // сохранений выглядела бы потерей прогресса.
+        const std::optional<std::vector<std::string>> names = src.files(error);
+        if (!names) {
+            messages.push_back(
+                std::format("Папка сохранений не читается: {} — папка прежняя", error));
             return false;
         }
-        const std::optional<std::string> there = target.read(name);
-        if (there == data) continue;  // уже такой же
-        if (there) {
-            if (!backup) backup = backup_folder(target, when, backup_name, error);
-            if (!backup || !backup->write(name, *there, error)) {
-                messages.push_back(std::format(
-                    "Копия файла {} новой папки не записана: {} — папка прежняя", name, error));
+        for (const std::string& name : *names) {
+            if (!wanted(name)) continue;
+            const std::optional<std::string> data = src.read(name);
+            if (!data) {
+                messages.push_back(std::format("Файл {} не читается — папка прежняя", name));
                 return false;
             }
+            const std::optional<std::string> there = dst.read(name);
+            if (there == data) continue;  // уже такой же
+            if (there) {
+                if (!backup) backup = backup_folder(target, when, backup_name, error);
+                std::optional<platform::Storage> keep = backup;
+                if (keep && !sub.empty()) keep = platform::Storage::open(keep->path(sub), error);
+                if (!keep || !keep->write(name, *there, error)) {
+                    messages.push_back(std::format(
+                        "Копия файла {} новой папки не записана: {} — папка прежняя", name, error));
+                    return false;
+                }
+            }
+            if (!dst.write(name, *data, error)) {
+                messages.push_back(
+                    std::format("Файл {} не скопирован: {} — папка прежняя", name, error));
+                return false;
+            }
+            ++copied;
         }
-        if (!target.write(name, *data, error)) {
-            messages.push_back(
-                std::format("Файл {} не скопирован: {} — папка прежняя", name, error));
+        return true;
+    };
+    if (!copy_folder(from, target, core::is_player_file, {})) return false;
+    // Реплеи (D-39) — в своей подпапке; её нет — копировать нечего.
+    if (from.exists(core::kReplayFolder)) {
+        std::string error;
+        const platform::Storage from_replays(from.path(core::kReplayFolder) + "/");
+        const std::optional<platform::Storage> to_replays =
+            platform::Storage::open(target.path(core::kReplayFolder), error);
+        if (!to_replays) {
+            messages.push_back(std::format("Папка реплеев не создана: {} — папка прежняя", error));
             return false;
         }
-        ++copied;
+        if (!copy_folder(from_replays, *to_replays, core::is_replay_file, core::kReplayFolder))
+            return false;
     }
     // Два уведомления, а не одно: длинная строка шире окна.
     messages.push_back(std::format("Папка сохранений сменилась, файлов скопировано: {}", copied));

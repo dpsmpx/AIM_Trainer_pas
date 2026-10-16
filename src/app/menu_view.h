@@ -2,7 +2,8 @@
 
 // Главное меню и панели поверх него на холсте app/canvas.h: наборы замера
 // (D-37), рекорд и среднее за N выбранного набора (D-38), график его
-// последних замеров, рекорды всех наборов, история замеров с параметрами.
+// последних замеров, рекорды всех наборов (щелчок по набору — его реплей,
+// D-39), история замеров с параметрами.
 // Что открыто и что выбрано — core/menu.h.
 
 #include <span>
@@ -11,6 +12,7 @@
 #include <vector>
 
 #include "app/canvas.h"
+#include "app/player_files.h"
 #include "app/toast.h"
 #include "core/menu.h"
 #include "core/mouse.h"
@@ -35,9 +37,10 @@ public:
     /// Меню целиком: фон, частицы, плашка, кнопки наборов, описание,
     /// график, рекорд набора, кнопки внизу, открытая панель, туториал,
     /// уведомления — поверх всего (AUD-33).
-    /// data_folder — папка сохранений для панели настроек (D-33).
+    /// files — папка сохранений для настроек (D-33) и какие реплеи есть
+    /// (D-39).
     void render(Canvas& canvas, Toasts& toasts, const core::Theme& theme, const core::Menu& menu,
-                const core::Profile& profile, std::string_view data_folder, core::Vec2 mouse,
+                const core::Profile& profile, const PlayerFiles& files, core::Vec2 mouse,
                 core::Nanoseconds now) const;
 
 private:

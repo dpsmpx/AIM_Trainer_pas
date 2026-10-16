@@ -66,5 +66,17 @@ TEST(EngineRandom, SameSeedSameSequence) {
         EXPECT_EQ(a.between(0, 1'000'000), b.between(0, 1'000'000));
 }
 
+TEST(EngineRandom, SameNumbersOnEverySystem) {
+    // Числа по началу 42 — одни и те же с libstdc++ (Linux) и libc++ (сборка
+    // для Windows): замер по записанному началу повторяется везде (D-39).
+    EngineRandom rng(42);
+    EXPECT_EQ(rng.between(0, 1'000'000), 198295);
+    EXPECT_EQ(rng.between(0, 1'000'000), 705358);
+    EXPECT_EQ(rng.between(0, 1'000'000), 591599);
+    EXPECT_EQ(rng.between(0, 1'000'000), 350242);
+    EXPECT_DOUBLE_EQ(rng.unit(), 0.90326896642837828);
+    EXPECT_EQ(rng.between(-5, 5), -1);
+}
+
 }  // namespace
 }  // namespace aim::core

@@ -33,8 +33,13 @@ struct ExportHistory {};
 struct OpenDataFolder {};
 /// Выбрать папку сохранений системным диалогом (D-33).
 struct ChooseDataFolder {};
-using MenuRequest =
-    std::variant<SaveProfile, SwitchProfile, ExportHistory, OpenDataFolder, ChooseDataFolder>;
+/// Реплей лучшего замера набора — щелчок по строке «Рекордов наборов»
+/// (D-39); есть ли он — знает программа.
+struct PlayReplay {
+    MeasureOptions options;
+};
+using MenuRequest = std::variant<SaveProfile, SwitchProfile, ExportHistory, OpenDataFolder,
+                                 ChooseDataFolder, PlayReplay>;
 
 /// Шагов туториала первого запуска.
 inline constexpr int kTutorialSteps = 4;
@@ -78,6 +83,7 @@ private:
     void close_tutorial();
     void click_settings(Vec2 p);
     void click_help(Vec2 p);
+    void click_records(Vec2 p);
     void scroll_help(int lines);
     /// Прокрутка по высоте курсора на полосе: верх — начало, низ — конец.
     void scroll_help_to(double y);

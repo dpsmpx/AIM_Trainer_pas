@@ -3,10 +3,13 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <utility>
+#include <vector>
 
 #include "core/help.h"
 #include "core/profile_file.h"
+#include "core/records.h"
 
 namespace aim::core {
 
@@ -100,7 +103,7 @@ std::optional<MeasureOptions> Menu::click(const ClickInput& click) {
     }
     switch (panel_) {
         case Panel::Help: click_help(p); return std::nullopt;
-        case Panel::Records:
+        case Panel::Records: click_records(p); return std::nullopt;
         case Panel::Achievements:
             // Любой щелчок закрывает и дальше не идёт: набор под панелью не
             // выбирается.
@@ -154,6 +157,21 @@ std::optional<MeasureOptions> Menu::click(const ClickInput& click) {
 
 void Menu::scroll_help(int lines) {
     help_scroll_ = std::clamp(help_scroll_ + lines, 0, kHelpMaxScroll);
+}
+
+void Menu::click_records(Vec2 p) {
+    // Строки — как на панели: наборы истории, свежие сверху (core/records.h).
+    const std::vector<ComboStats> all =
+        all_combo_stats(profile_.runs, profile_.settings.average_runs);
+    const int rows = std::min(kRecordsRows, static_cast<int>(all.size()));
+    for (int i = 0; i < rows; ++i) {
+        if (records_row(i).contains(p)) {
+            requests_.emplace_back(PlayReplay{all.at(static_cast<std::size_t>(i)).options});
+            return;
+        }
+    }
+    // Мимо строк — закрыть; набор под панелью не выбирается.
+    panel_ = Panel::None;
 }
 
 void Menu::scroll_help_to(double y) {

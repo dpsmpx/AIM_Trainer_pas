@@ -145,8 +145,9 @@ Pascal-версия — архив в `archive/pascal/`: код не прави�
   Чужой код и ассеты — только совместимые с ней и со строкой в
   `docs/PROVENANCE.md`.
 - Секретов в репозитории нет — даже «тестовых».
-- Файлы игрока (`profile*_stats.ini`, `profile*_sessions.csv`,
-  `export_profile*.csv`) и сборка (`*.exe`, `*.pdb`, `*.pcu`) в
+- Файлы игрока (`profile*.ini`, `profile*_runs.csv`, `replays/`,
+  `export_profile*.csv`; у Pascal-версии — `profile*_stats.ini`,
+  `profile*_sessions.csv`) и сборка (`*.exe`, `*.pdb`, `*.pcu`) в
   репозиторий не попадают (D-04); исключение — отладочные сборки для
   автора в отдельной ветке `win_debug_builds` (D-23).
 - Выход в сеть и любые данные других людей (например, сетевая таблица

@@ -140,6 +140,10 @@ std::optional<std::string_view> preset_name(const MeasureOptions& options) {
     return std::nullopt;
 }
 
+std::string_view combo_name(const MeasureOptions& options) {
+    return preset_name(options).value_or("Свой набор");
+}
+
 TargetRules target_rules(const MeasureOptions& options) {
     const MeasureOptions o = normalized(options);
     TargetRules rules;

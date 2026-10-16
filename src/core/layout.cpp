@@ -68,6 +68,18 @@ Rect help_track() {
     return {p.x2 - 22, top, p.x2 - 12, top + kHelpVisibleLines * kHelpLineH};
 }
 
+Rect records_panel() {
+    const int x = (kW - kRecordsW) / 2;
+    const int y = (kH - kRecordsH) / 2;
+    return {x, y, x + kRecordsW, y + kRecordsH};
+}
+
+Rect records_row(int i) {
+    const Rect p = records_panel();
+    const int y = p.y1 + 50 + i * 40;
+    return {p.x1 + 12, y, p.x2 - 12, y + 36};
+}
+
 Rect history_panel() {
     const int x = (kW - kHistoryW) / 2;
     const int y = (kH - kHistoryH) / 2;

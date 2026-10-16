@@ -50,11 +50,6 @@ std::string primary_text(const core::MeasureOptions& options, double value) {
                                           : std::format("{:.0f}", value);
 }
 
-// Имя набора замера для игрока: набор или «Свой набор».
-std::string_view combo_name(const core::MeasureOptions& options) {
-    return core::preset_name(options).value_or("Свой набор");
-}
-
 void fill_round_rect(Canvas& c, const Rect& r, int w, int h) {
     c.fill_round_rect(r.x1, r.y1, r.x2, r.y2, w, h);
 }
@@ -218,11 +213,9 @@ void render_settings(Canvas& c, const core::Settings& s, std::string_view folder
 }
 
 // Рекорды наборов (D-38): лучший замер и среднее за N, свежие наборы первыми.
-void render_records(Canvas& c, const core::Profile& profile) {
-    constexpr int kPanelW = 760;
-    constexpr int kPanelH = 470;
-    constexpr int kRows = 10;
-    const Rect p{(kW - kPanelW) / 2, (kH - kPanelH) / 2, (kW + kPanelW) / 2, (kH + kPanelH) / 2};
+// Рекорды наборов; у строки с реплеем — «▶»: щелчок проигрывает его (D-39).
+void render_records(Canvas& c, const core::Profile& profile, const PlayerFiles& files) {
+    const Rect p = core::records_panel();
     panel_back(c, p);
     panel_title(c, p, 12, "Рекорды наборов");
     const int n = profile.settings.average_runs;
@@ -232,17 +225,29 @@ void render_records(Canvas& c, const core::Profile& profile) {
         c.font_color = argb(200, 200, 200, 200);
         c.draw_text_centered(p.x1, p.y1 + 120, p.x2, p.y1 + 150, "Пока нет замеров");
     }
-    for (int i = 0; i < std::min(kRows, static_cast<int>(all.size())); ++i) {
+    bool any_replay = false;
+    for (int i = 0; i < std::min(core::kRecordsRows, static_cast<int>(all.size())); ++i) {
         const core::ComboStats& st = all.at(static_cast<std::size_t>(i));
-        const int y = p.y1 + 50 + i * 40;
+        const Rect row = core::records_row(i);
+        const int y = row.y1;
+        const bool replay = files.has_replay(st.options);
+        any_replay = any_replay || replay;
         c.brush = argb(35, 255, 255, 255);
         c.pen = argb(0, 0, 0, 0);
-        c.fill_round_rect(p.x1 + 12, y, p.x2 - 12, y + 36, 8, 8);
+        c.fill_round_rect(row.x1, row.y1, row.x2, row.y2, 8, 8);
+        if (replay) {
+            // Треугольник «▶» слева: у набора есть реплей.
+            const int cx = row.x1 + 14;
+            const int cy = (row.y1 + row.y2) / 2;
+            c.brush = argb(230, 120, 220, 140);
+            const std::array<IntPoint, 3> play{{{cx - 4, cy - 7}, {cx + 7, cy}, {cx - 4, cy + 7}}};
+            c.fill_polygon(play);
+        }
         c.font.size = 12;
         c.font_color = kClWhite;
         c.draw_text_centered(
             p.x1 + 20, y + 1, p.x2 - 20, y + 18,
-            std::format("{}: {}", combo_name(st.options), core::describe_short(st.options)));
+            std::format("{}: {}", core::combo_name(st.options), core::describe_short(st.options)));
         const std::string best =
             st.best
                 ? primary_text(st.options, core::primary_value(profile.runs.at(*st.best).summary))
@@ -253,7 +258,9 @@ void render_records(Canvas& c, const core::Profile& profile) {
             std::format("рекорд {} · среднее за {}: {} · замеров: {}", best, st.average.runs,
                         primary_text(st.options, st.average.primary), st.runs));
     }
-    panel_footer(c, p, "Клик — закрыть");
+    panel_footer(c, p,
+                 any_replay ? "Клик по строке с ▶ — реплей рекорда · мимо строк — закрыть"
+                            : "Клик — закрыть");
 }
 
 void render_achievements(Canvas& c, const core::Profile& profile) {
@@ -295,7 +302,7 @@ void render_history(Canvas& c, const core::Profile& profile, std::string_view fi
         const core::RunRecord& r = runs.at(i - 1);
         const core::GameSummary& g = r.summary;
         std::string text = std::format("{:02}.{:02} {:02}:{:02}  {}  ", r.when.day, r.when.month,
-                                       r.when.hour, r.when.minute, combo_name(g.options));
+                                       r.when.hour, r.when.minute, core::combo_name(g.options));
         text += core::lower_is_better(g.options)
                     ? std::format("{:.0f} мс, фальстартов {}", g.median_reaction_ms, g.misses)
                     : std::format("{} очков, {}%, {:.0f} мс", g.score, one_decimal(g.accuracy),
@@ -601,7 +608,7 @@ void MenuView::render_plate(Canvas& c, const core::Theme& theme, int preset,
 }
 
 void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const core::Menu& menu,
-                      const core::Profile& profile, std::string_view data_folder, core::Vec2 mouse,
+                      const core::Profile& profile, const PlayerFiles& files, core::Vec2 mouse,
                       core::Nanoseconds now) const {
     c.clear_window(theme.background);
     render_particles(c, profile, mouse);
@@ -745,8 +752,8 @@ void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const
 
     switch (menu.panel()) {
         case core::Panel::Help: render_help(c, menu.help_scroll()); break;
-        case core::Panel::Settings: render_settings(c, profile.settings, data_folder); break;
-        case core::Panel::Records: render_records(c, profile); break;
+        case core::Panel::Settings: render_settings(c, profile.settings, files.folder()); break;
+        case core::Panel::Records: render_records(c, profile, files); break;
         case core::Panel::Achievements: render_achievements(c, profile); break;
         case core::Panel::History:
             render_history(c, profile, core::runs_file_name(menu.profile_number()));

@@ -120,6 +120,30 @@ TEST_F(MenuTest, InformationPanelsCloseOnAnyClick) {
     }
 }
 
+TEST_F(MenuTest, RecordsRowAsksForItsReplay) {
+    // Два набора в истории: свежий — сверху (D-38).
+    RunRecord classic;
+    classic.summary.options = preset_options(1, {});
+    classic.summary.score = 100;
+    RunRecord flick = classic;
+    flick.summary.options = preset_options(4, {});
+    profile_.runs = {classic, flick};
+    menu_.click(click_at(center(mini_button(MiniButton::Records))));
+    ASSERT_EQ(menu_.panel(), Panel::Records);
+    menu_.take_requests();
+    menu_.click(click_at(center(records_row(1))));
+    const std::vector<MenuRequest> requests = menu_.take_requests();
+    ASSERT_EQ(requests.size(), 1U);
+    const auto* play = std::get_if<PlayReplay>(&requests.front());
+    ASSERT_NE(play, nullptr);
+    EXPECT_EQ(play->options, classic.summary.options) << "вторая строка — набор постарше";
+    EXPECT_EQ(menu_.panel(), Panel::Records) << "реплей просит программу, панель открыта";
+    // Строки без набора — мимо: панель закрывается, реплея не просит.
+    menu_.click(click_at(center(records_row(2))));
+    EXPECT_TRUE(menu_.take_requests().empty());
+    EXPECT_EQ(menu_.panel(), Panel::None);
+}
+
 TEST_F(MenuTest, HelpScrollsByArrowsWheelAndBar) {
     menu_.click(click_at(center(mini_button(MiniButton::Help))));
     ASSERT_EQ(menu_.panel(), Panel::Help);
