@@ -22,6 +22,7 @@
 | с 13 октября 2026 | сессии Claude Code по правилам `CLAUDE.md` | этот каркас |
 | 15 октября 2026 | замерщики ввода `tools/lib_probes/` — сессия Claude Code по поручению автора | `docs/LIB_PROBES.md` |
 | 15 октября 2026 | каркас C++-версии: `CMakeLists.txt`, `src/`, `tests/`, `tools/cmake/`, `tools/check_cpp.sh`, `tools/setup_env.sh` — сессия Claude Code по поручению автора; сборка и оформление — по образцу TrueJointTileMaker | D-24, D-25 |
+| 16 октября 2026 | эталон в сессии: `tools/gui.sh`, сборка компилятора в `tools/setup_env.sh` — сессия Claude Code по ROADMAP; по образцу `tools/gui.sh` и `tools/setup-env.sh` TrueJointTileMaker | D-26 |
 
 Какой ассистент писал правки 9 июля и 23 августа, в репозитории не
 записано. Шапка прямо говорит, что код 23 августа не компилировался в
@@ -33,6 +34,8 @@
 | что | откуда | в репозитории | лицензия |
 |---|---|---|---|
 | среда и компилятор PascalABC.NET, модуль GraphABC | поставка PascalABC.NET (pascalabc.net) | нет — ставится отдельно; модуль подключается `uses GraphABC` | аудитом не сверялась: **сверить до выпуска собранного `.exe`**, если модули среды входят в сборку |
+| компилятор PascalABC.NET 4.0.0.3882 для эталона в сессии | исходники `pascalabcnet/pascalabcnet`, коммит `643514c2d9b8` (D-26) | нет — `tools/setup_env.sh` собирает его в каталоге инструментов; сборка эталона в репозиторий не попадает (`build/`) | GNU LGPL v3 с оговорками авторов (`doc/License_en.txt` поставки); только инструмент, не распространяется |
+| заплатка компилятора для Mono 6.8 `tools/pabcnet/mono68-generic-array-ctors.patch` | TrueJointTileMaker `tools/pabcnet/`, тот же автор; файл скопирован без изменений | да | правка исходников PascalABC.NET — их лицензия (LGPL v3); заплатка в репозитории — GPL v3 TrueJointTileMaker |
 | шрифт Consolas | системный шрифт Windows | нет — берётся по имени | не распространяется проектом |
 | звук | `System.Console.Beep` (.NET) — тон, а не файл | нет | — |
 | графика | рисуется примитивами GraphABC; растровых файлов нет | нет | — |
