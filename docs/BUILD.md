@@ -2,8 +2,8 @@
 
 Как собрать C++-версию Aim Trainer у автора на Windows и в облачной сессии.
 Решения: C++20 (D-16), llvm-mingw (D-17), SDL 3.4.18 (D-18), CMake, Ninja и
-GoogleTest (D-19), раскладка и проверка (D-20, D-25). Pascal-версия
-собирается в PascalABC.NET, как раньше (`docs/MANUAL_CHECKS.md`).
+GoogleTest (D-19), раскладка и проверка (D-20, D-25). Pascal-версия —
+образец в `archive/pascal/` (D-28) — собирается под Mono в сессии, §5.
 
 ## 1. На Windows — у автора
 
@@ -107,7 +107,7 @@ build/windows-cross/AimTrainer.exe`; клик — `xdotool`.
 `tools/setup_env.sh`, сборкой и окном управляет `tools/gui.sh`:
 
 ```sh
-tools/gui.sh ref build              # *.pas корня → build/ref/AIM_Trainer.exe
+tools/gui.sh ref build              # archive/pascal/*.pas → build/ref/AIM_Trainer.exe
 tools/gui.sh ref start              # запуск в своём Xvfb (:97)
 tools/gui.sh ref click 585 57       # ЛКМ по «Classic Mode»; 3-й аргумент — кнопка
 tools/gui.sh ref key Escape space   # клавиши

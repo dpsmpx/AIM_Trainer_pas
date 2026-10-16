@@ -1,6 +1,6 @@
-# Aim Trainer — C++-версия (перенос, D-08). Pascal-версия в корне — эталон и
-# не правится (D-09). Раскладка — D-25, сборка у автора и в сессии —
-# docs/BUILD.md:
+# Aim Trainer — C++-версия (перенос, D-08). Pascal-версия — образец функционала
+# в archive/pascal/, не правится (D-09, D-28). Раскладка — D-25, сборка у автора
+# и в сессии — docs/BUILD.md:
 #
 #   cmake --preset linux-gcc && cmake --build --preset linux-gcc && ctest --preset linux-gcc
 #   tools/check_cpp.sh            — всё, что проверяется в сессии, одной командой

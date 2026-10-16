@@ -2,7 +2,7 @@
 # Окна оригинала и C++-версии без экрана: сборка, запуск, ввод и снимки
 # (D-26) — для сценариев docs/MANUAL_CHECKS.md и сверки снимков с эталоном.
 #
-#   tools/gui.sh ref  build              собрать оригинал под Mono в build/ref
+#   tools/gui.sh ref  build              собрать оригинал (archive/pascal) под Mono в build/ref
 #   tools/gui.sh port build              собрать C++-версию, пресет linux-gcc
 #   tools/gui.sh TARGET start            запустить в своём Xvfb
 #   tools/gui.sh TARGET stop             закрыть программу и её Xvfb
@@ -21,8 +21,8 @@
 # друга, и щелчок достался бы верхнему.
 #
 # Оригинал пишет файлы профиля в текущий каталог (AUD-17), поэтому работает
-# в build/ref с копиями исходников: файлы репозитория он не трогает (D-04,
-# D-09). Сборка начинает с чистого каталога — как «Подготовка» сценариев.
+# в build/ref с копиями исходников из archive/pascal: файлы репозитория он
+# не трогает (D-04, D-09, D-28). Сборка начинает с чистого каталога — как «Подготовка» сценариев.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -47,7 +47,7 @@ build_ref() {
     [ -f "$compiler" ] || die "нет $compiler — сначала tools/setup_env.sh"
     rm -rf "$REF_DIR"
     mkdir -p "$REF_DIR"
-    cp "$ROOT"/*.pas "$REF_DIR"/
+    cp "$ROOT"/archive/pascal/*.pas "$REF_DIR"/
     # Строки с номерами шагов ([12]BeginParsingFile...) — шум, остальное видно.
     { (cd "$REF_DIR" && mono "$compiler" AIM_Trainer.pas) | grep -v '^\[' >&2; } || true
     [ -f "$REF_DIR/AIM_Trainer.exe" ] || die "оригинал не собрался"

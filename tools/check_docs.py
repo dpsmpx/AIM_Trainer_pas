@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Проверка документов Aim Trainer (D-01).
 
-1. В корне — только точки входа и исходники (`ROOT_ALLOW`).
+1. В корне — только точки входа и исходники C++-версии (`ROOT_ALLOW`).
 2. Ссылка Markdown `[…](путь)` ведёт на существующий файл или каталог.
 3. Путь в обратных кавычках вида `docs/…`, `ROADMAP/…`, `tools/…`,
-   `.claude/…`, `.github/…` существует. Голые имена файлов не
+   `archive/…`, `.claude/…`, `.github/…` существует. Голые имена файлов не
    сверяются: документы нарочно цитируют несуществующие (`TODO.md`,
    раздел «README»). Не сверяются и аудиты (`docs/audits/` — снимок на
    дату), CHANGELOG (история называет то, чего уже нет), README (D-06),
@@ -18,9 +18,10 @@
    `[+]` (якорь — номер этапа или имя: `task-2`, `task-cpp`), шаг —
    `- [ ]` или `- [+]`.
 8. Чего по решениям быть не должно, того нет (`MUST_BE_ABSENT`).
-9. Исходники Pascal-версии не изменены (`PASCAL_FROZEN`, D-09): хэш
-   `git hash-object` каждого файла совпадает с записанным. Меняются эти
-   хэши только вместе с новым решением.
+9. Исходники Pascal-версии в `archive/pascal/` не изменены
+   (`PASCAL_FROZEN`, D-09, D-28): хэш `git hash-object` каждого файла
+   совпадает с записанным. Меняются эти хэши только вместе с новым
+   решением.
 
 Только стандартная библиотека, без сети. Коды возврата: 0 — чисто,
 1 — есть находки.
@@ -37,8 +38,9 @@ ROOT = Path(__file__).resolve().parent.parent
 ROOT_ALLOW = {
     ".git", ".gitignore", ".github", ".claude",
     "README.md", "CLAUDE.md", "TODO.md", "LICENSE",
-    "AIM_Trainer.pas", "AimCircle.pas", "Control_AI.pas", "Base.pas",
     "docs", "ROADMAP", "tools",
+    # Pascal-версия — образец функционала, в архиве (D-28).
+    "archive",
     # C++-версия (D-20); build/ — каталог сборки, в Git не попадает.
     "CMakeLists.txt", "CMakePresets.json", "src", "tests",
     ".clang-format", ".clang-tidy", "build",
@@ -52,17 +54,18 @@ DECISION_FIELDS = ("**Статус.**", "**Решение.**", "**Почему.*
 MUST_BE_ABSENT = {".github/workflows": "D-07"}
 # Названо в документах как отклонённое, но не запрещено (D-01, «Отклонено»).
 NAMED_ABSENT = {"tools/dpv"}
-# Pascal-версия остаётся как есть (D-09): хэши blob на коммите cbf5c3c.
+# Pascal-версия остаётся как есть (D-09), лежит в архиве (D-28): хэши blob
+# на коммите cbf5c3c.
 PASCAL_FROZEN = {
-    "AIM_Trainer.pas": "fab3b6383dbaf9909ae5da77f68295e21ec2376c",
-    "AimCircle.pas": "265704c2c59518759ed573b9d048afc5c2b2b382",
-    "Control_AI.pas": "33a228e5afa8853dff320c6afbe23140b799a94c",
-    "Base.pas": "41e8be2f9904fd4b4d164e7c39173c54207115f2",
+    "archive/pascal/AIM_Trainer.pas": "fab3b6383dbaf9909ae5da77f68295e21ec2376c",
+    "archive/pascal/AimCircle.pas": "265704c2c59518759ed573b9d048afc5c2b2b382",
+    "archive/pascal/Control_AI.pas": "33a228e5afa8853dff320c6afbe23140b799a94c",
+    "archive/pascal/Base.pas": "41e8be2f9904fd4b4d164e7c39173c54207115f2",
 }
 
 LINK_RE = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 CODE_RE = re.compile(r"`([^`\s]+)`")
-PATH_RE = re.compile(r"^(?:docs|ROADMAP|tools|\.claude|\.github)/[\w./-]*(?::\d+(?:-\d+)?)?$")
+PATH_RE = re.compile(r"^(?:docs|ROADMAP|tools|archive|\.claude|\.github)/[\w./-]*(?::\d+(?:-\d+)?)?$")
 D_REF_RE = re.compile(r"(?<![\w:-])D-(\d{2})(?![\w-])")
 AUD_REF_RE = re.compile(r"(?<![\w:-])AUD-(\d{2})(?![\w-])")
 TODO_ITEM_RE = re.compile(r"^- `[МСТК]` \*\*[^*]+\*\*")
@@ -153,7 +156,7 @@ def main() -> int:
 
     for name, want in PASCAL_FROZEN.items():
         if not (ROOT / name).is_file():
-            bad.append(f"нет {name} — Pascal-версия остаётся как есть (D-09)")
+            bad.append(f"нет {name} — Pascal-версия лежит в архиве как есть (D-09, D-28)")
             continue
         got = subprocess.run(["git", "-C", str(ROOT), "hash-object", name],
                              capture_output=True, text=True).stdout.strip()

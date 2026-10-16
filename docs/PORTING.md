@@ -1,8 +1,9 @@
 # Перенос на C++
 
 Aim Trainer переносится с PascalABC.NET на C++ и SDL3 (D-08, D-10, задача
-`task-cpp` в `ROADMAP/ROADMAP.md`). Оригинал — `*.pas` в корне — не
-правится: это эталон (D-09). Перенос сверяется с ним не по описанию, а по
+`task-cpp` в `ROADMAP/ROADMAP.md`) и постепенно реализует весь функционал
+оригинала. Оригинал — `archive/pascal/` — не правится: это образец
+функционала и эталон (D-09, D-28). Перенос сверяется с ним не по описанию, а по
 живой программе: один и тот же сценарий `docs/MANUAL_CHECKS.md` идёт на
 обеих, снимки окна сравниваются. Образец — перенос TrueJointTileMaker
 (`TrueJointTileMaker:docs/porting.md`).
@@ -14,7 +15,7 @@ C++-версии — там же, §12. Сборка — `docs/BUILD.md`.
 
 | путь | что |
 |---|---|
-| `AIM_Trainer.pas`, `AimCircle.pas`, `Control_AI.pas`, `Base.pas` | оригинал, эталон (D-02, D-09) |
+| `archive/pascal/` | оригинал: `AIM_Trainer.pas`, `AimCircle.pas`, `Control_AI.pas`, `Base.pas` — образец и эталон (D-09, D-28) |
 | `src/core/` | логика без окна: только стандартная библиотека C++ (D-20, D-25) |
 | `src/platform/` | SDL3 и ОС: свой поток сырого ввода мыши (D-24) |
 | `src/app/` | программа: окно и главный цикл |
@@ -36,12 +37,12 @@ C++-версии».
 ```sh
 tools/setup_env.sh                 # один раз; в облачной сессии — хук
 tools/check_cpp.sh                 # C++-версия: все пресеты сессии и тесты
-tools/gui.sh ref build             # оригинал под Mono → build/ref/AIM_Trainer.exe
+tools/gui.sh ref build             # archive/pascal под Mono → build/ref/AIM_Trainer.exe
 tools/gui.sh port build            # C++-версия, пресет linux-gcc
 ```
 
-У автора на Windows: C++-версия — пресет `windows` (`docs/BUILD.md`, §1),
-оригинал — PascalABC.NET, `F9` на `AIM_Trainer.pas`.
+У автора на Windows — только C++-версия, пресет `windows`
+(`docs/BUILD.md`, §1): оригинал там больше не прогоняется (D-28).
 
 ## 3. Сверка с эталоном
 
@@ -68,8 +69,8 @@ tools/gui.sh port build            # C++-версия, пресет linux-gcc
   пройти все сценарии.
 
 Чего эталон под Mono не показывает: частоту кадров и время Windows
-(AUD-01, AUD-25), текст GDI+, звук `Console.Beep`. Это — у автора на
-Windows, сценарии 1–4.
+(AUD-01, AUD-25), текст GDI+, звук `Console.Beep`. Здесь образец —
+чтение кода и `docs/ARCHITECTURE.md`.
 
 Оригинал падает на трёх экранах — точное попадание, подрыв, пауза
 (сценарий 22): сценарии с ними на эталоне не пройти, сверка там — по коду
