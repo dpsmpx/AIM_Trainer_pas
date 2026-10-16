@@ -5,11 +5,13 @@
 // события, по физическому положению; реакция — от показа кадра со стимулом
 // (D-12). Экраны — app/screens.h; файлы игрока — app/player_files.h.
 //
-//   AimTrainer [--frames N] [--screenshot файл.bmp] [--debug-title]
+//   AimTrainer [--frames N] [--screenshot файл.bmp] [--debug-title] [--text-check]
 //
 // --frames N — выйти после N кадров; --screenshot — записать последний кадр в
 // BMP. Оба — для проверки без экрана (tests/CMakeLists.txt). --debug-title —
 // в заголовке окна откуда взято время щелчка (сценарий 21, D-24).
+// --text-check — каждую надпись, которая не поместилась в свой
+// прямоугольник, — в журнал; были такие — код выхода 3 (D-43).
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
@@ -60,6 +62,7 @@ struct Options {
     int frames = 0;  // 0 — до закрытия окна
     std::string screenshot;
     bool debug_title = false;
+    bool text_check = false;
 };
 
 std::optional<Options> parse_options(int argc, char* argv[]) {
@@ -77,6 +80,8 @@ std::optional<Options> parse_options(int argc, char* argv[]) {
             options.screenshot = argv[++i];
         } else if (arg == "--debug-title") {
             options.debug_title = true;
+        } else if (arg == "--text-check") {
+            options.text_check = true;
         } else {
             return std::nullopt;
         }
@@ -193,7 +198,9 @@ private:
 int main(int argc, char* argv[]) {
     const std::optional<Options> options = parse_options(argc, argv);
     if (!options) {
-        SDL_Log("использование: AimTrainer [--frames N] [--screenshot файл.bmp]");
+        SDL_Log(
+            "использование: AimTrainer [--frames N] [--screenshot файл.bmp] [--debug-title] "
+            "[--text-check]");
         return 2;
     }
     SDL_SetAppMetadata(kTitle, nullptr, "io.github.dpsmpx.aimtrainer");
@@ -260,6 +267,7 @@ int main(int argc, char* argv[]) {
         if (!sound.active()) SDL_Log("звука нет: %s", sound.problem().c_str());
         aim::app::Screens screens(window, renderer, *text, profile, files, rng, menu, sound);
         screens.start(SDL_GetTicksNS());
+        screens.check_text(options->text_check);
         for (std::string& m : messages)
             screens.message(std::move(m));
 
@@ -385,6 +393,10 @@ int main(int argc, char* argv[]) {
             } else if (after - next_frame > period) {
                 next_frame = after;
             }
+        }
+        if (options->text_check && screens.clipped_texts() > 0) {
+            SDL_Log("не поместилось надписей: %zu", screens.clipped_texts());
+            if (status == 0) status = 3;
         }
     }
 

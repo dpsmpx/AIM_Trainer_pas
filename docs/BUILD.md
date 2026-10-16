@@ -151,7 +151,7 @@ ref build` начинает с чистого каталога, `tools/gui.sh Ц
 |---|---|---|
 | SDL 3.4.18 | архив выпуска `libsdl-org/SDL`; в сессии — `$AIM_DEPS_DIR` | SHA-256 (D-18), `tools/cmake/dependencies.cmake` |
 | SDL3_ttf 3.2.2, FreeType 2.15.0 | архивы выпусков `libsdl-org/SDL_ttf` и `download.savannah.gnu.org`; в сессии — `$AIM_DEPS_DIR` | SHA-256 и подписи авторов (D-31), `tools/cmake/dependencies.cmake` |
-| шрифт DejaVu Sans Mono 2.37 | архив выпуска `dejavu-fonts/dejavu-fonts`; в сессии — `$AIM_DEPS_DIR` | SHA-256 (D-31); сборка кладёт файлы в `fonts/` рядом с программой |
+| шрифты DejaVu Sans Condensed и Sans Mono 2.37 | архив выпуска `dejavu-fonts/dejavu-fonts`; в сессии — `$AIM_DEPS_DIR` | SHA-256 (D-31); сборка кладёт файлы в `fonts/` рядом с программой |
 | GoogleTest 1.14.0 | пакет Ubuntu 24.04; иначе — тег `v1.14.0` | версия пакета; коммит `f8d7d77c0693` |
 | llvm-mingw 20261006 | выпуск `mstorsjo/llvm-mingw` | SHA-256 (D-17), `tools/setup_env.sh` и раздел 1 |
 

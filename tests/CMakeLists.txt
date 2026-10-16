@@ -60,12 +60,13 @@ gtest_discover_tests(aim_app_tests DISCOVERY_MODE PRE_TEST
 # SDL3 и не требует X-сервера. Рендер — программный, кадровый буфер — без
 # ускорения: иначе SDL поднимает EGL и Mesa, а их утечки LeakSanitizer
 # приписывает программе (так же у TrueJointTileMaker). Папка игрока — своя
-# и пустая (D-30): первый запуск, туториал.
+# и пустая (D-30): первый запуск, туториал. --text-check: надпись меню или
+# туториала не поместилась — код выхода 3, тест красный (D-43).
 set(_aim_frame "${CMAKE_CURRENT_BINARY_DIR}/app_frame.bmp")
 add_test(NAME app_data_reset COMMAND "${CMAKE_COMMAND}" -E rm -rf "${CMAKE_CURRENT_BINARY_DIR}/app_data")
 set_tests_properties(app_data_reset PROPERTIES FIXTURES_SETUP app_data)
 add_test(NAME app_offscreen_frames
-         COMMAND AimTrainer --frames 3 --screenshot "${_aim_frame}")
+         COMMAND AimTrainer --frames 3 --screenshot "${_aim_frame}" --text-check)
 set_tests_properties(app_offscreen_frames PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=offscreen;SDL_RENDER_DRIVER=software;SDL_FRAMEBUFFER_ACCELERATION=0;SDL_AUDIO_DRIVER=dummy;AIM_TRAINER_DATA_DIR=app_data"
     FIXTURES_REQUIRED app_data

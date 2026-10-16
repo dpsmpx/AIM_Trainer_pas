@@ -289,27 +289,59 @@ void Canvas::text_out(int x, int y, std::string_view s) {
 }
 
 void Canvas::draw_text_centered(int x, int y, int x1, int y1, std::string_view s) {
+    draw_text_box(x, y, x1, y1, s, true);
+}
+
+void Canvas::draw_text_left(int x, int y, int x1, int y1, std::string_view s) {
+    draw_text_box(x, y, x1, y1, s, false);
+}
+
+void Canvas::draw_text_box(int x, int y, int x1, int y1, std::string_view s, bool centered) {
     const SDL_Rect box{x, y, x1 - x, y1 - y};
     if (box.w <= 0 || box.h <= 0) return;
     // Перенос — по ширине прямоугольника, как у эталона (libgdiplus).
     const std::vector<std::string> lines = text_.wrap(s, font, box.w);
     const int line_h = text_.height(font);
     const int block = line_h * static_cast<int>(lines.size());
-    const float top = static_cast<float>(box.y) + static_cast<float>(box.h - block) / 2.0F;
+    const float top = centered
+                          ? static_cast<float>(box.y) + static_cast<float>(box.h - block) / 2.0F
+                          : static_cast<float>(box.y);
     // Обрезка — только если текст выходит за прямоугольник: смена области
     // обрезки рвёт пакет отрисовки SDL.
     int widest = 0;
     for (const std::string& line : lines)
         widest = std::max(widest, text_.measure(line, font));
     const bool clip = block > box.h || widest > box.w;
+    if (clip && check_text_ && clipped_.emplace(s).second)
+        SDL_Log("надпись не помещается в %d×%d (строк %zu): %.*s", box.w, box.h, lines.size(),
+                static_cast<int>(s.size()), s.data());
     if (clip) SDL_SetRenderClipRect(renderer_, &box);
     for (std::size_t i = 0; i < lines.size(); ++i) {
         const int w = text_.measure(lines[i], font);
-        text_.out(static_cast<float>(box.x) + static_cast<float>(box.w - w) / 2.0F,
-                  top + static_cast<float>(line_h) * static_cast<float>(i), lines[i], font,
-                  font_color);
+        text_.out(
+            static_cast<float>(box.x) + (centered ? static_cast<float>(box.w - w) / 2.0F : 0.0F),
+            top + static_cast<float>(line_h) * static_cast<float>(i), lines[i], font, font_color);
     }
     if (clip) SDL_SetRenderClipRect(renderer_, nullptr);
+}
+
+void Canvas::pair_centered(int x, int y, int x1, int y1, std::string_view s, core::Rgba label,
+                           core::Rgba value) {
+    const std::size_t sep = s.find(": ");
+    const std::string_view head = sep == std::string_view::npos ? "" : s.substr(0, sep + 2);
+    const std::string_view tail = sep == std::string_view::npos ? s : s.substr(sep + 2);
+    const int head_w = text_.measure(head, font);
+    const int total = head_w + text_.measure(tail, font);
+    const int line_h = text_.height(font);
+    if (total > x1 - x || line_h > y1 - y) {
+        font_color = value;
+        draw_text_centered(x, y, x1, y1, s);
+        return;
+    }
+    const float left = static_cast<float>(x) + static_cast<float>(x1 - x - total) / 2.0F;
+    const float top = static_cast<float>(y) + static_cast<float>(y1 - y - line_h) / 2.0F;
+    text_.out(left, top, head, font, label);
+    text_.out(left + static_cast<float>(head_w), top, tail, font, value);
 }
 
 int Canvas::text_width(std::string_view s) {

@@ -284,11 +284,15 @@ TEST_F(MenuTest, SettingsStepToggleResetAndClose) {
     for (int i = 0; i < 3; ++i)
         menu_.click(click_at(center(settings_toggle(kSettingsThemeRow))));
     EXPECT_EQ(profile_.settings.theme, 0) << "три темы по кругу";
+    menu_.click(click_at(center(settings_toggle(kSettingsFontRow))));
+    EXPECT_EQ(profile_.settings.font, 1) << "Condensed → Mono (D-43)";
+    menu_.click(click_at(center(settings_toggle(kSettingsFontRow))));
+    EXPECT_EQ(profile_.settings.font, 0);
     menu_.click(click_at(center(settings_toggle(kSettingsHudRow))));
     EXPECT_FALSE(profile_.settings.hud);
     menu_.click(click_at(center(settings_toggle(kSettingsReplaysRow))));
     EXPECT_FALSE(profile_.settings.replays);
-    EXPECT_EQ(count<SaveProfile>(menu_.take_requests()), 10);
+    EXPECT_EQ(count<SaveProfile>(menu_.take_requests()), 12);
     menu_.click(click_at(center(settings_reset())));
     EXPECT_EQ(profile_.settings.preset.target_size, 40);
     EXPECT_EQ(profile_.settings.preset.ending, Ending::Lives);

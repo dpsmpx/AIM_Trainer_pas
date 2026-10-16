@@ -17,7 +17,7 @@
 
 namespace aim::app {
 
-/// Отсчёт: название набора, цифра, «Get ready!».
+/// Отсчёт: название набора, цифра, «Приготовься!».
 void render_countdown(Canvas& canvas, const core::Theme& theme, const core::Flow& flow,
                       core::Nanoseconds now);
 

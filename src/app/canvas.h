@@ -12,13 +12,27 @@
 
 #include <SDL3/SDL.h>
 
+#include <cstddef>
+#include <functional>
+#include <set>
 #include <span>
+#include <string>
 #include <string_view>
 
 #include "app/text.h"
 #include "core/palette.h"
 
 namespace aim::app {
+
+// Размеры шрифта, пунктов (D-43): один для всего текста; крупнее — только
+// заголовки экранов и панелей, заголовок итога и реакция замера на цвет,
+// отсчёт.
+inline constexpr int kTextSize = 12;
+inline constexpr int kTitleSize = 20;
+inline constexpr int kHeadlineSize = 32;
+inline constexpr int kCountdownSize = 120;
+/// Подпись у пары «подпись: значение» — приглушённо (D-43).
+inline constexpr core::Rgba kLabelColor{165, 170, 180, 255};
 
 struct IntPoint {
     int x = 0;
@@ -65,14 +79,41 @@ public:
     /// DrawTextCentered(x, y, x1, y1, s): по центру прямоугольника, с
     /// переносом по словам и обрезкой по нему, как DrawString GDI+.
     void draw_text_centered(int x, int y, int x1, int y1, std::string_view s);
+    /// То же, но строки — от левого края прямоугольника, блок — сверху.
+    void draw_text_left(int x, int y, int x1, int y1, std::string_view s);
     /// TextWidth(s).
     int text_width(std::string_view s);
+    /// «Подпись: значение» одной строкой по центру прямоугольника (D-43):
+    /// подпись — цветом label, значение — value; без «: » — вся строка
+    /// цветом value. Не помещается в ширину — переносом, как
+    /// draw_text_centered.
+    void pair_centered(int x, int y, int x1, int y1, std::string_view s, core::Rgba label,
+                       core::Rgba value);
+    /// Высота строки текущего шрифта, px: рамки — по ней (D-43).
+    int line_height() { return text_.height(font); }
+    /// Сколько строк займёт s при переносе по ширине width.
+    int text_lines(std::string_view s, int width) {
+        return static_cast<int>(text_.wrap(s, font, width).size());
+    }
+    /// Шрифт всех надписей (настройка «Шрифт», D-43).
+    void set_family(Family family) { text_.set_family(family); }
+
+    /// Проверка текста (--text-check, D-43): надпись, которая не поместилась
+    /// в свой прямоугольник, — в журнал, по разу на строку.
+    void check_text(bool on) { check_text_ = on; }
+    /// Сколько разных надписей не поместилось.
+    [[nodiscard]] std::size_t clipped_texts() const { return clipped_.size(); }
 
     [[nodiscard]] SDL_Renderer* renderer() const { return renderer_; }
 
 private:
+    /// Текст в прямоугольнике с переносом: по центру или от левого края.
+    void draw_text_box(int x, int y, int x1, int y1, std::string_view s, bool centered);
+
     SDL_Renderer* renderer_;
     Text& text_;
+    bool check_text_ = false;
+    std::set<std::string, std::less<>> clipped_;
 };
 
 }  // namespace aim::app

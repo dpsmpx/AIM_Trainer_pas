@@ -4,7 +4,8 @@
 #
 #   tools/gui.sh ref  build              собрать оригинал (archive/pascal) под Mono в build/ref
 #   tools/gui.sh port build              собрать C++-версию, пресет linux-gcc
-#   tools/gui.sh TARGET start            запустить в своём Xvfb
+#   tools/gui.sh TARGET start            запустить в своём Xvfb (ключи port —
+#                                        в AIM_PORT_ARGS, например --text-check)
 #   tools/gui.sh TARGET stop             закрыть программу и её Xvfb
 #   tools/gui.sh TARGET clean            удалить файлы игрока
 #   tools/gui.sh TARGET dir              папка файлов игрока
@@ -44,7 +45,7 @@ PLAYER_FILES=('profile*.ini' 'profile*_sessions.csv' 'profile*_runs.csv'
 
 die() { echo "gui.sh: $*" >&2; exit 1; }
 
-usage() { sed -n '2,18p' "$0"; exit 2; }
+usage() { sed -n '2,19p' "$0"; exit 2; }
 
 # --- цели -------------------------------------------------------------------
 
@@ -77,8 +78,10 @@ launch() {
             # Программный кадровый буфер: Xvfb всё равно рисует без GPU.
             # Звуковой карты в сессии нет: звук — в драйвер dummy, без шума
             # ALSA в журнале.
+            # AIM_PORT_ARGS — ключи программы, например --text-check (D-43).
+            # shellcheck disable=SC2086 # ключи — словами
             AIM_TRAINER_DATA_DIR="$PORT_DATA" SDL_FRAMEBUFFER_ACCELERATION=0 \
-                SDL_AUDIO_DRIVER="${SDL_AUDIO_DRIVER:-dummy}" exec "$PORT_BIN" ;;
+                SDL_AUDIO_DRIVER="${SDL_AUDIO_DRIVER:-dummy}" exec "$PORT_BIN" ${AIM_PORT_ARGS:-} ;;
     esac
 }
 

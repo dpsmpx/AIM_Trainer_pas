@@ -33,7 +33,7 @@ Screens::Screens(SDL_Window* window, SDL_Renderer* renderer, Text& text, core::P
       rng_(rng),
       menu_(menu),
       sound_(sound) {
-    canvas_.font.size = 14;
+    canvas_.font.size = kTextSize;
 }
 
 void Screens::start(core::Nanoseconds now) {
@@ -210,6 +210,7 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
 
 void Screens::render(const core::Flow& flow, core::Vec2 mouse, int fps, core::Nanoseconds now) {
     const core::Theme& th = theme();
+    canvas_.set_family(profile_.settings.font == 1 ? Family::Mono : Family::Condensed);
     switch (flow.screen()) {
         case core::Screen::Menu:
             menu_view_.render(canvas_, toasts_, th, menu_, profile_, files_, mouse, now);

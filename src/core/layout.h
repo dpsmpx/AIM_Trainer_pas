@@ -35,7 +35,7 @@ inline constexpr int kButtonsY = 40;
 inline constexpr int kButtonW = 330;
 inline constexpr int kButtonH = 26;
 inline constexpr int kButtonGap = 5;
-inline constexpr Rect kDescription{420, 226, 420 + 330, 226 + 68};
+inline constexpr Rect kDescription{420, 226, 420 + 330, 226 + 90};
 
 /// Кнопка пункта i (наборы, затем «Свой набор») через since_enter после
 /// входа в меню: появляется
@@ -53,8 +53,8 @@ inline constexpr std::array<MiniButton, 6> kMiniButtons{
 Rect mini_button(MiniButton b);
 
 // ---- Настройки ----
-inline constexpr int kSettingsW = 420;
-inline constexpr int kSettingsH = 520;
+inline constexpr int kSettingsW = 480;
+inline constexpr int kSettingsH = 560;
 inline constexpr int kSettingsRowH = 34;
 inline constexpr int kSettingsButton = 30;
 // Ряды настроек по порядку.
@@ -65,11 +65,12 @@ inline constexpr int kSettingsEndingRow = 3;   ///< окончание: жизн
 inline constexpr int kSettingsAverageRow = 4;  ///< среднее за N, «−»/«+» (D-38)
 inline constexpr int kSettingsSoundRow = 5;
 inline constexpr int kSettingsThemeRow = 6;
-inline constexpr int kSettingsHudRow = 7;      ///< интерфейс замера (D-45)
-inline constexpr int kSettingsReplaysRow = 8;  ///< запись реплеев (D-45)
-inline constexpr int kSettingsOpenFolderRow = 9;  ///< открыть папку сохранений (D-33)
-inline constexpr int kSettingsChooseFolderRow = 10;  ///< выбрать её (D-33)
-inline constexpr int kSettingsResetRow = 11;
+inline constexpr int kSettingsFontRow = 7;     ///< шрифт (D-43)
+inline constexpr int kSettingsHudRow = 8;      ///< интерфейс замера (D-45)
+inline constexpr int kSettingsReplaysRow = 9;  ///< запись реплеев (D-45)
+inline constexpr int kSettingsOpenFolderRow = 10;  ///< открыть папку сохранений (D-33)
+inline constexpr int kSettingsChooseFolderRow = 11;  ///< выбрать её (D-33)
+inline constexpr int kSettingsResetRow = 12;
 Rect settings_panel();
 int settings_row_y(int row);
 Rect settings_minus(int row);
@@ -89,10 +90,10 @@ Rect help_track();
 
 // ---- Конструктор «Своего набора» (D-37) ----
 inline constexpr int kConstructorW = 680;
-inline constexpr int kConstructorH = 500;
+inline constexpr int kConstructorH = 520;
 inline constexpr int kConstructorRowH = 32;  ///< шаг строк опций
 Rect constructor_panel();
-/// Заготовка — набор i: щелчок заполняет опции.
+/// Заготовка — набор i (два ряда: три и два): щелчок заполняет опции.
 Rect constructor_preset(int i);
 /// Строка опции row (OptionRow) целиком: щелчок переключает.
 Rect constructor_row(int row);
@@ -102,7 +103,7 @@ Rect constructor_start();
 
 // ---- Рекорды наборов ----
 inline constexpr int kRecordsW = 760;
-inline constexpr int kRecordsH = 470;
+inline constexpr int kRecordsH = 540;
 inline constexpr int kRecordsRows = 10;  ///< строк наборов на панели
 Rect records_panel();
 /// Строка набора i (0…kRecordsRows − 1), свежие сверху: щелчок — реплей

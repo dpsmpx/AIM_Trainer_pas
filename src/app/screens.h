@@ -8,6 +8,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <cstddef>
 #include <string>
 
 #include "app/canvas.h"
@@ -45,6 +46,10 @@ public:
     void after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds now);
     /// Нарисовать текущий экран на момент now.
     void render(const core::Flow& flow, core::Vec2 mouse, int fps, core::Nanoseconds now);
+    /// Проверка текста (--text-check, D-43): не поместившиеся надписи — в
+    /// журнал.
+    void check_text(bool on) { canvas_.check_text(on); }
+    [[nodiscard]] std::size_t clipped_texts() const { return canvas_.clipped_texts(); }
 
 private:
     void save();

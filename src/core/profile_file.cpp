@@ -40,6 +40,7 @@ std::string write_profile(const Profile& p, std::string_view newline) {
     line(std::format("sound={}", s.sound ? 1 : 0));
     line(std::format("menu_effects={}", s.menu_effects ? 1 : 0));
     line(std::format("theme={}", s.theme));
+    line(std::format("font={}", s.font == 1 ? "mono" : "condensed"));
     line(std::format("hud={}", s.hud ? 1 : 0));
     line(std::format("replays={}", s.replays ? 1 : 0));
     // «Свой набор» (D-37): все опции словами, как в истории.
@@ -97,6 +98,11 @@ bool apply(std::string_view key, std::string_view value, Profile& p) {
     if (key == "sound") return as_bool(s.sound);
     if (key == "menu_effects") return as_bool(s.menu_effects);
     if (key == "theme") return as_int(s.theme);
+    if (key == "font") {
+        if (value != "condensed" && value != "mono") return false;
+        s.font = value == "mono" ? 1 : 0;
+        return true;
+    }
     if (key == "hud") return as_bool(s.hud);
     if (key == "replays") return as_bool(s.replays);
     MeasureOptions& c = p.custom;

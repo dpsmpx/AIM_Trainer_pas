@@ -28,7 +28,7 @@ public:
     /// Надпись text в точке (x, y), всплывает и гаснет: реакция или
     /// фальстарт замера на цвет.
     void label(int x, int y, std::string text, core::Rgba color, core::Nanoseconds now,
-               int size = 32);
+               int size = kHeadlineSize);
     /// Новый забег: всё погасить.
     void clear();
     /// Надписи («+очки», реакция, «Фальстарт»): выключены — не появляются,
@@ -50,7 +50,7 @@ private:
         core::Nanoseconds duration = 0;
         core::Rgba color;
         std::string text;
-        int size = 16;  ///< шрифт надписи
+        int size = kTextSize;  ///< шрифт надписи
     };
     static constexpr std::size_t kSlots = 100;  // MAX_EFFECTS
 

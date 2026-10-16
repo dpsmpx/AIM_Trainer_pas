@@ -78,14 +78,16 @@ Rect constructor_panel() {
 Rect constructor_preset(int i) {
     const Rect p = constructor_panel();
     constexpr int kGap = 6;
-    constexpr int kChipW = (kConstructorW - 32 - (kPresetCount - 1) * kGap) / kPresetCount;
-    const int x = p.x1 + 16 + i * (kChipW + kGap);
-    return {x, p.y1 + 50, x + kChipW, p.y1 + 78};
+    constexpr int kPerRow = 3;
+    constexpr int kChipW = (kConstructorW - 32 - (kPerRow - 1) * kGap) / kPerRow;
+    const int x = p.x1 + 16 + (i % kPerRow) * (kChipW + kGap);
+    const int y = p.y1 + 48 + (i / kPerRow) * 34;
+    return {x, y, x + kChipW, y + 28};
 }
 
 Rect constructor_row(int row) {
     const Rect p = constructor_panel();
-    const int y = p.y1 + 90 + row * kConstructorRowH;
+    const int y = p.y1 + 124 + row * kConstructorRowH;
     return {p.x1 + 16, y, p.x2 - 16, y + kConstructorRowH - 4};
 }
 
@@ -102,7 +104,7 @@ Rect constructor_plus(int row) {
 Rect constructor_start() {
     const Rect p = constructor_panel();
     const int x = (p.x1 + p.x2) / 2 - 90;
-    const int y = p.y1 + 90 + kOptionRows * kConstructorRowH + 6;
+    const int y = p.y1 + 124 + kOptionRows * kConstructorRowH + 6;
     return {x, y, x + 180, y + 34};
 }
 
@@ -114,8 +116,8 @@ Rect records_panel() {
 
 Rect records_row(int i) {
     const Rect p = records_panel();
-    const int y = p.y1 + 50 + i * 40;
-    return {p.x1 + 12, y, p.x2 - 12, y + 36};
+    const int y = p.y1 + 50 + i * 46;
+    return {p.x1 + 12, y, p.x2 - 12, y + 42};
 }
 
 Rect history_panel() {

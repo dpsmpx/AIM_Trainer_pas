@@ -23,6 +23,8 @@ namespace aim::core {
 inline constexpr int kMinBaseLifetimeMs = 500;
 inline constexpr int kMaxBaseLifetimeMs = 2000;
 inline constexpr int kThemeCount = 3;  ///< 0 — Тёмная, 1 — Неон, 2 — Минимализм
+/// Шрифт (D-43): 0 — DejaVu Sans Condensed, 1 — DejaVu Sans Mono.
+inline constexpr int kFontCount = 2;
 /// Ступени «Среднее за N».
 inline constexpr std::array<int, 8> kAverageRunSteps{5, 10, 20, 30, 50, 100, 200, 500};
 
@@ -32,6 +34,7 @@ struct Settings {
     bool sound = true;
     bool menu_effects = true;  ///< частицы меню, «Effects: ON/OFF»
     int theme = 0;
+    int font = 0;         ///< kFontCount: 0 — Condensed (D-43)
     bool hud = true;      ///< панели и надписи в окне замера (D-45)
     bool replays = true;  ///< писать вход замера и реплей рекорда (D-45)
 };
@@ -42,7 +45,7 @@ enum class SettingRow : std::uint8_t { TargetSize, Lifetime, Lives, AverageRuns 
 /// Шаг ряда на delta ступеней с границами.
 void step_setting(Settings& settings, SettingRow row, int delta);
 /// «Сбросить по умолчанию»: размер, жизнь цели, жизни, окончание, N, звук,
-/// интерфейс замера и запись реплеев; тему и эффекты не трогает.
+/// интерфейс замера и запись реплеев; тему, шрифт и эффекты не трогает.
 void reset_settings(Settings& settings);
 /// Значение вне границ — к умолчанию; для настроек, прочитанных из файла.
 /// Возвращает, сколько полей сброшено.

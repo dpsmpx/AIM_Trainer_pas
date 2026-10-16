@@ -64,6 +64,7 @@ TEST(Settings, ResetKeepsThemeAndEffects) {
     s.theme = 1;
     s.hud = false;
     s.replays = false;
+    s.font = 1;
     reset_settings(s);
     EXPECT_EQ(s.preset.target_size, 40);
     EXPECT_EQ(s.preset.lifetime_ms, 1000);
@@ -75,6 +76,7 @@ TEST(Settings, ResetKeepsThemeAndEffects) {
     EXPECT_TRUE(s.replays);
     EXPECT_FALSE(s.menu_effects);
     EXPECT_EQ(s.theme, 1);
+    EXPECT_EQ(s.font, 1) << "шрифт сброс не трогает, как тему";
 }
 
 TEST(Settings, OutOfRangeFromFileGoesToDefault) {

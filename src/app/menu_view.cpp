@@ -89,15 +89,15 @@ void panel_back(Canvas& c, const Rect& panel, int dim_alpha = 210) {
 }
 
 void panel_title(Canvas& c, const Rect& panel, int top, std::string_view title) {
-    c.font.size = 20;
+    c.font.size = kTitleSize;
     c.font_color = kClWhite;
-    c.draw_text_centered(panel.x1, panel.y1 + top, panel.x2, panel.y1 + top + 30, title);
+    c.draw_text_centered(panel.x1, panel.y1 + top, panel.x2, panel.y1 + top + 34, title);
 }
 
 void panel_footer(Canvas& c, const Rect& panel, std::string_view text) {
-    c.font.size = 11;
+    c.font.size = kTextSize;
     c.font_color = argb(180, 180, 180, 180);
-    c.draw_text_centered(panel.x1, panel.y2 - 24, panel.x2, panel.y2 - 6, text);
+    c.draw_text_centered(panel.x1, panel.y2 - 28, panel.x2, panel.y2 - 6, text);
 }
 
 // Справка: видимые строки с прокрутки и полоса прокрутки справа.
@@ -111,7 +111,7 @@ void render_help(Canvas& c, int scroll) {
         if (at >= static_cast<int>(core::kHelp.size())) break;
         const core::HelpLine& line = core::kHelp.at(static_cast<std::size_t>(at));
         const int y = top + i * core::kHelpLineH;
-        c.font.size = 13;
+        c.font.size = kTextSize;
         c.font.weight = line.heading ? Weight::Bold : Weight::Normal;
         c.font_color = line.heading ? argb(255, 97, 207, 255) : argb(230, 220, 220, 220);
         c.draw_text_centered(p.x1 + 20, y, p.x2 - 30, y + core::kHelpLineH, line.text);
@@ -131,7 +131,7 @@ void render_help(Canvas& c, int scroll) {
                                              : 0);
     c.brush = argb(220, 97, 207, 255);
     c.fill_round_rect(track.x1, thumb_y, track.x2, thumb_y + thumb_h, 6, 6);
-    c.font.size = 11;
+    c.font.size = kTextSize;
     c.font_color = argb(180, 180, 180, 180);
     c.draw_text_centered(p.x1, p.y2 - 26, p.x2, p.y2 - 6,
                          "↑ ↓ и колёсико — листать · Esc или клик вне панели — закрыть");
@@ -156,16 +156,14 @@ std::string fit_path(Canvas& c, std::string_view prefix, std::string_view path, 
 void render_settings(Canvas& c, const core::Settings& s, std::string_view folder) {
     const Rect p = core::settings_panel();
     panel_back(c, p);
-    c.font.size = 20;
-    c.font_color = kClWhite;
-    c.draw_text_centered(p.x1, p.y1 + 14, p.x2, p.y1 + 44, "Настройки");
+    panel_title(c, p, 12, "Настройки");
 
     // Один размер шрифта во всех рядах (D-43).
-    c.font.size = 13;
+    c.font.size = kTextSize;
     const auto stepper = [&](int row, const std::string& text) {
         const int y = core::settings_row_y(row);
-        c.font_color = argb(230, 220, 220, 220);
-        c.draw_text_centered(p.x1 + 20, y, p.x2 - 120, y + core::kSettingsButton, text);
+        c.pair_centered(p.x1 + 20, y, p.x2 - 120, y + core::kSettingsButton, text, kLabelColor,
+                        kClWhite);
         c.pen = argb(0, 0, 0, 0);
         for (const Rect& r : {core::settings_minus(row), core::settings_plus(row)}) {
             c.brush = argb(150, 255, 255, 255);
@@ -180,8 +178,7 @@ void render_settings(Canvas& c, const core::Settings& s, std::string_view folder
         c.brush = argb(60, 255, 255, 255);
         c.pen = argb(0, 0, 0, 0);
         fill_round_rect(c, r, 8, 8);
-        c.font_color = kClWhite;
-        text_centered(c, r, text);
+        c.pair_centered(r.x1, r.y1, r.x2, r.y2, text, kLabelColor, kClWhite);
     };
     const core::PresetSettings& ps = s.preset;
     stepper(core::kSettingsSizeRow, std::format("Размер цели: {} px", ps.target_size));
@@ -191,10 +188,12 @@ void render_settings(Canvas& c, const core::Settings& s, std::string_view folder
            ps.ending == core::Ending::Lives
                ? "Окончание: по жизням"
                : std::format("Окончание: {} с", core::MeasureOptions{}.duration_s));
-    stepper(core::kSettingsAverageRow, std::format("Среднее за {} замеров", s.average_runs));
+    stepper(core::kSettingsAverageRow, std::format("Среднее за N замеров: {}", s.average_runs));
     toggle(core::kSettingsSoundRow, std::string("Звук: ") + (s.sound ? "ON" : "OFF"));
     toggle(core::kSettingsThemeRow,
            "Тема: " + std::string(core::kThemes.at(static_cast<std::size_t>(s.theme)).name));
+    toggle(core::kSettingsFontRow,
+           std::string("Шрифт: ") + (s.font == 1 ? "DejaVu Sans Mono" : "DejaVu Sans Condensed"));
     toggle(core::kSettingsHudRow, std::string("Интерфейс замера: ") + (s.hud ? "ON" : "OFF"));
     toggle(core::kSettingsReplaysRow, std::string("Запись реплеев: ") + (s.replays ? "ON" : "OFF"));
     toggle(core::kSettingsOpenFolderRow, "Открыть папку сохранений");
@@ -207,7 +206,7 @@ void render_settings(Canvas& c, const core::Settings& s, std::string_view folder
     fill_round_rect(c, reset, 8, 8);
     c.font_color = kClWhite;
     text_centered(c, reset, "Сбросить");
-    c.font.size = 11;
+    c.font.size = kTextSize;
     c.font_color = argb(180, 180, 180, 180);
     c.draw_text_centered(p.x1 + 10, p.y2 - 44, p.x2 - 10, p.y2 - 6,
                          "Размер, жизнь цели, жизни и окончание — для всех наборов. Клик вне "
@@ -223,7 +222,7 @@ void render_constructor(Canvas& c, const core::Profile& profile) {
     const core::MeasureOptions& o = profile.custom;
     // Заготовки: набор того же вида — ярче.
     const std::optional<int> same = core::preset_index(o);
-    c.font.size = 10;
+    c.font.size = kTextSize;
     for (int i = 0; i < core::kPresetCount; ++i) {
         const Rect r = core::constructor_preset(i);
         c.brush = with_alpha(core::kPresetLooks.at(static_cast<std::size_t>(i)).button,
@@ -233,7 +232,7 @@ void render_constructor(Canvas& c, const core::Profile& profile) {
         c.font_color = kClWhite;
         text_centered(c, r, core::kPresets.at(static_cast<std::size_t>(i)).name);
     }
-    c.font.size = 13;
+    c.font.size = kTextSize;
     for (int r = 0; r < core::kOptionRows; ++r) {
         const auto row = static_cast<core::OptionRow>(r);
         const Rect box = core::constructor_row(r);
@@ -241,7 +240,7 @@ void render_constructor(Canvas& c, const core::Profile& profile) {
         c.brush = argb(on ? 45 : 15, 255, 255, 255);
         c.pen = argb(0, 0, 0, 0);
         fill_round_rect(c, box, 8, 8);
-        const int ty = box.y1 + (box.y2 - box.y1 - 17) / 2;
+        const int ty = box.y1 + (box.y2 - box.y1 - c.line_height()) / 2;
         c.brush = argb(0, 0, 0, 0);
         c.font_color = on ? argb(230, 220, 220, 220) : argb(110, 200, 200, 200);
         c.text_out(box.x1 + 12, ty, core::option_label(o, row));
@@ -285,7 +284,7 @@ void render_records(Canvas& c, const core::Profile& profile, const PlayerFiles& 
     const int n = profile.settings.average_runs;
     const std::vector<core::ComboStats> all = core::all_combo_stats(profile.runs, n);
     if (all.empty()) {
-        c.font.size = 13;
+        c.font.size = kTextSize;
         c.font_color = argb(200, 200, 200, 200);
         c.draw_text_centered(p.x1, p.y1 + 120, p.x2, p.y1 + 150, "Пока нет замеров");
     }
@@ -307,10 +306,10 @@ void render_records(Canvas& c, const core::Profile& profile, const PlayerFiles& 
             const std::array<IntPoint, 3> play{{{cx - 4, cy - 7}, {cx + 7, cy}, {cx - 4, cy + 7}}};
             c.fill_polygon(play);
         }
-        c.font.size = 12;
+        c.font.size = kTextSize;
         c.font_color = kClWhite;
         c.draw_text_centered(
-            p.x1 + 20, y + 1, p.x2 - 20, y + 18,
+            p.x1 + 28, y + 2, p.x2 - 20, y + 21,
             std::format("{}: {}", core::combo_name(st.options), core::describe_short(st.options)));
         const std::string best =
             st.best
@@ -318,7 +317,7 @@ void render_records(Canvas& c, const core::Profile& profile, const PlayerFiles& 
                 : "—";
         c.font_color = argb(220, 255, 210, 90);
         c.draw_text_centered(
-            p.x1 + 20, y + 18, p.x2 - 20, y + 35,
+            p.x1 + 28, y + 21, p.x2 - 20, y + 40,
             std::format("рекорд {} · среднее за {}: {} · замеров: {}", best, st.average.runs,
                         primary_text(st.options, st.average.primary), st.runs));
     }
@@ -328,22 +327,21 @@ void render_records(Canvas& c, const core::Profile& profile, const PlayerFiles& 
 }
 
 void render_achievements(Canvas& c, const core::Profile& profile) {
-    const Rect p{(kW - 460) / 2, (kH - 440) / 2, (kW - 460) / 2 + 460, (kH - 440) / 2 + 440};
+    const Rect p{(kW - 560) / 2, (kH - 470) / 2, (kW - 560) / 2 + 560, (kH - 470) / 2 + 470};
     panel_back(c, p);
     panel_title(c, p, 14, "Достижения");
     for (int i = 0; i < core::kAchievementCount; ++i) {
-        const int y = p.y1 + 56 + i * 42;
+        const int y = p.y1 + 52 + i * 46;
         const auto at = static_cast<std::size_t>(i);
         const core::Rgba col =
             profile.achievements.at(at) ? argb(255, 255, 210, 90) : argb(140, 150, 150, 150);
         c.brush = argb(40, 255, 255, 255);
-        c.fill_round_rect(p.x1 + 16, y, p.x2 - 16, y + 36, 8, 8);
+        c.fill_round_rect(p.x1 + 16, y, p.x2 - 16, y + 42, 8, 8);
         c.font_color = col;
-        c.font.size = 13;
-        c.draw_text_centered(p.x1 + 26, y + 2, p.x2 - 26, y + 18, core::kAchievements.at(at).name);
-        c.font.size = 10;
+        c.font.size = kTextSize;
+        c.draw_text_centered(p.x1 + 26, y + 2, p.x2 - 26, y + 21, core::kAchievements.at(at).name);
         c.font_color = argb(180, 200, 200, 200);
-        c.draw_text_centered(p.x1 + 26, y + 19, p.x2 - 26, y + 34,
+        c.draw_text_centered(p.x1 + 26, y + 21, p.x2 - 26, y + 40,
                              core::kAchievements.at(at).description);
     }
     panel_footer(c, p, "Клик — закрыть");
@@ -354,11 +352,11 @@ void render_history(Canvas& c, const core::Profile& profile, std::string_view fi
     const Rect p = core::history_panel();
     panel_back(c, p);
     panel_title(c, p, 12, "История");
-    c.font.size = 12;
+    c.font.size = kTextSize;
     c.font_color = argb(210, 210, 210, 210);
-    c.draw_text_centered(p.x1, p.y1 + 44, p.x2, p.y1 + 62,
+    c.draw_text_centered(p.x1, p.y1 + 42, p.x2, p.y1 + 64,
                          std::format("Замеров в истории: {}", profile.runs.size()));
-    constexpr int kRows = 16;
+    constexpr int kRows = 14;
     const auto& runs = profile.runs;
     const std::size_t from = runs.size() > kRows ? runs.size() - kRows : 0;
     int y = p.y1 + 70;
@@ -372,23 +370,21 @@ void render_history(Canvas& c, const core::Profile& profile, std::string_view fi
                     : std::format("{} очков, {}%, {:.0f} мс", g.score, one_decimal(g.accuracy),
                                   g.avg_reaction_ms);
         c.font_color = argb(220, 220, 220, 220);
-        c.draw_text_centered(p.x1 + 16, y, p.x2 - 16, y + 20, text);
-        y += 20;
+        c.draw_text_centered(p.x1 + 16, y, p.x2 - 16, y + 22, text);
+        y += 22;
     }
     // «Экспорт в CSV» — в папку сохранений (D-33).
     const Rect export_button = core::history_export();
     c.brush = argb(160, 90, 90, 95);
     c.pen = argb(0, 0, 0, 0);
     fill_round_rect(c, export_button, 8, 8);
-    c.font.size = 12;
+    c.font.size = kTextSize;
     c.font_color = kClWhite;
     text_centered(c, export_button, "Экспорт в CSV");
     c.font_color = argb(170, 180, 180, 180);
     c.draw_text_centered(export_button.x2 + 10, export_button.y1, p.x2 - 10, export_button.y2,
                          file_name);
-    c.font.size = 11;
-    c.font_color = argb(180, 180, 180, 180);
-    c.draw_text_centered(p.x1, p.y2 - 22, p.x2, p.y2 - 4, "Клик вне панели — закрыть");
+    panel_footer(c, p, "Клик вне панели — закрыть");
 }
 
 void render_profiles(Canvas& c, int current) {
@@ -407,7 +403,7 @@ void render_profiles(Canvas& c, int current) {
         }
         const Rect row = core::profile_row(n);
         fill_round_rect(c, row, 8, 8);
-        c.font.size = 14;
+        c.font.size = kTextSize;
         c.font_color = kClWhite;
         text_centered(c, row, std::format("Профиль {}", n));
     }
@@ -433,42 +429,16 @@ void render_tutorial(Canvas& c, int step) {
     c.pen = argb(255, 97, 207, 255);
     c.pen_width = 2;
     fill_round_rect(c, p, 14, 14);
-    c.font.size = 16;
+    c.font.size = kTextSize;
     c.font_color = kClWhite;
     c.draw_text_centered(p.x1 + 20, p.y1 + 30, p.x2 - 20, p.y1 + 130,
                          kTutorial.at(static_cast<std::size_t>(std::clamp(step, 0, 3))));
-    c.font.size = 12;
+    c.font.size = kTextSize;
     c.font_color = argb(200, 200, 200, 200);
-    c.draw_text_centered(p.x1, p.y2 - 50, p.x2, p.y2 - 30, std::format("{} / 4", step + 1));
+    c.draw_text_centered(p.x1, p.y2 - 54, p.x2, p.y2 - 32, std::format("{} / 4", step + 1));
     c.font_color = argb(180, 180, 180, 180);
-    c.draw_text_centered(p.x1, p.y2 - 26, p.x2, p.y2 - 8,
+    c.draw_text_centered(p.x1, p.y2 - 30, p.x2, p.y2 - 8,
                          step < 3 ? "Клик — далее" : "Клик — начать!");
-}
-
-// Описание режима по строкам — как DrawModeDescription: не длиннее
-// 330 / TextWidth('W') знаков, перенос по пробелу. У образца последнее слово
-// всегда уходило на свою строку; здесь — только если не помещается.
-std::vector<std::string> description_lines(std::string_view text, int max_chars) {
-    // Знаки UTF-8: начало каждого.
-    std::vector<std::size_t> starts;
-    for (std::size_t i = 0; i < text.size(); ++i)
-        if ((static_cast<unsigned char>(text[i]) & 0xC0U) != 0x80U) starts.push_back(i);
-    const std::size_t n = starts.size();
-    const auto byte_at = [&](std::size_t ch) { return ch < n ? starts[ch] : text.size(); };
-    std::vector<std::string> lines;
-    std::size_t start = 0;
-    while (start < n && lines.size() < 4) {
-        std::size_t end = std::min(start + static_cast<std::size_t>(max_chars), n);  // за последним
-        if (end < n) {
-            std::size_t space = end;
-            while (space > start && text[byte_at(space)] != ' ')
-                --space;
-            if (space > start) end = space + 1;
-        }
-        lines.emplace_back(text.substr(byte_at(start), byte_at(end) - byte_at(start)));
-        start = end;
-    }
-    return lines;
 }
 
 }  // namespace
@@ -568,7 +538,7 @@ void MenuView::render_plate(Canvas& c, const core::Theme& theme, std::string_vie
     c.pen = argb(border_alpha, 255, 255, 255);
     c.fill_round_rect(x, y, x + w, y + h, 12, 12);
 
-    c.font.size = 18;
+    c.font.size = kTitleSize;
     c.font_color = kClWhite;
     c.brush = argb(0, 0, 0, 0);
     c.font.weight = Weight::Bold;
@@ -598,7 +568,7 @@ void MenuView::render_plate(Canvas& c, const core::Theme& theme, std::string_vie
             c.pen_width = 1;
             c.fill_round_rect(ax - 90, ay - 50, ax + 90, ay + 50, 10, 10);
             if (lit) {
-                c.font.size = 14;
+                c.font.size = kTextSize;
                 c.font_color = kClWhite;
                 c.draw_text_centered(ax - 90, ay - 50, ax + 90, ay + 50, "Жми!");
             }
@@ -663,7 +633,7 @@ void MenuView::render_plate(Canvas& c, const core::Theme& theme, std::string_vie
         }
     }
 
-    c.font.size = 10;
+    c.font.size = kTextSize;
     c.font_color = kClWhite;
     c.brush = argb(0, 0, 0, 0);
     constexpr std::string_view kHint = "Кликни для старта";
@@ -706,7 +676,7 @@ void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const
             fill_round_rect(c, b, 8, 8);
             c.pen_width = 1;
         }
-        c.font.size = 13;
+        c.font.size = kTextSize;
         c.font_color = argb(entry, 255, 255, 255);
         c.brush = argb(0, 0, 0, 0);
         c.font.weight = Weight::Bold;
@@ -721,27 +691,22 @@ void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const
     c.brush = argb(35, 255, 255, 255);
     c.pen = argb(55, 255, 255, 255);
     fill_round_rect(c, d, 8, 8);
-    c.font.size = 11;
+    c.font.size = kTextSize;
     c.font_color = argb(220, 255, 255, 255);
-    const int max_chars = round_int(330.0 / c.text_width("W"));
-    int ly = d.y1 + 14;
     const std::string description =
         custom ? std::format("Свои опции: {}. Щелчок — конструктор.", core::describe_short(options))
                : std::string(core::kPresets.at(static_cast<std::size_t>(preset)).description);
-    for (const std::string& line : description_lines(description, max_chars)) {
-        c.brush = argb(0, 0, 0, 0);
-        c.text_out(d.x1 + 12, ly, line);
-        ly += 18;
-    }
+    // Перенос — по мере строк шрифта (D-43): у Condensed знаки разной ширины.
+    c.draw_text_left(d.x1 + 12, d.y1 + 6, d.x2 - 10, d.y2 - 6, description);
 
     // График: главная мера последних замеров выбранного набора (D-38).
     const int n = profile.settings.average_runs;
     const std::vector<double> recent =
         core::recent_primary(profile.runs, options, static_cast<std::size_t>(n));
     constexpr int kGraphX = 50;
-    constexpr int kGraphY = kH / 2;
+    constexpr int kGraphY = core::kDescription.y2 + 8;  // под описанием набора
     constexpr int kGraphW = kW - 100;
-    constexpr int kGraphH = kH / 2 - 110;
+    constexpr int kGraphH = kH - 110 - kGraphY;
     const bool by_reaction = core::lower_is_better(options);
     double top = 1000.0;
     if (!by_reaction) {
@@ -754,7 +719,7 @@ void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const
     }
     c.brush = argb(150, 30, 30, 35);
     c.fill_round_rect(kGraphX, kGraphY, kGraphX + kGraphW, kGraphY + kGraphH, 8, 8);
-    c.font.size = 10;
+    c.font.size = kTextSize;
     c.font_color = argb(200, 200, 200, 200);
     for (int i = 0; i <= 5; ++i) {
         const double value = top * i / 5;
@@ -762,10 +727,11 @@ void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const
         c.pen = argb(80, 200, 200, 200);
         c.pen_width = 1;
         c.line(kGraphX, y, kGraphX + kGraphW, y);
-        c.draw_text_centered(kGraphX - 50, y - 8, kGraphX - 5, y + 8, std::format("{:.0f}", value));
+        c.draw_text_centered(kGraphX - 50, y - 11, kGraphX - 5, y + 11,
+                             std::format("{:.0f}", value));
     }
     if (recent.empty()) {
-        c.font.size = 12;
+        c.font.size = kTextSize;
         c.font_color = argb(170, 200, 200, 200);
         c.draw_text_centered(kGraphX, kGraphY, kGraphX + kGraphW, kGraphY + kGraphH,
                              "Пока нет замеров этого набора");
@@ -789,7 +755,7 @@ void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const
 
     // Рекорд и среднее за N выбранного набора (D-38).
     const core::ComboStats st = core::combo_stats(profile.runs, options, n);
-    c.font.size = 11;
+    c.font.size = kTextSize;
     c.font_color = argb(200, 200, 200, 200);
     constexpr int kBottomY = kH - 50;
     constexpr int kCol = kW / 3;
@@ -804,11 +770,11 @@ void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const
         std::format("Замеров набора: {}", st.runs),
     };
     for (int i = 0; i < 3; ++i)
-        c.draw_text_centered(kCol * i, kBottomY - 10, i == 2 ? kW : kCol * (i + 1), kBottomY + 10,
-                             stats.at(static_cast<std::size_t>(i)));
+        c.pair_centered(kCol * i, kBottomY - 11, i == 2 ? kW : kCol * (i + 1), kBottomY + 11,
+                        stats.at(static_cast<std::size_t>(i)), kLabelColor, kClWhite);
 
     // Кнопки внизу (DrawMiniButton).
-    c.font.size = 10;
+    c.font.size = kTextSize;
     c.font_color = argb(170, 200, 200, 200);
     const std::array<std::string, 6> labels{
         "Справка", "Настройки", "Рекорды",
@@ -820,8 +786,8 @@ void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const
         text_centered(c, b, labels.at(i));
     }
     c.font_color = argb(150, 200, 200, 200);
-    c.draw_text_centered(kW - 120, kH - 20, kW - 10, kH - 10,
-                         profile.settings.menu_effects ? "Effects: ON" : "Effects: OFF");
+    c.draw_text_centered(kW - 200, kH - 30, kW - 10, kH - 8,
+                         profile.settings.menu_effects ? "Эффекты: ON" : "Эффекты: OFF");
 
     switch (menu.panel()) {
         case core::Panel::Help: render_help(c, menu.help_scroll()); break;

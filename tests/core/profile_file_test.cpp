@@ -22,6 +22,7 @@ TEST(ProfileFile, WriteThenReadKeepsEverything) {
     p.settings.theme = 2;
     p.settings.hud = false;
     p.settings.replays = false;
+    p.settings.font = 1;
     p.achievements[1] = true;
     p.achievements[7] = true;
     p.custom = {.stimulus = Stimulus::Screen,
@@ -46,8 +47,18 @@ TEST(ProfileFile, WriteThenReadKeepsEverything) {
     EXPECT_TRUE(loaded.profile.achievements[7]);
     EXPECT_FALSE(loaded.profile.achievements[0]);
     EXPECT_EQ(loaded.profile.custom, p.custom) << "«Свой набор» — как оставлен, даже не к замеру";
+    EXPECT_EQ(loaded.profile.settings.font, 1) << "Mono (D-43)";
     EXPECT_FALSE(loaded.profile.settings.hud);
     EXPECT_FALSE(loaded.profile.settings.replays);
+}
+
+TEST(ProfileFile, FontWordOrDefault) {
+    const std::string base = std::string(kProfileVersionLine) + "\n";
+    EXPECT_EQ(read_profile(base + "font=mono\n").profile.settings.font, 1);
+    const LoadedProfile odd = read_profile(base + "font=comic\n");
+    EXPECT_EQ(odd.profile.settings.font, 0) << "не то слово — Condensed";
+    EXPECT_EQ(odd.reset_fields.size(), 1U);
+    EXPECT_NE(write_profile(Profile{}, "\n").find("font=condensed"), std::string::npos);
 }
 
 TEST(ProfileFile, CustomItemAndItsBadValues) {
