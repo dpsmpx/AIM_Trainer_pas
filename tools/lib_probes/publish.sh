@@ -4,7 +4,8 @@
 #   tools/lib_probes/build.sh && tools/lib_probes/publish.sh
 #
 # Ветка без общей истории с main (orphan) и только со сборками: AimProbes/ —
-# EXE, README.md и SHA256SUMS; BUILD.md — из какого коммита и чем собрано.
+# EXE, README.md, SHA256SUMS и BUILD.md — из какого коммита и чем собрано
+# (D-23, D-34); программа — tools/publish_build.sh.
 # Новая сборка — новый коммит в ветке. Сборка должна быть из закоммиченного
 # кода: коммит записан в свойствах каждого EXE (probe.rc.in) и в BUILD.md.
 # Строки в конец сообщения коммита (соавторство) — $PUBLISH_TRAILERS.
@@ -57,11 +58,11 @@ cp -r "$SRC" "$WT/AimProbes"
 (cd "$WT/AimProbes" && sha256sum -- *.exe > SHA256SUMS)
 LLVM_MINGW="${LLVM_MINGW:-/opt/llvm-mingw-20261006-ucrt-ubuntu-22.04-x86_64}"
 CLANG="$("$LLVM_MINGW/bin/x86_64-w64-mingw32-clang" --version | head -1)"
-cat > "$WT/BUILD.md" <<EOF
-# Отладочные сборки AIM Trainer
-
-Ветка только со сборками для проверки у автора на Windows; в \`main\` не
-вливается (решение D-23 в \`docs/direction/DECISIONS.md\` ветки \`main\`).
+# Корневой BUILD.md — оглавление сборок (D-34), описание замерщиков — в
+# AimProbes/BUILD.md.
+cp "$ROOT/tools/publish/BUILD.md" "$WT/BUILD.md"
+cat > "$WT/AimProbes/BUILD.md" <<EOF
+# Замерщики ввода
 
 - Исходники: коммит \`$REV\` ветки \`$SOURCE_BRANCH\` репозитория
   \`dpsmpx/AIM_Trainer_pas\` — \`tools/lib_probes/\`.

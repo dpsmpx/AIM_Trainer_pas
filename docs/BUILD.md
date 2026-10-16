@@ -7,6 +7,9 @@ GoogleTest (D-19), раскладка и проверка (D-20, D-25), текс
 
 ## 1. На Windows — у автора
 
+Готовая сборка — ветка `win_debug_builds`, каталог `AimTrainer/` (D-34):
+«Code» → «Download ZIP». Своя — ниже.
+
 Один раз:
 
 1. **llvm-mingw 20261006** (D-17): архив
@@ -68,6 +71,11 @@ tools/check_cpp.sh --fix           # заодно поправить оформ�
 
 Итог — таблица в конце вывода: её — в описание PR. Журналы —
 `build/check/`.
+
+Сборку для автора — EXE с `fonts/` — по его запросу выкладывает
+`tools/publish_build.sh` в ветку `win_debug_builds`, каталог `AimTrainer/`
+(D-23, D-29, D-34): собирает пресет `windows-cross` из закоммиченного кода
+и записывает коммит в `AimTrainer/BUILD.md`.
 
 ## 3. Пресеты
 
