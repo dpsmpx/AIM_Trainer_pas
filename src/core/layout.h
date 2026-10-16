@@ -55,8 +55,8 @@ Rect mini_button(MiniButton b);
 // ---- Настройки ----
 inline constexpr int kSettingsW = 420;
 inline constexpr int kSettingsH = 520;
-inline constexpr int kSettingsRowH = 38;
-inline constexpr int kSettingsButton = 32;
+inline constexpr int kSettingsRowH = 34;
+inline constexpr int kSettingsButton = 30;
 // Ряды настроек по порядку.
 inline constexpr int kSettingsSizeRow = 0;      ///< размер цели, «−»/«+»
 inline constexpr int kSettingsLifetimeRow = 1;  ///< жизнь цели, «−»/«+»
@@ -65,9 +65,11 @@ inline constexpr int kSettingsEndingRow = 3;   ///< окончание: жизн
 inline constexpr int kSettingsAverageRow = 4;  ///< среднее за N, «−»/«+» (D-38)
 inline constexpr int kSettingsSoundRow = 5;
 inline constexpr int kSettingsThemeRow = 6;
-inline constexpr int kSettingsOpenFolderRow = 7;  ///< открыть папку сохранений (D-33)
-inline constexpr int kSettingsChooseFolderRow = 8;  ///< выбрать её (D-33)
-inline constexpr int kSettingsResetRow = 9;
+inline constexpr int kSettingsHudRow = 7;      ///< интерфейс замера (D-45)
+inline constexpr int kSettingsReplaysRow = 8;  ///< запись реплеев (D-45)
+inline constexpr int kSettingsOpenFolderRow = 9;  ///< открыть папку сохранений (D-33)
+inline constexpr int kSettingsChooseFolderRow = 10;  ///< выбрать её (D-33)
+inline constexpr int kSettingsResetRow = 11;
 Rect settings_panel();
 int settings_row_y(int row);
 Rect settings_minus(int row);

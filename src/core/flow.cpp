@@ -177,7 +177,9 @@ void Flow::update(Nanoseconds now, Vec2 cursor) {
                         static_cast<std::uint64_t>(seeds_.between(0, INT_MAX));
                 run_random_ = make_random_(seed_);
                 game_.emplace(options_, *run_random_, countdown_started_ + kCountdown);
-                recorder_.emplace(options_, seed_, countdown_started_ + kCountdown);
+                // Запись реплеев выключена — вход не пишется (D-45).
+                if (profile_.settings.replays)
+                    recorder_.emplace(options_, seed_, countdown_started_ + kCountdown);
                 finished_ = false;
                 go(Screen::Game);
             }

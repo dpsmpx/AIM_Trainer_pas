@@ -71,6 +71,8 @@ void reset_settings(Settings& settings) {
     settings.preset = defaults.preset;
     settings.average_runs = defaults.average_runs;
     settings.sound = defaults.sound;
+    settings.hud = defaults.hud;
+    settings.replays = defaults.replays;
 }
 
 int reset_out_of_range(Settings& settings) {

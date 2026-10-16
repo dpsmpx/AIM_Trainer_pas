@@ -83,6 +83,8 @@ void Screens::before_input(const core::Flow& flow, core::Vec2 mouse, bool left_h
 
 void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds now) {
     const core::Theme& th = theme();
+    // Без интерфейса замера — без надписей эффектов; реплей — как был (D-45).
+    effects_.show_text(profile_.settings.hud || flow.screen() != core::Screen::Game);
     for (const core::FlowEvent& e : flow.take_events()) {
         std::visit(
             Overload{
@@ -215,8 +217,9 @@ void Screens::render(const core::Flow& flow, core::Vec2 mouse, int fps, core::Na
         case core::Screen::Countdown: render_countdown(canvas_, th, flow, now); break;
         case core::Screen::Game:
             if (const core::Game* g = flow.game()) {
-                render_game(canvas_, th, *g, effects_, trail_, fps, now);
-                toasts_.render(canvas_, now);
+                const bool hud = profile_.settings.hud;
+                render_game(canvas_, th, *g, effects_, trail_, fps, now, hud);
+                if (hud) toasts_.render(canvas_, now);
             }
             break;
         case core::Screen::GameOver:

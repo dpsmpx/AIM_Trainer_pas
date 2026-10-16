@@ -236,6 +236,27 @@ TEST(ReplayScreen, OnlyFromMenu) {
     EXPECT_EQ(flow.screen(), Screen::Countdown);
 }
 
+TEST(ReplayRecording, OffInSettingsMeansNoReplay) {
+    Profile profile;
+    profile.settings.replays = false;  // D-45
+    testing::ScriptedRandom seeds;
+    PresetMenu menu(profile, 1);
+    Flow flow(profile, seeds, menu);
+    const std::vector<Input> start{ClickInput{.position = {500, 50}, .time = kT0}};
+    flow.input(start, kT0);
+    flow.update(kT0 + kCountdown, {});
+    flow.update(kT0 + kCountdown + kFrame, {});
+    const std::vector<Input> esc{KeyInput{.key = Key::Escape, .time = kT0 + kCountdown + ms(10)}};
+    flow.input(esc, kT0 + kCountdown + ms(10));
+    int finished = 0;
+    for (const FlowEvent& e : flow.take_events())
+        if (const auto* run = std::get_if<RunFinished>(&e)) {
+            ++finished;
+            EXPECT_EQ(run->replay, nullptr);
+        }
+    EXPECT_EQ(finished, 1) << "замер записан в историю, реплея нет";
+}
+
 TEST(ReplayRecording, RestartDropsRecording) {
     Profile profile;
     testing::ScriptedRandom seeds;

@@ -20,6 +20,8 @@ TEST(ProfileFile, WriteThenReadKeepsEverything) {
     p.settings.sound = false;
     p.settings.menu_effects = false;
     p.settings.theme = 2;
+    p.settings.hud = false;
+    p.settings.replays = false;
     p.achievements[1] = true;
     p.achievements[7] = true;
     p.custom = {.stimulus = Stimulus::Screen,
@@ -44,6 +46,8 @@ TEST(ProfileFile, WriteThenReadKeepsEverything) {
     EXPECT_TRUE(loaded.profile.achievements[7]);
     EXPECT_FALSE(loaded.profile.achievements[0]);
     EXPECT_EQ(loaded.profile.custom, p.custom) << "«Свой набор» — как оставлен, даже не к замеру";
+    EXPECT_FALSE(loaded.profile.settings.hud);
+    EXPECT_FALSE(loaded.profile.settings.replays);
 }
 
 TEST(ProfileFile, CustomItemAndItsBadValues) {

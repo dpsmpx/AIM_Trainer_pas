@@ -62,6 +62,8 @@ TEST(Settings, ResetKeepsThemeAndEffects) {
     s.sound = false;
     s.menu_effects = false;
     s.theme = 1;
+    s.hud = false;
+    s.replays = false;
     reset_settings(s);
     EXPECT_EQ(s.preset.target_size, 40);
     EXPECT_EQ(s.preset.lifetime_ms, 1000);
@@ -69,6 +71,8 @@ TEST(Settings, ResetKeepsThemeAndEffects) {
     EXPECT_EQ(s.preset.ending, Ending::Lives);
     EXPECT_EQ(s.average_runs, 50);
     EXPECT_TRUE(s.sound);
+    EXPECT_TRUE(s.hud) << "интерфейс замера — снова включён (D-45)";
+    EXPECT_TRUE(s.replays);
     EXPECT_FALSE(s.menu_effects);
     EXPECT_EQ(s.theme, 1);
 }

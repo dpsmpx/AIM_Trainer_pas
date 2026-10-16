@@ -80,6 +80,12 @@ void Menu::click_settings(Vec2 p) {
     } else if (settings_toggle(kSettingsThemeRow).contains(p)) {
         s.theme = (s.theme + 1) % kThemeCount;
         requests_.emplace_back(SaveProfile{});
+    } else if (settings_toggle(kSettingsHudRow).contains(p)) {
+        s.hud = !s.hud;
+        requests_.emplace_back(SaveProfile{});
+    } else if (settings_toggle(kSettingsReplaysRow).contains(p)) {
+        s.replays = !s.replays;
+        requests_.emplace_back(SaveProfile{});
     } else if (settings_toggle(kSettingsOpenFolderRow).contains(p)) {
         requests_.emplace_back(OpenDataFolder{});
     } else if (settings_toggle(kSettingsChooseFolderRow).contains(p)) {

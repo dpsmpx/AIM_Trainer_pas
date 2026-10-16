@@ -30,7 +30,7 @@ Rect settings_panel() {
 }
 
 int settings_row_y(int row) {
-    return settings_panel().y1 + 80 + row * kSettingsRowH;
+    return settings_panel().y1 + 60 + row * kSettingsRowH;
 }
 
 Rect settings_minus(int row) {

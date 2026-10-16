@@ -136,7 +136,7 @@ void render_countdown(Canvas& c, const core::Theme& theme, const core::Flow& flo
 }
 
 void render_game(Canvas& c, const core::Theme& theme, const core::Game& game, Effects& effects,
-                 const CursorTrail& trail, int fps, core::Nanoseconds now) {
+                 const CursorTrail& trail, int fps, core::Nanoseconds now, bool hud) {
     const bool screen = game.screen_stimulus();
     // Замер на цвет: окно целиком — фон или сигнал (D-37).
     c.clear_window(screen && game.signal_lit(now) ? theme.signal : theme.background);
@@ -145,6 +145,7 @@ void render_game(Canvas& c, const core::Theme& theme, const core::Game& game, Ef
         render_target(c, theme, game, now);
     }
     effects.render(c, now);
+    if (!hud) return;  // интерфейс замера выключен (D-45)
 
     const int old_size = c.font.size;
     const core::Rgba bg = argb(220, 60, 60, 65);

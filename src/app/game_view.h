@@ -21,10 +21,10 @@ namespace aim::app {
 void render_countdown(Canvas& canvas, const core::Theme& theme, const core::Flow& flow,
                       core::Nanoseconds now);
 
-/// Кадр замера без уведомления: след, цель или цвет окна, эффекты, HUD,
-/// подсказка кнопок, серия.
+/// Кадр замера без уведомления: след, цель или цвет окна, эффекты; с hud —
+/// ещё панель мер, подсказка кнопок, серия (интерфейс замера, D-45).
 void render_game(Canvas& canvas, const core::Theme& theme, const core::Game& game, Effects& effects,
-                 const CursorTrail& trail, int fps, core::Nanoseconds now);
+                 const CursorTrail& trail, int fps, core::Nanoseconds now, bool hud = true);
 
 /// Итог замера: причина конца, параметры, меры, рекорд и среднее за N
 /// набора, тепловая карта промахов; без уведомления.

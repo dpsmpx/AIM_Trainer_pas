@@ -31,6 +31,9 @@ public:
                int size = 32);
     /// Новый забег: всё погасить.
     void clear();
+    /// Надписи («+очки», реакция, «Фальстарт»): выключены — не появляются,
+    /// частицы и вспышки остаются (интерфейс замера, D-45).
+    void show_text(bool on) { text_ = on; }
 
     void render(Canvas& canvas, core::Nanoseconds now);
 
@@ -56,6 +59,7 @@ private:
 
     std::array<Effect, kSlots> effects_{};
     std::size_t next_ = 0;
+    bool text_ = true;
 };
 
 /// След курсора во время игры — 12 последних кадров (TRAIL_LENGTH).

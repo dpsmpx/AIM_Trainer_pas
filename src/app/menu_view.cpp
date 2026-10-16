@@ -195,6 +195,8 @@ void render_settings(Canvas& c, const core::Settings& s, std::string_view folder
     toggle(core::kSettingsSoundRow, std::string("Звук: ") + (s.sound ? "ON" : "OFF"));
     toggle(core::kSettingsThemeRow,
            "Тема: " + std::string(core::kThemes.at(static_cast<std::size_t>(s.theme)).name));
+    toggle(core::kSettingsHudRow, std::string("Интерфейс замера: ") + (s.hud ? "ON" : "OFF"));
+    toggle(core::kSettingsReplaysRow, std::string("Запись реплеев: ") + (s.replays ? "ON" : "OFF"));
     toggle(core::kSettingsOpenFolderRow, "Открыть папку сохранений");
     const Rect folder_row = core::settings_toggle(core::kSettingsChooseFolderRow);
     toggle(core::kSettingsChooseFolderRow,

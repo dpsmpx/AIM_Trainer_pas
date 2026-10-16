@@ -27,6 +27,7 @@ core::Rgba with_alpha(core::Rgba c, int alpha) {
 
 void Effects::spawn(Kind kind, double x, double y, double vx, double vy, int duration_ms,
                     core::Rgba color, std::string text, core::Nanoseconds now) {
+    if (kind == Kind::Points && !text_) return;
     Effect& e = effects_[next_];
     e = {.active = true,
          .kind = kind,
@@ -58,6 +59,7 @@ void Effects::hit(int x, int y, core::Rgba color, int points, core::Random& rng,
 
 void Effects::label(int x, int y, std::string text, core::Rgba color, core::Nanoseconds now,
                     int size) {
+    if (!text_) return;
     spawn(Kind::Points, x, y, 0, -30, 900, color, std::move(text), now);
     effects_[(next_ + kSlots - 1) % kSlots].size = size;
 }

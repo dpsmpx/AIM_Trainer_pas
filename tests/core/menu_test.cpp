@@ -284,12 +284,18 @@ TEST_F(MenuTest, SettingsStepToggleResetAndClose) {
     for (int i = 0; i < 3; ++i)
         menu_.click(click_at(center(settings_toggle(kSettingsThemeRow))));
     EXPECT_EQ(profile_.settings.theme, 0) << "три темы по кругу";
-    EXPECT_EQ(count<SaveProfile>(menu_.take_requests()), 8);
+    menu_.click(click_at(center(settings_toggle(kSettingsHudRow))));
+    EXPECT_FALSE(profile_.settings.hud);
+    menu_.click(click_at(center(settings_toggle(kSettingsReplaysRow))));
+    EXPECT_FALSE(profile_.settings.replays);
+    EXPECT_EQ(count<SaveProfile>(menu_.take_requests()), 10);
     menu_.click(click_at(center(settings_reset())));
     EXPECT_EQ(profile_.settings.preset.target_size, 40);
     EXPECT_EQ(profile_.settings.preset.ending, Ending::Lives);
     EXPECT_EQ(profile_.settings.average_runs, 50);
     EXPECT_TRUE(profile_.settings.sound);
+    EXPECT_TRUE(profile_.settings.hud);
+    EXPECT_TRUE(profile_.settings.replays);
     // Щелчок внутри панели мимо кнопок — панель открыта; снаружи — закрыта.
     menu_.click(click_at({static_cast<double>(settings_panel().x1 + 5),
                           static_cast<double>(settings_panel().y1 + 5)}));
