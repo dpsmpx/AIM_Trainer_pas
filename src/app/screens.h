@@ -1,10 +1,10 @@
 #pragma once
 
 // Экраны программы: что показать и что сделать по событиям переходов
-// (core/flow.h) и меню (core/menu.h) — эффекты попадания, след курсора,
-// звук, уведомления, запись профиля и истории (app/player_files.h), смена
-// профиля, «История». Рисуют app/menu_view.h и app/game_view.h на холсте
-// app/canvas.h.
+// (core/flow.h) и меню (core/menu.h) — эффекты, след курсора, звук,
+// уведомления, запись профиля и истории замеров (app/player_files.h), смена
+// профиля и папки сохранений. Рисуют app/menu_view.h и app/game_view.h на
+// холсте app/canvas.h.
 
 #include <SDL3/SDL.h>
 
@@ -36,7 +36,7 @@ public:
     /// Уведомление вверху окна.
     void message(std::string text) { toasts_.push(std::move(text)); }
 
-    /// До ввода кадра: в меню режим под курсором — выбранный.
+    /// До ввода кадра: в меню набор под курсором — выбранный.
     void before_input(const core::Flow& flow, core::Vec2 mouse, core::Nanoseconds now);
     /// После Flow::update: события переходов и меню — эффекты, файлы,
     /// уведомления; след курсора и частицы.
@@ -50,7 +50,6 @@ private:
     void take_folder_choice();
     /// Звук, если он включён в настройках.
     void play(core::Beep beep);
-    void open_history();
     [[nodiscard]] const core::Theme& theme() const;
 
     SDL_Window* window_;
@@ -64,7 +63,6 @@ private:
     Effects effects_;
     CursorTrail trail_;
     Toasts toasts_;
-    HistoryView history_;
     platform::FolderPicker folder_picker_;
 };
 

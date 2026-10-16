@@ -23,7 +23,7 @@ cmake --build "$OUT" --target AimTrainer >/dev/null
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "${WORK:?}"' EXIT
-printf '[Stats]\nTutorialSeen=True\n' > "$WORK/profile1_stats.ini"
+printf '# DP AIM Trainer profile v1\ntutorial_seen=1\n' > "$WORK/profile1.ini"
 (cd "$WORK" && AIM_TRAINER_DATA_DIR="$WORK" SDL_VIDEO_DRIVER=dummy SDL_RENDER_DRIVER=software \
     SDL_AUDIO_DRIVER=dummy valgrind --tool=callgrind --callgrind-out-file="$WORK/menu.cg" \
     "$OUT/AimTrainer" --frames "$FRAMES" >/dev/null 2>&1)

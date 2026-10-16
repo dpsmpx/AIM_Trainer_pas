@@ -56,6 +56,12 @@ void Effects::hit(int x, int y, core::Rgba color, int points, core::Random& rng,
     spawn(Kind::Points, x, y, 0, -30, 700, core::kWhite, "+" + std::to_string(points), now);
 }
 
+void Effects::label(int x, int y, std::string text, core::Rgba color, core::Nanoseconds now,
+                    int size) {
+    spawn(Kind::Points, x, y, 0, -30, 900, color, std::move(text), now);
+    effects_[(next_ + kSlots - 1) % kSlots].size = size;
+}
+
 void Effects::precise_flash(core::Nanoseconds now) {
     spawn(Kind::WhiteScreen, 0, 0, 0, 0, 200, core::kWhite, {}, now);
 }
@@ -95,10 +101,11 @@ void Effects::render(Canvas& c, core::Nanoseconds now) {
                               round_int(4 * (1 - 0.5 * t)));
                 break;
             case Kind::Points: {
-                c.font.size = 16;
+                c.font.size = e.size;
                 c.font_color = with_alpha(e.color, round_int(255 * (1 - t)));
+                c.brush = {0, 0, 0, 0};  // без плашки под текстом
                 const int tw = c.text_width(e.text);
-                c.text_out(round_int(e.x) - tw / 2, round_int(e.y + e.vy * t), e.text);
+                c.text_out(round_int(e.x) - tw / 2, round_int(e.y + e.vy * t) - e.size / 2, e.text);
                 break;
             }
             case Kind::WhiteScreen:

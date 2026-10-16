@@ -18,7 +18,7 @@ double seconds(Nanoseconds value) {
 
 }  // namespace
 
-Target Target::spawn(const ModeRules& rules, int max_radius, Vec2 prev, bool allow_bomb,
+Target Target::spawn(const TargetRules& rules, int max_radius, Vec2 prev, bool allow_bomb,
                      Nanoseconds now, Random& rng) {
     Target target;
     target.rules_ = rules;
@@ -115,12 +115,6 @@ bool Target::hover(Vec2 cursor, Nanoseconds dt) {
 
 void Target::mark_shown(Nanoseconds frame_time, Nanoseconds presented_at) {
     if (!shown_at_ && radius_at(frame_time) > 0.0) shown_at_ = presented_at;
-}
-
-void Target::shift(Nanoseconds by) {
-    spawned_at_ += by;
-    expires_at_ += by;
-    if (shown_at_) *shown_at_ += by;
 }
 
 }  // namespace aim::core

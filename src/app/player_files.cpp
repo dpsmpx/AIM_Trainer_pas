@@ -5,7 +5,6 @@
 #include <format>
 #include <utility>
 
-#include "core/history.h"
 #include "core/profile_file.h"
 
 namespace aim::app {
@@ -19,7 +18,8 @@ core::LocalTime local_now() {
              .month = dt.month,
              .day = dt.day,
              .hour = dt.hour,
-             .minute = dt.minute};
+             .minute = dt.minute,
+             .second = dt.second};
     }
     return t;
 }
@@ -61,43 +61,51 @@ core::Profile PlayerFiles::open(int number, std::vector<std::string>& messages) 
         if (!save(profile, error)) messages.push_back("Профиль не записан: " + error);
     };
 
-    const std::optional<std::string> text = storage_->read(core::stats_file_name(number_));
+    core::Profile profile;
+    const std::optional<std::string> text = storage_->read(core::profile_file_name(number_));
     if (!text) {
-        // Как образец: у нового профиля сразу появляется файл по умолчанию.
-        const core::Profile fresh;
-        save_or_say(fresh);
-        return fresh;
+        // У нового профиля сразу появляется файл по умолчанию.
+        save_or_say(profile);
+    } else {
+        core::LoadedProfile loaded = core::read_profile(*text);
+        profile = std::move(loaded.profile);
+        if (loaded.corrupt) {
+            if (!storage_->write(core::corrupt_backup_file_name(number_), *text, error))
+                messages.push_back("Копия повреждённого профиля не записана: " + error);
+            messages.push_back(
+                std::format("Профиль {} не читается: сброшен, копия сохранена", number_));
+            save_or_say(profile);
+        } else if (!loaded.reset_fields.empty()) {
+            messages.push_back(std::format("Профиль {}: неверных значений сброшено — {}", number_,
+                                           loaded.reset_fields.size()));
+            save_or_say(profile);
+        } else if (!remember(error)) {
+            messages.push_back("Номер профиля не записан: " + error);
+        }
     }
-    const core::LoadedProfile loaded = core::read_stats(*text);
-    if (loaded.corrupt) {
-        // Как образец: копия повреждённого файла и всё по умолчанию.
-        if (!storage_->write(core::corrupt_backup_file_name(number_), *text, error))
-            messages.push_back("Копия повреждённого профиля не записана: " + error);
-        messages.push_back(std::format("Профиль {} повреждён: сброшен, копия сохранена", number_));
-        save_or_say(loaded.profile);
-    } else if (!loaded.reset_fields.empty()) {
-        messages.push_back(std::format("Профиль {}: неверных значений сброшено — {}", number_,
-                                       loaded.reset_fields.size()));
-        save_or_say(loaded.profile);
-    } else if (!remember(error)) {
-        messages.push_back("Номер профиля не записан: " + error);
+    if (const std::optional<std::string> runs = storage_->read(history_file_name())) {
+        std::size_t skipped = 0;
+        profile.runs = core::read_runs(*runs, &skipped);
+        if (skipped > 0)
+            messages.push_back(std::format("История профиля {}: испорченных строк пропущено — {}",
+                                           number_, skipped));
     }
-    return loaded.profile;
+    return profile;
 }
 
 bool PlayerFiles::save(const core::Profile& profile, std::string& error) {
     if (!storage_) {
-        error = "no player folder";
+        error = "нет папки игрока";
         return false;
     }
-    return storage_->write(core::stats_file_name(number_),
-                           core::write_stats(profile, platform::kNewline), error) &&
+    return storage_->write(core::profile_file_name(number_),
+                           core::write_profile(profile, platform::kNewline), error) &&
            remember(error);
 }
 
 bool PlayerFiles::remember(std::string& error) {
     if (!home_) {
-        error = "no player folder";
+        error = "нет папки игрока";
         return false;
     }
     const core::AppState state{.last_profile = number_, .data_dir = data_dir_};
@@ -111,36 +119,28 @@ bool PlayerFiles::remember(std::string& error) {
     return true;
 }
 
-std::optional<std::string> PlayerFiles::read_history() const {
-    if (!storage_) return std::nullopt;
-    return storage_->read(core::sessions_file_name(number_));
-}
-
 std::string PlayerFiles::history_file_name() const {
-    return core::sessions_file_name(number_);
+    return core::runs_file_name(number_);
 }
 
-bool PlayerFiles::log_run(const core::GameSummary& summary, std::string& error) {
+bool PlayerFiles::log_run(const core::RunRecord& run, std::string& error) {
     if (!storage_) {
-        error = "no player folder";
+        error = "нет папки игрока";
         return false;
     }
-    const std::string name = core::sessions_file_name(number_);
+    const std::string name = history_file_name();
     std::string text;
-    if (!storage_->exists(name)) {
-        text += core::kSessionsHeader;
-        text += platform::kNewline;
-    }
-    text += core::session_line(summary, local_now());
+    if (!storage_->exists(name)) text += core::runs_file_header(platform::kNewline);
+    text += core::run_line(run);
     text += platform::kNewline;
     return storage_->append(name, text, error);
 }
 
 bool PlayerFiles::export_history(const core::LocalTime& when, std::string& file_name,
                                  std::string& error) {
-    const std::optional<std::string> history = read_history();
+    const std::optional<std::string> history =
+        storage_ ? storage_->read(history_file_name()) : std::nullopt;
     if (!history || !storage_) {
-        // Как образец: «нет данных для экспорта».
         error = "нет данных для экспорта";
         return false;
     }

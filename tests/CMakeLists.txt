@@ -27,6 +27,8 @@ add_executable(aim_core_tests
     core/profile_file_test.cpp
     core/profile_test.cpp
     core/random_test.cpp
+    core/records_test.cpp
+    core/runs_test.cpp
     core/target_test.cpp
     core/tone_test.cpp)
 target_link_libraries(aim_core_tests PRIVATE aim_core GTest::gtest_main)

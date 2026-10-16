@@ -1,14 +1,9 @@
 #pragma once
 
-// Профиль игрока в памяти: настройки, рекорды, таблица лидеров, достижения,
-// история реакций (archive/pascal/AIM_Trainer.pas: TStats, TSettings,
-// StepSetting, TryAddToLeaderboard, UnlockAchievement,
-// FinishGameAndSaveStats; docs/ARCHITECTURE.md, §8.1, §10). Текст файла —
-// core/profile_file.h. Отличия — нарочные:
-//
-//   * рекорды точности, точности попадания и реакции — от 20 выстрелов (D-13);
-//   * реакции забега дописываются в кольцо по порядку, и по порядку же его
-//     отдаёт in_order — для графика (AUD-14).
+// Профиль игрока в памяти: настройки, выбранный набор, достижения и история
+// замеров (D-37, D-38). Рекорды и средние выводятся из истории
+// (core/records.h). Текст файла профиля — core/profile_file.h, истории —
+// core/runs.h.
 
 #include <array>
 #include <cstdint>
@@ -16,124 +11,83 @@
 #include <vector>
 
 #include "core/game.h"
-#include "core/modes.h"
+#include "core/measure.h"
+#include "core/records.h"
+#include "core/runs.h"
 
 namespace aim::core {
 
 // ---- Настройки ----
-
-inline constexpr int kMinCircleSize = 20;
-inline constexpr int kMaxCircleSize = 60;
-inline constexpr int kCircleSizeStep = 2;
-inline constexpr int kMinLifetimeMs = 500;
-inline constexpr int kMaxLifetimeMs = 2000;
-inline constexpr int kLifetimeStepMs = 100;
-inline constexpr int kMinLives = 5;
-inline constexpr int kMaxLives = 30;
+/// Общие размер, жизнь цели и жизни наборов — до правки опций в
+/// конструкторе (D-37); жизнь цели — до множителя набора (D-21).
+inline constexpr int kMinBaseLifetimeMs = 500;
+inline constexpr int kMaxBaseLifetimeMs = 2000;
 inline constexpr int kThemeCount = 3;  ///< 0 — Тёмная, 1 — Неон, 2 — Минимализм
+/// Ступени «Среднее за N».
+inline constexpr std::array<int, 8> kAverageRunSteps{5, 10, 20, 30, 50, 100, 200, 500};
 
 struct Settings {
-    int circle_size = 40;
-    int lifetime_ms = 1000;
-    int lives = 15;
+    PresetSettings preset;
+    int average_runs = kDefaultAverageRuns;  ///< N у «среднего за N» (D-38)
     bool sound = true;
     bool menu_effects = true;  ///< частицы меню, «Effects: ON/OFF»
     int theme = 0;
 };
 
 /// Ряд панели настроек со ступенями «−»/«+».
-enum class SettingRow : std::uint8_t { CircleSize, Lifetime, Lives };
+enum class SettingRow : std::uint8_t { TargetSize, Lifetime, Lives, AverageRuns };
 
-/// Шаг ряда на delta ступеней с границами (StepSetting).
+/// Шаг ряда на delta ступеней с границами.
 void step_setting(Settings& settings, SettingRow row, int delta);
-/// «Сбросить по умолчанию»: размер, время жизни, жизни и звук; тему и эффекты
-/// не трогает — как SetDefaultSettings образца (прогон 16 октября 2026).
+/// «Сбросить по умолчанию»: размер, жизнь цели, жизни, окончание, N и звук;
+/// тему и эффекты не трогает.
 void reset_settings(Settings& settings);
-/// Значение вне границ — к умолчанию, как LoadStats образца; для настроек,
-/// прочитанных из файла.
-void reset_out_of_range(Settings& settings);
-/// Настройки забега из настроек профиля.
-GameSettings game_settings(const Settings& settings);
-
-// ---- Таблица лидеров ----
-
-inline constexpr int kLeaderboardSize = 10;
-
-struct LeaderboardEntry {
-    int score = 0;
-    double accuracy = 0.0;  ///< %
-};
-
-/// По режиму — до 10 мест, по убыванию очков.
-using Leaderboard = std::array<std::vector<LeaderboardEntry>, kModeCount>;
-
-/// Записать результат (TryAddToLeaderboard): встаёт перед первым меньшим, при
-/// равных очках — после прежних. Возвращает место 0…9 или −1, если не вошёл.
-int add_to_leaderboard(Leaderboard& board, GameMode mode, int score, double accuracy);
+/// Значение вне границ — к умолчанию; для настроек, прочитанных из файла.
+/// Возвращает, сколько полей сброшено.
+int reset_out_of_range(Settings& settings);
 
 // ---- Достижения ----
-
 inline constexpr int kAchievementCount = 8;
 
 struct AchievementInfo {
+    std::string_view key;  ///< ключ в файле профиля
     std::string_view name;
     std::string_view description;
 };
 
-/// Названия и условия — как InitAchievements образца.
 extern const std::array<AchievementInfo, kAchievementCount> kAchievements;
 
-/// Порог серии и счёта для достижений «Комбо x100» и «Тысяча».
+/// Порог серии и счёта для достижений «Серия x100» и «Тысяча».
 inline constexpr int kComboAchievement = 100;
 inline constexpr int kScoreAchievement = 1000;
 /// «Молниеносно» — реакция короче, мс.
 inline constexpr double kFastReactionMs = 150.0;
-/// Порог выстрелов: «Снайпер» и рекорды точности и реакции (D-13).
-inline constexpr int kRecordMinShots = 20;
 
 // ---- Профиль ----
-
-/// Последние kReactionHistory реакций, мс — кольцо, как в файле профиля
-/// (ReactionCount, ReactionIndex, Reaction0…49): запись прочитанного файла его
-/// не меняет (D-11).
-struct ReactionRing {
-    std::array<int, kReactionHistory> values{};
-    int count = 0;  ///< 0…50
-    int next = 0;   ///< 0…49 — куда пойдёт следующая
-
-    void push(int value_ms);
-    /// Старые первыми.
-    [[nodiscard]] std::vector<int> in_order() const;
-};
-
 struct Profile {
-    int best_score = 0;
-    double best_accuracy = 0.0;      ///< %
-    double best_precision = 0.0;     ///< %
-    double best_avg_reaction = 0.0;  ///< мс; 0 — ещё нет
-    int games_played = 0;
-    bool tutorial_seen = false;
     Settings settings;
-    ReactionRing reactions;
+    int preset = 1;  ///< выбранный набор меню (kPresets)
+    bool tutorial_seen = false;
     std::array<bool, kAchievementCount> achievements{};
-    Leaderboard leaderboard;
+    std::vector<RunRecord> runs;  ///< история замеров, по порядку
 };
+
+/// Опции выбранного набора с общими настройками.
+MeasureOptions selected_options(const Profile& profile);
 
 /// Открыть достижение; true — открыто сейчас, а не раньше.
 bool unlock(Profile& profile, int achievement);
 
-/// Достижения по событию забега (ProcessClick образца): по попаданию —
-/// «В яблочко», «Молниеносно», «Комбо x100», «Тысяча». Возвращает открытые
-/// сейчас.
+/// Достижения по событию замера: по попаданию — «В яблочко»,
+/// «Молниеносно», «Серия x100», «Тысяча». Возвращает открытые сейчас.
 std::vector<int> achievements_on_event(Profile& profile, const GameEvent& event);
 
 struct FinishResult {
     std::vector<int> unlocked;  ///< открытые сейчас достижения
-    int leaderboard_place = -1;
+    bool new_best = false;      ///< лучший замер своего набора (D-38)
 };
 
-/// Итог законченного забега (FinishGameAndSaveStats): рекорды (D-13), счётчик
-/// игр, таблица лидеров, достижения по итогу, история реакций.
-FinishResult finish_game(Profile& profile, const GameSummary& summary);
+/// Итог законченного замера: в историю, рекорд набора, достижения по итогу.
+FinishResult finish_game(Profile& profile, const RunRecord& run);
 
 }  // namespace aim::core

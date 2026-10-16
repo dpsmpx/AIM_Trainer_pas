@@ -1,5 +1,6 @@
 #include "core/menu.h"
 
+#include <algorithm>
 #include <array>
 #include <utility>
 
@@ -8,7 +9,10 @@
 namespace aim::core {
 
 Menu::Menu(Profile& profile, int profile_number, bool show_tutorial)
-    : profile_(profile), profile_number_(profile_number), tutorial_(show_tutorial) {}
+    : profile_(profile),
+      profile_number_(profile_number),
+      tutorial_(show_tutorial),
+      selected_(std::clamp(profile.preset, 0, kPresetCount - 1)) {}
 
 void Menu::enter(Nanoseconds now) {
     entered_at_ = now;
@@ -16,8 +20,8 @@ void Menu::enter(Nanoseconds now) {
 
 void Menu::hover(Vec2 cursor, Nanoseconds now) {
     if (tutorial_ || panel_ != Panel::None) return;
-    for (int i = 0; i < kModeCount; ++i) {
-        if (mode_button(i, since_entered(now)).contains(cursor)) {
+    for (int i = 0; i < kPresetCount; ++i) {
+        if (preset_button(i, since_entered(now)).contains(cursor)) {
             selected_ = i;
             return;
         }
@@ -34,28 +38,42 @@ void Menu::close_tutorial() {
     requests_.emplace_back(SaveProfile{});
 }
 
-std::optional<GameMode> Menu::start_selected() const {
-    return kAllModes.at(static_cast<std::size_t>(selected_));
+MeasureOptions Menu::start_selected() {
+    if (profile_.preset != selected_) {
+        profile_.preset = selected_;
+        requests_.emplace_back(SaveProfile{});
+    }
+    return selected_options(profile_);
 }
 
 void Menu::click_settings(Vec2 p) {
-    constexpr std::array<SettingRow, 3> kRows{SettingRow::CircleSize, SettingRow::Lifetime,
-                                              SettingRow::Lives};
-    for (int row = 0; row < 3; ++row) {
-        const SettingRow r = kRows.at(static_cast<std::size_t>(row));
+    constexpr std::array<std::pair<int, SettingRow>, 4> kSteppers{{
+        {kSettingsSizeRow, SettingRow::TargetSize},
+        {kSettingsLifetimeRow, SettingRow::Lifetime},
+        {kSettingsLivesRow, SettingRow::Lives},
+        {kSettingsAverageRow, SettingRow::AverageRuns},
+    }};
+    for (const auto& [row, setting] : kSteppers) {
         if (settings_minus(row).contains(p)) {
-            step_setting(profile_.settings, r, -1);
+            step_setting(profile_.settings, setting, -1);
             requests_.emplace_back(SaveProfile{});
-        } else if (settings_plus(row).contains(p)) {
-            step_setting(profile_.settings, r, 1);
+            return;
+        }
+        if (settings_plus(row).contains(p)) {
+            step_setting(profile_.settings, setting, 1);
             requests_.emplace_back(SaveProfile{});
+            return;
         }
     }
-    if (settings_toggle(3).contains(p)) {
-        profile_.settings.sound = !profile_.settings.sound;
+    Settings& s = profile_.settings;
+    if (settings_toggle(kSettingsEndingRow).contains(p)) {
+        s.preset.ending = s.preset.ending == Ending::Lives ? Ending::Time : Ending::Lives;
         requests_.emplace_back(SaveProfile{});
-    } else if (settings_toggle(4).contains(p)) {
-        profile_.settings.theme = (profile_.settings.theme + 1) % kThemeCount;
+    } else if (settings_toggle(kSettingsSoundRow).contains(p)) {
+        s.sound = !s.sound;
+        requests_.emplace_back(SaveProfile{});
+    } else if (settings_toggle(kSettingsThemeRow).contains(p)) {
+        s.theme = (s.theme + 1) % kThemeCount;
         requests_.emplace_back(SaveProfile{});
     } else if (settings_toggle(kSettingsOpenFolderRow).contains(p)) {
         requests_.emplace_back(OpenDataFolder{});
@@ -69,7 +87,7 @@ void Menu::click_settings(Vec2 p) {
     }
 }
 
-std::optional<GameMode> Menu::click(const ClickInput& click) {
+std::optional<MeasureOptions> Menu::click(const ClickInput& click) {
     // Меню читает только ЛКМ, как образец.
     if (click.button != MouseButton::Left) return std::nullopt;
     const Vec2 p = click.position;
@@ -82,7 +100,7 @@ std::optional<GameMode> Menu::click(const ClickInput& click) {
         case Panel::Help:
         case Panel::Records:
         case Panel::Achievements:
-            // Любой щелчок закрывает и дальше не идёт: режим под панелью не
+            // Любой щелчок закрывает и дальше не идёт: набор под панелью не
             // выбирается.
             panel_ = Panel::None;
             return std::nullopt;
@@ -115,19 +133,18 @@ std::optional<GameMode> Menu::click(const ClickInput& click) {
     for (const auto& [button, panel] : kOpens) {
         if (mini_button(button).contains(p)) {
             panel_ = panel;
-            if (panel == Panel::History) requests_.emplace_back(LoadHistory{});
             return std::nullopt;
         }
     }
-    for (int i = 0; i < kModeCount; ++i) {
-        if (mode_button(i, since_entered(click.time)).contains(p)) {
+    for (int i = 0; i < kPresetCount; ++i) {
+        if (preset_button(i, since_entered(click.time)).contains(p)) {
             selected_ = i;
             return start_selected();
         }
     }
     if (kPlate.contains(p)) return start_selected();
     // Щелчок по пустому месту — эффекты меню вкл./выкл.; записываются со
-    // следующим сохранением, как у образца.
+    // следующим сохранением.
     profile_.settings.menu_effects = !profile_.settings.menu_effects;
     return std::nullopt;
 }

@@ -92,13 +92,12 @@ std::optional<MouseButton> to_button(Uint8 sdl_button) {
     }
 }
 
-// Клавиши — по физическому положению (scancode), как виртуальные коды
-// образца: P, R, M работают и в русской раскладке.
+// Клавиши — по физическому положению (scancode): R и M работают и в
+// русской раскладке.
 std::optional<aim::core::Key> to_key(SDL_Scancode scancode) {
     switch (scancode) {
         case SDL_SCANCODE_ESCAPE: return aim::core::Key::Escape;
         case SDL_SCANCODE_SPACE: return aim::core::Key::Space;
-        case SDL_SCANCODE_P: return aim::core::Key::P;
         case SDL_SCANCODE_R: return aim::core::Key::R;
         case SDL_SCANCODE_M: return aim::core::Key::M;
         default: return std::nullopt;
@@ -217,7 +216,7 @@ int main(int argc, char* argv[]) {
         aim::core::EngineRandom rng(SDL_GetPerformanceCounter());
         // Туториал — при запуске, если профиль его ещё не видел (как образец).
         aim::core::Menu menu(profile, files.profile_number(), !profile.tutorial_seen);
-        aim::core::Flow flow(profile, rng, menu);
+        aim::core::Flow flow(profile, rng, menu, aim::core::engine_random, aim::app::local_now);
         aim::platform::Sound sound;
         if (!sound.active()) SDL_Log("звука нет: %s", sound.problem().c_str());
         aim::app::Screens screens(window, renderer, *text, profile, files, rng, menu, sound);

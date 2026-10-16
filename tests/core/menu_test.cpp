@@ -48,8 +48,8 @@ TEST(MenuTutorial, ClicksPageAndLastClosesAndSaves) {
     Menu menu(profile, 1, true);
     menu.enter(kEntered);
     for (int step = 1; step < kTutorialSteps; ++step) {
-        // Щелчок по кнопке режима под туториалом режим не запускает.
-        EXPECT_EQ(menu.click(click_at(center(mode_button(0, kLater)))), std::nullopt);
+        // Щелчок по кнопке набора под туториалом замер не запускает.
+        EXPECT_EQ(menu.click(click_at(center(preset_button(0, kLater)))), std::nullopt);
         EXPECT_EQ(menu.tutorial_step(), step);
         EXPECT_TRUE(menu.tutorial_shown());
     }
@@ -68,23 +68,30 @@ TEST(MenuTutorial, EscapeSkipsAndMarksSeen) {
     EXPECT_EQ(menu.take_requests().size(), 1U);
 }
 
-TEST_F(MenuTest, ModeButtonStartsItsMode) {
-    EXPECT_EQ(menu_.click(click_at(center(mode_button(2, kLater - kEntered)))), GameMode::Tracking);
-    EXPECT_EQ(menu_.selected_mode(), 2);
+TEST_F(MenuTest, PresetButtonStartsItsPresetAndRemembersIt) {
+    const auto options = menu_.click(click_at(center(preset_button(3, kLater - kEntered))));
+    ASSERT_TRUE(options.has_value());
+    EXPECT_EQ(options.value_or(MeasureOptions{}).action, Action::Hover) << "«Слежение»";
+    EXPECT_EQ(menu_.selected_preset(), 3);
+    EXPECT_EQ(profile_.preset, 3);
+    EXPECT_EQ(count<SaveProfile>(menu_.take_requests()), 1) << "выбранный набор — в профиль";
 }
 
-TEST_F(MenuTest, PlateStartsHoveredMode) {
-    menu_.hover(center(mode_button(1, kLater - kEntered)), kLater);
-    EXPECT_EQ(menu_.selected_mode(), 1);
-    EXPECT_EQ(menu_.click(click_at(center(kPlate))), GameMode::Dual);
+TEST_F(MenuTest, PlateStartsHoveredPresetFirstIsScreen) {
+    menu_.hover(center(preset_button(0, kLater - kEntered)), kLater);
+    EXPECT_EQ(menu_.selected_preset(), 0);
+    const auto options = menu_.click(click_at(center(kPlate)));
+    ASSERT_TRUE(options.has_value());
+    EXPECT_EQ(options.value_or(MeasureOptions{}).stimulus, Stimulus::Screen)
+        << "первым — замер на цвет (D-37)";
 }
 
 TEST_F(MenuTest, ButtonIsHitWhereItIsDrawnDuringEntry) {
     // Сразу после входа кнопка 0 ниже своего места на 20 px (AUD-24: у
     // образца попадание проверялось по месту без сдвига).
-    const Rect drawn = mode_button(0, 0);
+    const Rect drawn = preset_button(0, 0);
     EXPECT_EQ(drawn.y1, kButtonsY + 20);
-    const Rect resting = mode_button(0, kLater);
+    const Rect resting = preset_button(0, kLater);
     EXPECT_EQ(resting.y1, kButtonsY);
     Menu menu(profile_, 1, false);
     menu.enter(kLater);
@@ -98,7 +105,7 @@ TEST_F(MenuTest, EmptySpaceTogglesEffectsRightClickDoesNothing) {
     EXPECT_EQ(profile_.settings.menu_effects, before);
     EXPECT_EQ(menu_.click(click_at({400, 20})), std::nullopt);
     EXPECT_NE(profile_.settings.menu_effects, before);
-    EXPECT_TRUE(menu_.take_requests().empty()) << "как образец: записывается с другим сохранением";
+    EXPECT_TRUE(menu_.take_requests().empty()) << "записывается с другим сохранением";
 }
 
 TEST_F(MenuTest, InformationPanelsCloseOnAnyClick) {
@@ -107,16 +114,16 @@ TEST_F(MenuTest, InformationPanelsCloseOnAnyClick) {
           std::pair{MiniButton::Achievements, Panel::Achievements}}) {
         menu_.click(click_at(center(mini_button(button))));
         EXPECT_EQ(menu_.panel(), panel);
-        // Щелчок по кнопке режима под панелью только закрывает её.
-        EXPECT_EQ(menu_.click(click_at(center(mode_button(0, kLater)))), std::nullopt);
+        // Щелчок по кнопке набора под панелью только закрывает её.
+        EXPECT_EQ(menu_.click(click_at(center(preset_button(0, kLater)))), std::nullopt);
         EXPECT_EQ(menu_.panel(), Panel::None);
     }
 }
 
-TEST_F(MenuTest, HistoryLoadsOnOpenClosesOutside) {
+TEST_F(MenuTest, HistoryOpensClosesOutside) {
     menu_.click(click_at(center(mini_button(MiniButton::History))));
     EXPECT_EQ(menu_.panel(), Panel::History);
-    EXPECT_EQ(count<LoadHistory>(menu_.take_requests()), 1);
+    EXPECT_TRUE(menu_.take_requests().empty()) << "история — уже в профиле";
     menu_.click(click_at(center(history_panel())));
     EXPECT_EQ(menu_.panel(), Panel::History);
     menu_.click(click_at({5, 5}));
@@ -125,25 +132,31 @@ TEST_F(MenuTest, HistoryLoadsOnOpenClosesOutside) {
 
 TEST_F(MenuTest, HoverDoesNotSelectUnderPanel) {
     menu_.click(click_at(center(mini_button(MiniButton::Help))));
-    menu_.hover(center(mode_button(3, kLater)), kLater);
-    EXPECT_EQ(menu_.selected_mode(), 0);
+    menu_.hover(center(preset_button(3, kLater)), kLater);
+    EXPECT_EQ(menu_.selected_preset(), 1) << "под панелью — прежний набор профиля";
 }
 
 TEST_F(MenuTest, SettingsStepToggleResetAndClose) {
     menu_.click(click_at(center(mini_button(MiniButton::Settings))));
     ASSERT_EQ(menu_.panel(), Panel::Settings);
-    menu_.click(click_at(center(settings_plus(0))));
-    EXPECT_EQ(profile_.settings.circle_size, 42);
-    menu_.click(click_at(center(settings_minus(2))));
-    EXPECT_EQ(profile_.settings.lives, 14);
-    menu_.click(click_at(center(settings_toggle(3))));
+    menu_.click(click_at(center(settings_plus(kSettingsSizeRow))));
+    EXPECT_EQ(profile_.settings.preset.target_size, 42);
+    menu_.click(click_at(center(settings_minus(kSettingsLivesRow))));
+    EXPECT_EQ(profile_.settings.preset.lives, 14);
+    menu_.click(click_at(center(settings_plus(kSettingsAverageRow))));
+    EXPECT_EQ(profile_.settings.average_runs, 100);
+    menu_.click(click_at(center(settings_toggle(kSettingsEndingRow))));
+    EXPECT_EQ(profile_.settings.preset.ending, Ending::Time);
+    menu_.click(click_at(center(settings_toggle(kSettingsSoundRow))));
     EXPECT_FALSE(profile_.settings.sound);
     for (int i = 0; i < 3; ++i)
-        menu_.click(click_at(center(settings_toggle(4))));
+        menu_.click(click_at(center(settings_toggle(kSettingsThemeRow))));
     EXPECT_EQ(profile_.settings.theme, 0) << "три темы по кругу";
-    EXPECT_EQ(count<SaveProfile>(menu_.take_requests()), 6);
+    EXPECT_EQ(count<SaveProfile>(menu_.take_requests()), 8);
     menu_.click(click_at(center(settings_reset())));
-    EXPECT_EQ(profile_.settings.circle_size, 40);
+    EXPECT_EQ(profile_.settings.preset.target_size, 40);
+    EXPECT_EQ(profile_.settings.preset.ending, Ending::Lives);
+    EXPECT_EQ(profile_.settings.average_runs, 50);
     EXPECT_TRUE(profile_.settings.sound);
     // Щелчок внутри панели мимо кнопок — панель открыта; снаружи — закрыта.
     menu_.click(click_at({static_cast<double>(settings_panel().x1 + 5),
@@ -165,6 +178,8 @@ TEST_F(MenuTest, DataFolderRowsAndExportAreRequests) {
     EXPECT_LT(settings_toggle(kSettingsChooseFolderRow).y2, settings_reset().y1);
     EXPECT_LT(settings_reset().y2, settings_panel().y2 - 44)
         << "под сбросом — подпись в две строки";
+    for (int row = 0; row < kSettingsResetRow; ++row)
+        EXPECT_LE(settings_row_y(row) + kSettingsButton, settings_row_y(row + 1)) << row;
     menu_.key({.key = Key::Escape, .time = kLater});
 
     menu_.click(click_at(center(mini_button(MiniButton::History))));
@@ -185,13 +200,13 @@ TEST_F(MenuTest, ProfilesSwitchOnlyToAnother) {
     ASSERT_EQ(r.size(), 1U);
     ASSERT_TRUE(std::holds_alternative<SwitchProfile>(r[0]));
     EXPECT_EQ(std::get<SwitchProfile>(r[0]).number, 3);
-    EXPECT_EQ(menu_.panel(), Panel::Profiles) << "как образец: панель остаётся";
+    EXPECT_EQ(menu_.panel(), Panel::Profiles) << "панель остаётся";
     menu_.key({.key = Key::Escape, .time = kLater});
     EXPECT_EQ(menu_.panel(), Panel::None);
 }
 
 TEST(Layout, MiniButtonsAreTheDrawnRectangles) {
-    // DrawMiniButton образца: (10, H−35)–(100, H−10), шаг 100.
+    // (10, H−35)–(100, H−10), шаг 100.
     const Rect help = mini_button(MiniButton::Help);
     EXPECT_EQ(help.x1, 10);
     EXPECT_EQ(help.x2, 100);

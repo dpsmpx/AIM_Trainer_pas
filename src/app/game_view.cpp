@@ -1,12 +1,14 @@
 #include "app/game_view.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <format>
 #include <string>
 #include <string_view>
 
+#include "core/records.h"
 #include "core/rounding.h"
 #include "core/rules.h"
 #include "core/screen.h"
@@ -65,7 +67,7 @@ void render_target(Canvas& c, const core::Theme& theme, const core::Game& game,
     }
     c.brush = theme.circles.at(static_cast<std::size_t>(t.color()));
     c.fill_circle(x, y, r);
-    if (game.mode() == core::GameMode::Tracking) {
+    if (game.options().action == core::Action::Hover) {
         // Кольцо наводки: чем ближе к засчитыванию, тем ярче.
         if (t.hover_progress() > 0) {
             const int progress = std::min(round_int(255.0 * core::to_ms(t.hover_progress()) /
@@ -90,15 +92,14 @@ void render_heatmap(Canvas& c, const core::Game& game) {
     for (const auto& column : map)
         for (const int n : column)
             most = std::max(most, n);
-    constexpr int kOriginX = kW - 220;
-    constexpr int kOriginY = 20;
+    constexpr int kOriginX = 40;
+    constexpr int kOriginY = kH - 150;
     constexpr int kCellW = 200 / core::kHeatmapCols;
     constexpr int kCellH = 100 / core::kHeatmapRows;
 
     c.font.size = 10;
     c.font_color = argb(180, 200, 200, 200);
-    c.draw_text_centered(kOriginX, kOriginY - 18, kOriginX + 200, kOriginY,
-                         "Промахи (последний забег)");
+    c.draw_text_centered(kOriginX, kOriginY - 18, kOriginX + 200, kOriginY, "Промахи");
     c.brush = argb(80, 30, 30, 35);
     c.fill_round_rect(kOriginX, kOriginY, kOriginX + 200, kOriginY + 100, 4, 4);
     for (int cx = 0; cx < core::kHeatmapCols; ++cx) {
@@ -118,24 +119,32 @@ void render_heatmap(Canvas& c, const core::Game& game) {
 
 void render_countdown(Canvas& c, const core::Theme& theme, const core::Flow& flow,
                       core::Nanoseconds now) {
-    // Цвет шрифта образец здесь не задаёт — остаётся от прошлого экрана.
     c.clear_window(theme.background);
+    const core::MeasureOptions& o = flow.options();
     c.font.size = 20;
-    c.draw_text_centered(
-        0, kH / 2 - 140, kW, kH / 2 - 120,
-        core::kModeLooks.at(static_cast<std::size_t>(core::mode_index(flow.mode()))).title);
+    c.font_color = argb(200, 230, 230, 230);
+    c.draw_text_centered(0, kH / 2 - 150, kW, kH / 2 - 120,
+                         core::preset_name(o).value_or("Свой набор"));
+    c.font.size = 12;
+    c.draw_text_centered(40, kH / 2 - 118, kW - 40, kH / 2 - 100, core::describe_short(o));
     c.font.size = 120;
     c.draw_text_centered(0, kH / 2 - 100, kW, kH / 2 + 100,
                          std::to_string(flow.countdown_value(now)));
     c.font.size = 20;
-    c.draw_text_centered(0, kH / 2 + 120, kW, kH / 2 + 140, "Get ready!");
+    c.draw_text_centered(
+        0, kH / 2 + 116, kW, kH / 2 + 146,
+        o.stimulus == core::Stimulus::Screen ? "Жми, как только окно сменит цвет" : "Get ready!");
 }
 
 void render_game(Canvas& c, const core::Theme& theme, const core::Game& game, Effects& effects,
                  const CursorTrail& trail, int fps, core::Nanoseconds now) {
-    c.clear_window(theme.background);
-    trail.render(c);
-    render_target(c, theme, game, now);
+    const bool screen = game.screen_stimulus();
+    // Замер на цвет: окно целиком — фон или сигнал (D-37).
+    c.clear_window(screen && game.signal_lit(now) ? theme.signal : theme.background);
+    if (!screen) {
+        trail.render(c);
+        render_target(c, theme, game, now);
+    }
     effects.render(c, now);
 
     const int old_size = c.font.size;
@@ -144,19 +153,34 @@ void render_game(Canvas& c, const core::Theme& theme, const core::Game& game, Ef
     constexpr int kCol = kW / 5;
     constexpr int kPad = 16;
     constexpr int kBottom = 16;
-    text_with_background(c, bg, kPad, kH - kInfoH, kCol - kPad, kH - kBottom, 16,
-                         std::format("FPS:\n{}", fps));
-    text_with_background(c, bg, kCol + kPad, kH - kInfoH, 2 * kCol - kPad, kH - kBottom, 16,
-                         std::format("Score:\n{}", game.score()));
-    text_with_background(c, bg, 2 * kCol + kPad, kH - kInfoH, 3 * kCol - kPad, kH - kBottom, 16,
-                         "Accuracy:\n" + one_decimal(game.accuracy()) + "%");
-    text_with_background(c, bg, 3 * kCol + kPad, kH - kInfoH, 4 * kCol - kPad, kH - kBottom, 16,
-                         "Avg:\n" + one_decimal(game.avg_reaction_ms()) + "ms");
-    text_with_background(c, bg, 4 * kCol + kPad, kH - kInfoH, kW - kPad, kH - kBottom, 16,
-                         std::format("Lives:\n{}", std::max(game.lives_left(), 0)));
+    const core::MeasureOptions& o = game.options();
+    const std::string end_box =
+        o.ending == core::Ending::Time
+            ? std::format("Time:\n{}", core::to_ms(game.time_left(now)) > 0
+                                           ? (game.time_left(now) + core::ms(999)) / core::ms(1000)
+                                           : 0)
+            : std::format("Lives:\n{}", std::max(game.lives_left(), 0));
+    const std::array<std::string, 5> boxes{
+        std::format("FPS:\n{}", fps),
+        screen ? std::format("Last:\n{}ms", game.reactions().empty()
+                                                ? 0
+                                                : round_int(core::to_ms(game.reactions().back())))
+               : std::format("Score:\n{}", game.score()),
+        screen ? std::format("Median:\n{}ms", round_int(game.median_reaction_ms()))
+               : "Accuracy:\n" + one_decimal(game.accuracy()) + "%",
+        screen ? std::format("False:\n{}", game.misses())
+               : "Avg:\n" + one_decimal(game.avg_reaction_ms()) + "ms",
+        end_box,
+    };
+    for (int i = 0; i < 5; ++i) {
+        const int x1 = i == 0 ? kPad : i * kCol + kPad;
+        const int x2 = i == 4 ? kW - kPad : (i + 1) * kCol - kPad;
+        text_with_background(c, bg, x1, kH - kInfoH, x2, kH - kBottom, 16,
+                             boxes.at(static_cast<std::size_t>(i)));
+    }
     c.font.size = old_size;
 
-    if (game.mode() == core::GameMode::Dual) {
+    if (!screen && o.action == core::Action::Click && o.color_buttons) {
         // Подсказка «какой цвет какой кнопкой»; цели под ней не появляются.
         c.brush = argb(160, 40, 40, 45);
         c.fill_round_rect(10, 10, 190, 42, 8, 8);
@@ -180,50 +204,93 @@ void render_game(Canvas& c, const core::Theme& theme, const core::Game& game, Ef
     }
 }
 
-void render_pause(Canvas& c) {
-    // У образца — FillRoundRect с нулевым скруглением, на котором он падает
-    // (сценарий 22): здесь — заливка окна.
-    c.brush = argb(150, 15, 15, 18);
-    c.fill_rect(0, 0, kW, kH);
-    c.font.size = 40;
-    c.font_color = kClWhite;
-    c.draw_text_centered(0, kH / 2 - 70, kW, kH / 2 - 20, "PAUSE");
-    c.font.size = 14;
-    c.font_color = argb(220, 210, 210, 210);
-    c.draw_text_centered(0, kH / 2 + 10, kW, kH / 2 + 30, "P — продолжить");
-    c.draw_text_centered(0, kH / 2 + 34, kW, kH / 2 + 54, "R — заново    M — в меню");
-}
-
-void render_game_over(Canvas& c, const core::Theme& theme, const core::Game& game) {
+void render_game_over(Canvas& c, const core::Theme& theme, const core::Game& game,
+                      const std::optional<core::RunFinished>& run, const core::Profile& profile) {
     c.clear_window(theme.background);
-    c.font.size = 44;
-    c.font_color = kClWhite;
-    c.draw_text_centered(0, kH / 2 - 60, kW, kH / 2 + 20,
-                         game.died_to_bomb() ? "ПОДРЫВ!" : "GAME OVER");
-    if (game.died_to_bomb()) {
-        c.font.size = 14;
-        c.font_color = argb(220, 255, 120, 100);
-        c.draw_text_centered(0, kH / 2 + 24, kW, kH / 2 + 44,
-                             "Кликнул по бомбе — мгновенный конец забега");
-        c.font_color = kClWhite;
+    const core::GameSummary s = game.summary();
+    const core::MeasureOptions& o = s.options;
+    std::string_view title = "ЗАМЕР ОКОНЧЕН";
+    switch (s.end) {
+        case core::EndReason::Bomb: title = "ПОДРЫВ!"; break;
+        case core::EndReason::Time: title = "ВРЕМЯ ВЫШЛО"; break;
+        case core::EndReason::Lives: title = "GAME OVER"; break;
+        case core::EndReason::None:
+        case core::EndReason::GaveUp:
+        case core::EndReason::ToMenu: break;
     }
-    c.font.size = 18;
-    c.draw_text_centered(0, kH / 2 + 60, kW, kH / 2 + 90, "Press SPACE to continue");
+    // Верх окна (20–60) — место уведомлений: заголовок ниже.
+    c.font.size = 32;
+    c.font_color = kClWhite;
+    c.draw_text_centered(0, 66, kW, 110, title);
+    c.font.size = 14;
+    c.font_color = argb(220, 220, 220, 220);
+    c.draw_text_centered(
+        0, 112, kW, 132,
+        std::format("{} — Space: в меню, R: заново", core::preset_name(o).value_or("Свой набор")));
 
-    c.font.size = 15;
-    int y = kH / 2 + 120;
-    const auto row = [&](const std::string& s) {
-        c.draw_text_centered(0, y, kW, y + 24, s);
-        y += 26;
+    // Слева — параметры замера (D-38).
+    c.font.size = 13;
+    int y = 150;
+    c.font_color = argb(200, 160, 200, 255);
+    c.draw_text_centered(40, y, 380, y + 20, "Параметры");
+    y += 26;
+    c.font_color = argb(220, 220, 220, 220);
+    for (const std::string& line : core::describe(o)) {
+        c.draw_text_centered(40, y, 380, y + 20, line);
+        y += 22;
+    }
+
+    // Справа — меры, по одной на строку: строка не шире столбца.
+    y = 150;
+    c.font_color = argb(200, 160, 200, 255);
+    c.draw_text_centered(420, y, 760, y + 20, "Результат");
+    y += 26;
+    c.font_color = kClWhite;
+    const auto row = [&](const std::string& text) {
+        c.draw_text_centered(420, y, 760, y + 20, text);
+        y += 22;
     };
-    row(std::format("Score: {}", game.score()));
-    row("Accuracy: " + one_decimal(game.accuracy()) + "%");
-    row("Avg Reaction: " + one_decimal(game.avg_reaction_ms()) + "ms");
-    row("Precision: " + one_decimal(game.precision()) + "%");
-    row(std::format("Hits: {}  Misses: {}", game.hits(), game.misses()));
-    row(std::format("Max Combo: x{}", game.max_combo()));
+    if (o.stimulus == core::Stimulus::Target && o.action == core::Action::Hover) {
+        row(std::format("Очки: {}", s.score));
+        row(std::format("Засчитано целей: {}", s.tracked));
+        row(std::format("Пропущено целей: {}", s.expired));
+    } else if (game.screen_stimulus()) {
+        row(std::format("Медиана реакции: {:.0f} мс", s.median_reaction_ms));
+        row(std::format("Средняя реакция: {:.0f} мс", s.avg_reaction_ms));
+        row(std::format("Реакций: {}", s.hits));
+        row(std::format("Фальстартов: {}", s.misses));
+    } else {
+        row(std::format("Очки: {}", s.score));
+        row("Точность: " + one_decimal(s.accuracy) + "%");
+        row("Точность попадания: " + one_decimal(s.precision) + "%");
+        row(std::format("Реакция средняя: {:.0f} мс", s.avg_reaction_ms));
+        row(std::format("Реакция медиана: {:.0f} мс", s.median_reaction_ms));
+        row(std::format("Попаданий: {}, промахов: {}", s.hits, s.misses));
+        row(std::format("Пропущено целей: {}", s.expired));
+        row(std::format("Лучшая серия: x{}", s.max_combo));
+    }
+    row(std::format("Длительность: {:.1f} с", s.duration_ms / 1000.0));
 
-    render_heatmap(c, game);
+    // Рекорд и среднее за N набора.
+    const core::ComboStats st = core::combo_stats(profile.runs, o, profile.settings.average_runs);
+    const auto primary = [&](double v) {
+        return core::lower_is_better(o) ? std::format("{:.0f} мс", v) : std::format("{:.0f}", v);
+    };
+    y += 10;
+    if (run && run->new_best) {
+        c.font.size = 16;
+        c.font_color = argb(255, 255, 210, 90);
+        c.draw_text_centered(420, y, 760, y + 24, "Новый рекорд набора!");
+        y += 30;
+        c.font.size = 13;
+    }
+    c.font_color = argb(220, 255, 210, 90);
+    if (st.best)
+        row("Рекорд набора: " + primary(core::primary_value(profile.runs.at(*st.best).summary)));
+    if (st.average.runs > 0)
+        row(std::format("Среднее за {}: {}", st.average.runs, primary(st.average.primary)));
+
+    if (!game.screen_stimulus()) render_heatmap(c, game);
 }
 
 }  // namespace aim::app

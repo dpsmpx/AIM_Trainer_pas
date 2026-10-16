@@ -12,6 +12,7 @@
 
 #include "core/layout.h"
 #include "core/profile_file.h"
+#include "core/records.h"
 #include "core/rounding.h"
 
 namespace aim::app {
@@ -39,6 +40,18 @@ int round_int(double v) {
 
 std::string one_decimal(double v) {
     return std::format("{:.1f}", v);
+}
+
+// Главная мера замера (D-38): у замера на цвет — медиана реакции, у
+// остальных — очки.
+std::string primary_text(const core::MeasureOptions& options, double value) {
+    return core::lower_is_better(options) ? std::format("{:.0f} мс", value)
+                                          : std::format("{:.0f}", value);
+}
+
+// Имя набора замера для игрока: набор или «Свой набор».
+std::string_view combo_name(const core::MeasureOptions& options) {
+    return core::preset_name(options).value_or("Свой набор");
 }
 
 void fill_round_rect(Canvas& c, const Rect& r, int w, int h) {
@@ -104,15 +117,14 @@ void render_help(Canvas& c) {
         c.draw_text_centered(p.x1 + 20, y, p.x2 - 20, y + 20, s);
         y += step;
     };
-    line("ЛКМ — выстрел / \"синяя\" кнопка в Dual Mode", 24);
-    line("ПКМ — \"красная\" кнопка в Dual Mode", 24);
-    line("R — начать текущий режим заново", 24);
-    line("M — выйти в меню", 24);
-    line("P — пауза", 24);
-    line("Esc — закончить попытку", 34);
+    line("ЛКМ — выстрел; синие цели в «Двух кнопках»", 24);
+    line("ПКМ — красные цели в «Двух кнопках»", 24);
+    line("Esc — закончить замер, R — заново, M — в меню", 34);
+    line("Реакция — от показа стимула до щелчка", 24);
     line("Accuracy — % попаданий от всех выстрелов", 24);
-    line("Precision — точность по центру круга", 34);
-    line("Score — очки: меньше круг — больше очков", 24);
+    line("Precision — точность по центру круга", 24);
+    line("Score — очки: меньше круг — больше очков", 34);
+    line("Рекорд и среднее — у каждого набора свои", 24);
     c.font.size = 11;
     c.font_color = argb(180, 180, 180, 180);
     c.draw_text_centered(p.x1, p.y2 - 26, p.x2, p.y2 - 6, "Клик — закрыть");
@@ -141,41 +153,41 @@ void render_settings(Canvas& c, const core::Settings& s, std::string_view folder
     c.font_color = kClWhite;
     c.draw_text_centered(p.x1, p.y1 + 14, p.x2, p.y1 + 44, "Настройки");
 
-    const std::array<std::string, 3> rows{
-        std::format("Размер круга: {}", s.circle_size),
-        std::format("Время жизни: {} мс", s.lifetime_ms),
-        std::format("Жизни: {}", s.lives),
-    };
-    // Размер шрифта образец задаёт один раз: строки после первой пишутся
-    // размером «−» и «+» (16), как у него.
+    // Один размер шрифта во всех рядах (D-43).
     c.font.size = 13;
-    for (int row = 0; row < 3; ++row) {
+    const auto stepper = [&](int row, const std::string& text) {
         const int y = core::settings_row_y(row);
         c.font_color = argb(230, 220, 220, 220);
-        c.draw_text_centered(p.x1 + 20, y, p.x2 - 130, y + core::kSettingsButton,
-                             rows.at(static_cast<std::size_t>(row)));
-        // DrawSettingsStepper.
-        c.brush = argb(150, 255, 255, 255);
+        c.draw_text_centered(p.x1 + 20, y, p.x2 - 120, y + core::kSettingsButton, text);
         c.pen = argb(0, 0, 0, 0);
-        fill_round_rect(c, core::settings_minus(row), 6, 6);
-        c.font.size = 16;
+        for (const Rect& r : {core::settings_minus(row), core::settings_plus(row)}) {
+            c.brush = argb(150, 255, 255, 255);
+            fill_round_rect(c, r, 6, 6);
+        }
         c.font_color = argb(255, 30, 30, 34);
         text_centered(c, core::settings_minus(row), "-");
-        c.brush = argb(150, 255, 255, 255);
-        fill_round_rect(c, core::settings_plus(row), 6, 6);
         text_centered(c, core::settings_plus(row), "+");
-    }
+    };
     const auto toggle = [&](int row, const std::string& text) {
         const Rect r = core::settings_toggle(row);
         c.brush = argb(60, 255, 255, 255);
+        c.pen = argb(0, 0, 0, 0);
         fill_round_rect(c, r, 8, 8);
         c.font_color = kClWhite;
         text_centered(c, r, text);
     };
-    toggle(3, std::string("Звук: ") + (s.sound ? "ON" : "OFF"));
-    toggle(4, "Тема: " + std::string(core::kThemes.at(static_cast<std::size_t>(s.theme)).name));
-    // Папка сохранений (D-33) — мельче: путь длинный.
-    c.font.size = 13;
+    const core::PresetSettings& ps = s.preset;
+    stepper(core::kSettingsSizeRow, std::format("Размер цели: {} px", ps.target_size));
+    stepper(core::kSettingsLifetimeRow, std::format("Жизнь цели: {} мс", ps.lifetime_ms));
+    stepper(core::kSettingsLivesRow, std::format("Жизни: {}", ps.lives));
+    toggle(core::kSettingsEndingRow,
+           ps.ending == core::Ending::Lives
+               ? "Окончание: по жизням"
+               : std::format("Окончание: {} с", core::MeasureOptions{}.duration_s));
+    stepper(core::kSettingsAverageRow, std::format("Среднее за {} замеров", s.average_runs));
+    toggle(core::kSettingsSoundRow, std::string("Звук: ") + (s.sound ? "ON" : "OFF"));
+    toggle(core::kSettingsThemeRow,
+           "Тема: " + std::string(core::kThemes.at(static_cast<std::size_t>(s.theme)).name));
     toggle(core::kSettingsOpenFolderRow, "Открыть папку сохранений");
     const Rect folder_row = core::settings_toggle(core::kSettingsChooseFolderRow);
     toggle(core::kSettingsChooseFolderRow,
@@ -184,49 +196,50 @@ void render_settings(Canvas& c, const core::Settings& s, std::string_view folder
     const Rect reset = core::settings_reset();
     c.brush = argb(160, 90, 90, 95);
     fill_round_rect(c, reset, 8, 8);
-    c.font.size = 12;
     c.font_color = kClWhite;
-    text_centered(c, reset, "Сбросить по умолчанию");
-    // Подпись не помещается в строку и у образца (переносится и обрезается
-    // по высоте 18 px) — здесь ей две строки (D-22).
+    text_centered(c, reset, "Сбросить");
     c.font.size = 11;
     c.font_color = argb(180, 180, 180, 180);
-    c.draw_text_centered(p.x1, p.y2 - 44, p.x2, p.y2 - 6,
-                         "Клик вне панели — закрыть. Изменения — со следующей игры.");
+    c.draw_text_centered(p.x1 + 10, p.y2 - 44, p.x2 - 10, p.y2 - 6,
+                         "Размер, жизнь цели, жизни и окончание — для всех наборов. Клик вне "
+                         "панели — закрыть.");
 }
 
-// Таблица лидеров: все четыре режима (AUD-09), у образца — только Classic и
-// Dual в панели 480 px; здесь — четыре столбца в панели шире.
-void render_leaderboard(Canvas& c, const core::Leaderboard& board) {
+// Рекорды наборов (D-38): лучший замер и среднее за N, свежие наборы первыми.
+void render_records(Canvas& c, const core::Profile& profile) {
     constexpr int kPanelW = 760;
-    constexpr int kPanelH = 420;
+    constexpr int kPanelH = 470;
+    constexpr int kRows = 10;
     const Rect p{(kW - kPanelW) / 2, (kH - kPanelH) / 2, (kW + kPanelW) / 2, (kH + kPanelH) / 2};
     panel_back(c, p);
-    panel_title(c, p, 14, "Таблица лидеров");
-    constexpr int kColW = (kPanelW - 20) / core::kModeCount;
-    for (int m = 0; m < core::kModeCount; ++m) {
-        const int x1 = p.x1 + 10 + m * kColW;
-        const int x2 = x1 + kColW;
-        c.font.size = 14;
-        c.font_color = kClWhite;
-        c.draw_text_centered(x1, p.y1 + 56, x2, p.y1 + 80,
-                             core::kModeLooks.at(static_cast<std::size_t>(m)).title);
+    panel_title(c, p, 12, "Рекорды наборов");
+    const int n = profile.settings.average_runs;
+    const std::vector<core::ComboStats> all = core::all_combo_stats(profile.runs, n);
+    if (all.empty()) {
+        c.font.size = 13;
+        c.font_color = argb(200, 200, 200, 200);
+        c.draw_text_centered(p.x1, p.y1 + 120, p.x2, p.y1 + 150, "Пока нет замеров");
+    }
+    for (int i = 0; i < std::min(kRows, static_cast<int>(all.size())); ++i) {
+        const core::ComboStats& st = all.at(static_cast<std::size_t>(i));
+        const int y = p.y1 + 50 + i * 40;
+        c.brush = argb(35, 255, 255, 255);
+        c.pen = argb(0, 0, 0, 0);
+        c.fill_round_rect(p.x1 + 12, y, p.x2 - 12, y + 36, 8, 8);
         c.font.size = 12;
-        c.font_color = argb(220, 220, 220, 220);
-        const auto& rows = board.at(static_cast<std::size_t>(m));
-        for (int i = 0; i < core::kLeaderboardSize; ++i) {
-            const int y = p.y1 + 90 + i * 28;
-            std::string text = std::format("{}. —", i + 1);
-            if (i < static_cast<int>(rows.size())) {
-                const core::LeaderboardEntry& e = rows[static_cast<std::size_t>(i)];
-                // В Tracking щелчков нет — точность у записи всегда 0, её не
-                // показываем.
-                text = m == core::mode_index(core::GameMode::Tracking)
-                           ? std::format("{}. {}", i + 1, e.score)
-                           : std::format("{}. {} ({}%)", i + 1, e.score, one_decimal(e.accuracy));
-            }
-            c.draw_text_centered(x1, y, x2, y + 24, text);
-        }
+        c.font_color = kClWhite;
+        c.draw_text_centered(
+            p.x1 + 20, y + 1, p.x2 - 20, y + 18,
+            std::format("{}: {}", combo_name(st.options), core::describe_short(st.options)));
+        const std::string best =
+            st.best
+                ? primary_text(st.options, core::primary_value(profile.runs.at(*st.best).summary))
+                : "—";
+        c.font_color = argb(220, 255, 210, 90);
+        c.draw_text_centered(
+            p.x1 + 20, y + 18, p.x2 - 20, y + 35,
+            std::format("рекорд {} · среднее за {}: {} · замеров: {}", best, st.average.runs,
+                        primary_text(st.options, st.average.primary), st.runs));
     }
     panel_footer(c, p, "Клик — закрыть");
 }
@@ -253,59 +266,31 @@ void render_achievements(Canvas& c, const core::Profile& profile) {
     panel_footer(c, p, "Клик — закрыть");
 }
 
-void render_history(Canvas& c, const HistoryView& h) {
+// Последние замеры с параметрами (D-38) и экспорт CSV (D-33).
+void render_history(Canvas& c, const core::Profile& profile, std::string_view file_name) {
     const Rect p = core::history_panel();
     panel_back(c, p);
-    panel_title(c, p, 14, "История");
+    panel_title(c, p, 12, "История");
     c.font.size = 12;
     c.font_color = argb(210, 210, 210, 210);
-    c.draw_text_centered(p.x1, p.y1 + 46, p.x2, p.y1 + 64,
-                         std::format("Забегов в истории: {}", h.games));
-
-    constexpr std::array<std::string_view, 4> kBuckets{"Утро (6-12)", "День (12-18)",
-                                                       "Вечер (18-23)", "Ночь (23-6)"};
-    c.font.size = 13;
-    int y = p.y1 + 76;
-    for (std::size_t i = 0; i < kBuckets.size(); ++i) {
+    c.draw_text_centered(p.x1, p.y1 + 44, p.x2, p.y1 + 62,
+                         std::format("Замеров в истории: {}", profile.runs.size()));
+    constexpr int kRows = 16;
+    const auto& runs = profile.runs;
+    const std::size_t from = runs.size() > kRows ? runs.size() - kRows : 0;
+    int y = p.y1 + 70;
+    for (std::size_t i = runs.size(); i > from; --i) {
+        const core::RunRecord& r = runs.at(i - 1);
+        const core::GameSummary& g = r.summary;
+        std::string text = std::format("{:02}.{:02} {:02}:{:02}  {}  ", r.when.day, r.when.month,
+                                       r.when.hour, r.when.minute, combo_name(g.options));
+        text += core::lower_is_better(g.options)
+                    ? std::format("{:.0f} мс, фальстартов {}", g.median_reaction_ms, g.misses)
+                    : std::format("{} очков, {}%, {:.0f} мс", g.score, one_decimal(g.accuracy),
+                                  g.avg_reaction_ms);
         c.font_color = argb(220, 220, 220, 220);
-        const core::TimeOfDayScore& b = h.by_time_of_day.at(i);
-        const std::string text = b.games > 0
-                                     ? std::format("{}: средний счёт {} ({} игр)", kBuckets.at(i),
-                                                   one_decimal(b.average_score), b.games)
-                                     : std::format("{}: нет данных", kBuckets.at(i));
-        c.draw_text_centered(p.x1 + 20, y, p.x1 + 500, y + 22, text);
-        y += 26;
-    }
-
-    c.font.size = 12;
-    c.font_color = argb(200, 200, 200, 200);
-    c.draw_text_centered(p.x1 + 20, y + 8, p.x1 + 500, y + 26,
-                         "Средняя реакция по последним играм:");
-    y += 32;
-    const int gx = p.x1 + 20;
-    const int gy = y;
-    constexpr int kGraphW = 480;
-    constexpr int kGraphH = 140;
-    c.brush = argb(120, 30, 30, 35);
-    c.fill_round_rect(gx, gy, gx + kGraphW, gy + kGraphH, 6, 6);
-    if (!h.recent_reactions.empty()) {
-        const auto count = static_cast<int>(h.recent_reactions.size());
-        int most = 100;
-        for (const double v : h.recent_reactions)
-            most = std::max(most, round_int(v));
-        std::vector<IntPoint> pts;
-        for (int i = 0; i < count; ++i) {
-            const int v = round_int(h.recent_reactions[static_cast<std::size_t>(i)]);
-            pts.push_back(
-                {gx + round_int(i * kGraphW / (count - 1 + 0.0001)),
-                 gy + kGraphH - round_int(static_cast<double>(v) * (kGraphH - 10) / most) - 5});
-        }
-        if (count >= 2) {
-            draw_smooth_curve(c, pts, argb(255, 97, 207, 255), 2);
-        } else {
-            c.brush = argb(255, 97, 207, 255);
-            c.fill_circle(pts[0].x, pts[0].y, 3);
-        }
+        c.draw_text_centered(p.x1 + 16, y, p.x2 - 16, y + 20, text);
+        y += 20;
     }
     // «Экспорт в CSV» — в папку сохранений (D-33).
     const Rect export_button = core::history_export();
@@ -315,12 +300,12 @@ void render_history(Canvas& c, const HistoryView& h) {
     c.font.size = 12;
     c.font_color = kClWhite;
     text_centered(c, export_button, "Экспорт в CSV");
-    c.font.size = 10;
     c.font_color = argb(170, 180, 180, 180);
-    c.draw_text_centered(p.x1 + 250, p.y1 + 410, p.x1 + 500, p.y1 + 442, h.file_name);
+    c.draw_text_centered(export_button.x2 + 10, export_button.y1, p.x2 - 10, export_button.y2,
+                         file_name);
     c.font.size = 11;
     c.font_color = argb(180, 180, 180, 180);
-    c.draw_text_centered(p.x1, p.y1 + 436, p.x2, p.y1 + 454, "Клик вне панели — закрыть");
+    c.draw_text_centered(p.x1, p.y2 - 22, p.x2, p.y2 - 4, "Клик вне панели — закрыть");
 }
 
 void render_profiles(Canvas& c, int current) {
@@ -346,14 +331,12 @@ void render_profiles(Canvas& c, int current) {
     panel_footer(c, p, "Клик по профилю — переключить");
 }
 
-// Тексты туториала (TutorialTexts); у бомбы крест белый, а не красный, как
-// писал образец (AUD-19).
+// Тексты туториала.
 constexpr std::array<std::string_view, core::kTutorialSteps> kTutorial{
-    "Добро пожаловать в Aim Trainer! Кликай по кругам, пока они не исчезли.",
-    "Чем ближе к центру — тем выше Precision (точность попадания).",
-    "В Dual Mode синие круги — ЛКМ, красные — ПКМ. С бомбами (белый крест) — осторожно, "
-    "лучше их не трогать!",
-    "R — заново, M — в меню, P — пауза, Esc — закончить попытку. Удачи!",
+    "Добро пожаловать в DP AIM Trainer! Выбери набор замера — замер начнётся через 3 секунды.",
+    "«Реакция на цвет»: щёлкни, как только окно сменит цвет. Раньше — фальстарт.",
+    "С целями: чем ближе к центру — тем выше точность. Бомбы (белый крест) лучше не трогать!",
+    "Esc — закончить замер, R — заново, M — в меню. Рекорд — у каждого набора свой. Удачи!",
 };
 
 void render_tutorial(Canvas& c, int step) {
@@ -478,7 +461,8 @@ void MenuView::render_particles(Canvas& c, const core::Profile& profile, core::V
     }
 }
 
-void MenuView::render_plate(Canvas& c, int mode, core::Vec2 mouse) const {
+void MenuView::render_plate(Canvas& c, const core::Theme& theme, int preset,
+                            core::Vec2 mouse) const {
     const Rect& plate = core::kPlate;
     const int x = plate.x1;
     const int y = plate.y1;
@@ -505,13 +489,12 @@ void MenuView::render_plate(Canvas& c, int mode, core::Vec2 mouse) const {
     c.brush = argb(0, 0, 0, 0);
     c.font.weight = Weight::Bold;
 
-    const core::ModeLook& look = core::kModeLooks.at(static_cast<std::size_t>(mode));
+    const auto index = static_cast<std::size_t>(preset);
+    const core::PresetLook& look = core::kPresetLooks.at(index);
     const int ax = x + w / 2;
     const int ay = y + h / 2 + 12;
     const double t = timer_mod(2000) / 2000;
-    constexpr std::array<std::string_view, core::kModeCount> kTitles{
-        "Режим - Classic", "Режим - Dual", "Режим - Tracking", "Режим - Flick"};
-    const std::string_view title = kTitles.at(static_cast<std::size_t>(mode));
+    const std::string_view title = core::kPresets.at(index).name;
     c.text_out(x + (w - c.text_width(title)) / 2, y + 14, title);
     c.font.weight = Weight::Normal;
 
@@ -524,8 +507,22 @@ void MenuView::render_plate(Canvas& c, int mode, core::Vec2 mouse) const {
     const auto fading = [](double u) {
         return u > 0.85 ? round_int(255 * (1 - (u - 0.85) / 0.15)) : 255;
     };
-    switch (mode) {
-        case 0: {  // появление и сжатие
+    switch (preset) {
+        case 0: {  // окно меняет цвет: пауза, затем сигнал на 0,6 с
+            const double cycle = timer_mod(2400) / 2400;
+            const bool lit = cycle > 0.75;
+            c.brush = lit ? theme.signal : argb(255, 15, 15, 18);
+            c.pen = argb(120, 255, 255, 255);
+            c.pen_width = 1;
+            c.fill_round_rect(ax - 90, ay - 50, ax + 90, ay + 50, 10, 10);
+            if (lit) {
+                c.font.size = 14;
+                c.font_color = kClWhite;
+                c.draw_text_centered(ax - 90, ay - 50, ax + 90, ay + 50, "Жми!");
+            }
+            break;
+        }
+        case 1: {  // появление и сжатие
             const int r = std::max(round_int(48 * (1 - t)), 4);
             const int alpha = fading(t);
             c.brush = with_alpha(look.circle, alpha);
@@ -536,7 +533,7 @@ void MenuView::render_plate(Canvas& c, int mode, core::Vec2 mouse) const {
             cross(ax, ay, argb(alpha, 255, 255, 255));
             break;
         }
-        case 1: {  // синий и красный по очереди
+        case 2: {  // синий и красный по очереди
             const double phase = timer_mod(4000) / 2000;
             const core::Rgba col = static_cast<int>(phase) % 2 == 0 ? look.circle : look.circle2;
             const double t2 = phase - std::floor(phase);
@@ -550,7 +547,7 @@ void MenuView::render_plate(Canvas& c, int mode, core::Vec2 mouse) const {
             cross(ax, ay, argb(alpha, 255, 255, 255));
             break;
         }
-        case 2: {  // движение со следом
+        case 3: {  // движение со следом
             const int offset = round_int(55 * std::sin(static_cast<double>(timer) / 700));
             constexpr int kR = 20;
             for (int i = 1; i <= 6; ++i) {
@@ -592,20 +589,21 @@ void MenuView::render_plate(Canvas& c, int mode, core::Vec2 mouse) const {
 }
 
 void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const core::Menu& menu,
-                      const core::Profile& profile, const HistoryView& history,
-                      std::string_view data_folder, core::Vec2 mouse, core::Nanoseconds now) const {
+                      const core::Profile& profile, std::string_view data_folder, core::Vec2 mouse,
+                      core::Nanoseconds now) const {
     c.clear_window(theme.background);
     render_particles(c, profile, mouse);
-    render_plate(c, menu.selected_mode(), mouse);
+    const int preset = menu.selected_preset();
+    render_plate(c, theme, preset, mouse);
 
-    // DrawModeButtons: появление каскадом; выбранная — ярче.
+    // Кнопки наборов: появление каскадом; выбранная — ярче.
     const core::Nanoseconds since = now > menu.entered_at() ? now - menu.entered_at() : 0;
-    for (int i = 0; i < core::kModeCount; ++i) {
-        const int entry = round_int(255 * core::mode_button_entry(i, since));
-        const Rect b = core::mode_button(i, since);
-        const bool selected = menu.selected_mode() == i;
+    for (int i = 0; i < core::kPresetCount; ++i) {
+        const int entry = round_int(255 * core::preset_button_entry(i, since));
+        const Rect b = core::preset_button(i, since);
+        const bool selected = preset == i;
         const int base = (selected ? 255 : 120) * entry / 255;
-        const core::ModeLook& look = core::kModeLooks.at(static_cast<std::size_t>(i));
+        const core::PresetLook& look = core::kPresetLooks.at(static_cast<std::size_t>(i));
         c.brush = with_alpha(look.button, base);
         c.pen = argb(80 * entry / 255, 255, 255, 255);
         c.pen_width = 1;
@@ -621,12 +619,13 @@ void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const
         c.font_color = argb(entry, 255, 255, 255);
         c.brush = argb(0, 0, 0, 0);
         c.font.weight = Weight::Bold;
-        const int tw = c.text_width(look.title);
-        c.text_out(b.x1 + (core::kButtonW - tw) / 2, b.y1 + (core::kButtonH - 16) / 2, look.title);
+        const std::string_view name = core::kPresets.at(static_cast<std::size_t>(i)).name;
+        const int tw = c.text_width(name);
+        c.text_out(b.x1 + (core::kButtonW - tw) / 2, b.y1 + (core::kButtonH - 16) / 2, name);
         c.font.weight = Weight::Normal;
     }
 
-    // DrawModeDescription.
+    // Описание набора.
     const Rect& d = core::kDescription;
     c.brush = argb(35, 255, 255, 255);
     c.pen = argb(55, 255, 255, 255);
@@ -636,57 +635,84 @@ void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const
     const int max_chars = round_int(330.0 / c.text_width("W"));
     int ly = d.y1 + 14;
     for (const std::string& line : description_lines(
-             core::kModeLooks.at(static_cast<std::size_t>(menu.selected_mode())).description,
-             max_chars)) {
+             core::kPresets.at(static_cast<std::size_t>(preset)).description, max_chars)) {
         c.brush = argb(0, 0, 0, 0);
         c.text_out(d.x1 + 12, ly, line);
         ly += 18;
     }
 
-    // DrawGraph: последние 50 реакций по порядку (AUD-14), шкала 0–1000 мс.
+    // График: главная мера последних замеров выбранного набора (D-38).
+    const core::MeasureOptions options = core::preset_options(preset, profile.settings.preset);
+    const int n = profile.settings.average_runs;
+    const std::vector<double> recent =
+        core::recent_primary(profile.runs, options, static_cast<std::size_t>(n));
     constexpr int kGraphX = 50;
     constexpr int kGraphY = kH / 2;
     constexpr int kGraphW = kW - 100;
     constexpr int kGraphH = kH / 2 - 110;
+    const bool by_reaction = core::lower_is_better(options);
+    double top = 1000.0;
+    if (!by_reaction) {
+        // Очки: шкала до ближайшего «круглого» числа над лучшим замером.
+        const double most = recent.empty() ? 0.0 : *std::max_element(recent.begin(), recent.end());
+        for (const double step : {100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0, 50000.0}) {
+            top = step;
+            if (most <= step) break;
+        }
+    }
     c.brush = argb(150, 30, 30, 35);
     c.fill_round_rect(kGraphX, kGraphY, kGraphX + kGraphW, kGraphY + kGraphH, 8, 8);
     c.font.size = 10;
     c.font_color = argb(200, 200, 200, 200);
     for (int i = 0; i <= 5; ++i) {
-        const int value = i * 200;
-        const int y = kGraphY + kGraphH - round_int(value * kGraphH / 1000.0);
+        const double value = top * i / 5;
+        const int y = kGraphY + kGraphH - round_int(value * kGraphH / top);
         c.pen = argb(80, 200, 200, 200);
         c.pen_width = 1;
         c.line(kGraphX, y, kGraphX + kGraphW, y);
-        c.draw_text_centered(kGraphX - 50, y - 8, kGraphX - 5, y + 8, std::to_string(value));
+        c.draw_text_centered(kGraphX - 50, y - 8, kGraphX - 5, y + 8, std::format("{:.0f}", value));
     }
-    const std::vector<int> reactions = profile.reactions.in_order();
-    if (!reactions.empty()) {
-        const auto count = static_cast<int>(reactions.size());
+    if (recent.empty()) {
+        c.font.size = 12;
+        c.font_color = argb(170, 200, 200, 200);
+        c.draw_text_centered(kGraphX, kGraphY, kGraphX + kGraphW, kGraphY + kGraphH,
+                             "Пока нет замеров этого набора");
+    } else {
+        const auto count = static_cast<int>(recent.size());
         std::vector<IntPoint> pts;
         for (int i = 0; i < count; ++i) {
-            const int v = std::min(reactions[static_cast<std::size_t>(i)], 1000);
-            pts.push_back({50 + round_int(static_cast<double>(i) * kGraphW / count),
-                           kH / 2 + kGraphH - round_int(static_cast<double>(v) * kGraphH / 1000)});
+            const double v = std::min(recent[static_cast<std::size_t>(i)], top);
+            pts.push_back(
+                {kGraphX + (count > 1 ? round_int(static_cast<double>(i) * kGraphW / (count - 1))
+                                      : kGraphW / 2),
+                 kGraphY + kGraphH - round_int(v * kGraphH / top)});
         }
-        draw_smooth_curve(c, pts, argb(255, 97, 207, 255), 2);
+        if (count >= 2) {
+            draw_smooth_curve(c, pts, argb(255, 97, 207, 255), 2);
+        } else {
+            c.brush = argb(255, 97, 207, 255);
+            c.fill_circle(pts[0].x, pts[0].y, 4);
+        }
     }
 
-    // Рекорды профиля. DejaVu шире Consolas: в 12 пт «Best Avg: 382.5ms» не
-    // помещается в столбец 160 px и переносится — здесь 11 пт (D-22).
+    // Рекорд и среднее за N выбранного набора (D-38).
+    const core::ComboStats st = core::combo_stats(profile.runs, options, n);
     c.font.size = 11;
     c.font_color = argb(200, 200, 200, 200);
     constexpr int kBottomY = kH - 50;
-    constexpr int kCol = kW / 5;
-    const std::array<std::string, 5> stats{
-        std::format("Best Score: {}", profile.best_score),
-        "Best Acc: " + one_decimal(profile.best_accuracy) + "%",
-        "Best Prec: " + one_decimal(profile.best_precision) + "%",
-        "Best Avg: " + one_decimal(profile.best_avg_reaction) + "ms",
-        std::format("Games: {}", profile.games_played),
+    constexpr int kCol = kW / 3;
+    const std::string measure = by_reaction ? "медиана" : "очки";
+    const std::array<std::string, 3> stats{
+        std::format(
+            "Рекорд ({}): {}", measure,
+            st.best ? primary_text(options, core::primary_value(profile.runs.at(*st.best).summary))
+                    : "—"),
+        std::format("Среднее за {}: {}", st.average.runs > 0 ? st.average.runs : n,
+                    st.average.runs > 0 ? primary_text(options, st.average.primary) : "—"),
+        std::format("Замеров набора: {}", st.runs),
     };
-    for (int i = 0; i < 5; ++i)
-        c.draw_text_centered(kCol * i, kBottomY - 10, i == 4 ? kW : kCol * (i + 1), kBottomY + 10,
+    for (int i = 0; i < 3; ++i)
+        c.draw_text_centered(kCol * i, kBottomY - 10, i == 2 ? kW : kCol * (i + 1), kBottomY + 10,
                              stats.at(static_cast<std::size_t>(i)));
 
     // Кнопки внизу (DrawMiniButton).
@@ -705,18 +731,20 @@ void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const
     c.draw_text_centered(kW - 120, kH - 20, kW - 10, kH - 10,
                          profile.settings.menu_effects ? "Effects: ON" : "Effects: OFF");
 
-    toasts.render(c, now);
-
     switch (menu.panel()) {
         case core::Panel::Help: render_help(c); break;
         case core::Panel::Settings: render_settings(c, profile.settings, data_folder); break;
-        case core::Panel::Records: render_leaderboard(c, profile.leaderboard); break;
+        case core::Panel::Records: render_records(c, profile); break;
         case core::Panel::Achievements: render_achievements(c, profile); break;
-        case core::Panel::History: render_history(c, history); break;
+        case core::Panel::History:
+            render_history(c, profile, core::runs_file_name(menu.profile_number()));
+            break;
         case core::Panel::Profiles: render_profiles(c, menu.profile_number()); break;
         case core::Panel::None: break;
     }
     if (menu.tutorial_shown()) render_tutorial(c, menu.tutorial_step());
+    // Уведомления — поверх панелей: ответ на действие в панели виден (AUD-33).
+    toasts.render(c, now);
 }
 
 }  // namespace aim::app

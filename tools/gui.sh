@@ -38,8 +38,10 @@ PORT_BIN="$ROOT/build/linux-gcc/AimTrainer"
 TITLE="Aim Trainer"
 # Шаблоны файлов игрока — для find -name: раскрывать их здесь, в текущем
 # каталоге, нельзя.
-PLAYER_FILES=('profile*_stats.ini' 'profile*_sessions.csv' 'profile*_corrupt_backup.txt'
-              'export_profile*.csv' 'aim_trainer.ini')
+# Обе программы: Pascal-версия — profileN_stats.ini и _sessions.csv,
+# C++-версия — profileN.ini и profileN_runs.csv (D-38).
+PLAYER_FILES=('profile*.ini' 'profile*_sessions.csv' 'profile*_runs.csv'
+              'profile*_corrupt_backup.txt' 'export_profile*.csv' 'aim_trainer.ini')
 
 die() { echo "gui.sh: $*" >&2; exit 1; }
 

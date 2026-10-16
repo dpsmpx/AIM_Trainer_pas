@@ -1,10 +1,7 @@
 #pragma once
 
-// Геометрия меню и панелей — константы и раскладка образца (PLATE_*, BTNS_*,
-// DESC_*, SET_*, DrawMiniButton, HistoryPanelX, ProfilesPanelX и др. в
-// archive/pascal/AIM_Trainer.pas). Одна на отрисовку и попадания (AUD-24):
-// у образца кнопки внизу проверялись по другим прямоугольникам, а кнопки
-// режимов — без сдвига анимации появления.
+// Геометрия меню и панелей в логических 800×600 — одна на отрисовку и
+// попадания (AUD-24).
 
 #include <array>
 
@@ -32,19 +29,19 @@ inline constexpr int kW = kWindowWidth;
 inline constexpr int kH = kWindowHeight;
 
 // ---- Меню ----
-inline constexpr Rect kPlate{50, 40, 50 + 330, 40 + 240};  ///< плашка-превью режима
+inline constexpr Rect kPlate{50, 40, 50 + 330, 40 + 240};  ///< плашка-превью набора
 inline constexpr int kButtonsX = 420;
 inline constexpr int kButtonsY = 40;
 inline constexpr int kButtonW = 330;
-inline constexpr int kButtonH = 34;
-inline constexpr int kButtonGap = 8;
-inline constexpr Rect kDescription{420, 214, 420 + 330, 214 + 76};
+inline constexpr int kButtonH = 30;
+inline constexpr int kButtonGap = 6;
+inline constexpr Rect kDescription{420, 222, 420 + 330, 222 + 68};
 
-/// Кнопка режима i через since_enter после входа в меню: появляется
+/// Кнопка набора i через since_enter после входа в меню: появляется
 /// каскадом — через i·80 мс, за 400 мс, снизу на 20 px.
-Rect mode_button(int i, Nanoseconds since_enter);
+Rect preset_button(int i, Nanoseconds since_enter);
 /// Доля появления кнопки i, 0…1.
-double mode_button_entry(int i, Nanoseconds since_enter);
+double preset_button_entry(int i, Nanoseconds since_enter);
 
 /// Кнопки внизу меню: Справка, Настройки, Рекорды, Награды, История,
 /// Профиль.
@@ -56,20 +53,26 @@ Rect mini_button(MiniButton b);
 
 // ---- Настройки ----
 inline constexpr int kSettingsW = 420;
-/// Выше, чем у образца (390), на две строки папки сохранений (D-33).
-inline constexpr int kSettingsH = 470;
-inline constexpr int kSettingsRowH = 40;
-inline constexpr int kSettingsButton = 34;
+inline constexpr int kSettingsH = 520;
+inline constexpr int kSettingsRowH = 38;
+inline constexpr int kSettingsButton = 32;
+// Ряды настроек по порядку.
+inline constexpr int kSettingsSizeRow = 0;      ///< размер цели, «−»/«+»
+inline constexpr int kSettingsLifetimeRow = 1;  ///< жизнь цели, «−»/«+»
+inline constexpr int kSettingsLivesRow = 2;     ///< жизни, «−»/«+»
+inline constexpr int kSettingsEndingRow = 3;   ///< окончание: жизни или время
+inline constexpr int kSettingsAverageRow = 4;  ///< среднее за N, «−»/«+» (D-38)
+inline constexpr int kSettingsSoundRow = 5;
+inline constexpr int kSettingsThemeRow = 6;
+inline constexpr int kSettingsOpenFolderRow = 7;  ///< открыть папку сохранений (D-33)
+inline constexpr int kSettingsChooseFolderRow = 8;  ///< выбрать её (D-33)
+inline constexpr int kSettingsResetRow = 9;
 Rect settings_panel();
-/// Верх строки настроек: 0 — размер, 1 — время жизни, 2 — жизни, 3 — звук,
-/// 4 — тема, 5 — открыть папку сохранений, 6 — выбрать её (D-33), 7 — сброс.
 int settings_row_y(int row);
 Rect settings_minus(int row);
 Rect settings_plus(int row);
-/// Строка-кнопка: 3 — звук, 4 — тема, 5 и 6 — папка сохранений.
+/// Строка-кнопка во всю ширину панели.
 Rect settings_toggle(int row);
-inline constexpr int kSettingsOpenFolderRow = 5;
-inline constexpr int kSettingsChooseFolderRow = 6;
 Rect settings_reset();
 
 // ---- История и профили ----

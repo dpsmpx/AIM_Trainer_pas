@@ -60,14 +60,15 @@ add_library(aim_core STATIC
     src/core/click_time.cpp
     src/core/flow.cpp
     src/core/game.cpp
-    src/core/history.cpp
     src/core/layout.cpp
+    src/core/measure.cpp
     src/core/menu.cpp
-    src/core/modes.cpp
     src/core/particles.cpp
     src/core/profile.cpp
     src/core/profile_file.cpp
     src/core/random.cpp
+    src/core/records.cpp
+    src/core/runs.cpp
     src/core/target.cpp
     src/core/text.cpp
     src/core/tone.cpp)

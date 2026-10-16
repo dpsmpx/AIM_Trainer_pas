@@ -1,5 +1,6 @@
 #include "core/flow.h"
 
+#include <climits>
 #include <utility>
 
 namespace aim::core {
@@ -16,8 +17,17 @@ Overload(F...) -> Overload<F...>;
 
 }  // namespace
 
-Flow::Flow(Profile& profile, Random& rng, MenuInput& menu)
-    : profile_(profile), rng_(rng), menu_(menu) {}
+std::unique_ptr<Random> engine_random(std::uint64_t seed) {
+    return std::make_unique<EngineRandom>(seed);
+}
+
+Flow::Flow(Profile& profile, Random& seeds, MenuInput& menu, RandomFactory make_random,
+           std::function<LocalTime()> clock)
+    : profile_(profile),
+      seeds_(seeds),
+      menu_(menu),
+      make_random_(std::move(make_random)),
+      clock_(std::move(clock)) {}
 
 void Flow::go(Screen to) {
     if (to == screen_) return;
@@ -44,21 +54,23 @@ void Flow::finish_run() {
     if (!game_ || finished_) return;
     finished_ = true;
     pass_game_events();
-    const GameSummary summary = game_->summary();
-    const FinishResult result = finish_game(profile_, summary);
+    RunRecord run{.when = clock_ ? clock_() : LocalTime{}, .summary = game_->summary()};
+    run.summary.seed = seed_;
+    const FinishResult result = finish_game(profile_, run);
     for (const int id : result.unlocked)
         events_.emplace_back(AchievementUnlocked{.id = id});
-    events_.emplace_back(
-        RunFinished{.summary = summary, .leaderboard_place = result.leaderboard_place});
+    last_run_ = RunFinished{.record = std::move(run), .new_best = result.new_best};
+    events_.emplace_back(*last_run_);
 }
 
 bool Flow::handle(const Input& event) {
     switch (screen_) {
         case Screen::Menu:
             return std::visit(Overload{[&](const ClickInput& c) {
-                                           const std::optional<GameMode> mode = menu_.click(c);
-                                           if (!mode) return true;
-                                           mode_ = *mode;
+                                           const std::optional<MeasureOptions> options =
+                                               menu_.click(c);
+                                           if (!options) return true;
+                                           options_ = normalized(*options);
                                            start_countdown(now_);
                                            return false;
                                        },
@@ -88,22 +100,16 @@ bool Flow::handle(const Input& event) {
             }
             const auto& k = std::get<KeyInput>(event);
             switch (k.key) {
-                case Key::P:
-                    if (game.paused()) {
-                        game.resume(k.time);
-                    } else {
-                        game.pause(k.time);
-                    }
-                    return true;
-                case Key::R:  // заново, забег не записывается
+                case Key::R:  // заново, замер не записывается
                     start_countdown(now_);
                     return false;
-                case Key::M:  // в меню, забег записывается
+                case Key::M:  // в меню, замер записывается
+                    game.finish(EndReason::ToMenu, k.time);
                     finish_run();
                     go(Screen::Menu);
                     return false;
-                case Key::Escape:
-                    game.give_up();
+                case Key::Escape:  // конец попытки (D-40)
+                    game.finish(EndReason::GaveUp, k.time);
                     finish_run();
                     go(Screen::GameOver);
                     return false;
@@ -140,9 +146,13 @@ void Flow::update(Nanoseconds now, Vec2 cursor) {
     switch (screen_) {
         case Screen::Countdown:
             if (now >= countdown_started_ + kCountdown) {
-                // Забег — с конца отсчёта, а не с кадра, который его заметил.
-                game_.emplace(mode_, game_settings(profile_.settings), rng_,
-                              countdown_started_ + kCountdown);
+                // Замер — с конца отсчёта, а не с кадра, который его заметил;
+                // у замера свой генератор с записанным началом (D-39).
+                game_.reset();
+                seed_ = (static_cast<std::uint64_t>(seeds_.between(0, INT_MAX)) << 31U) ^
+                        static_cast<std::uint64_t>(seeds_.between(0, INT_MAX));
+                run_random_ = make_random_(seed_);
+                game_.emplace(options_, *run_random_, countdown_started_ + kCountdown);
                 finished_ = false;
                 go(Screen::Game);
             }

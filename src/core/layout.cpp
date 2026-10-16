@@ -6,12 +6,12 @@
 
 namespace aim::core {
 
-double mode_button_entry(int i, Nanoseconds since_enter) {
+double preset_button_entry(int i, Nanoseconds since_enter) {
     return std::clamp((to_ms(since_enter) - i * 80.0) / 400.0, 0.0, 1.0);
 }
 
-Rect mode_button(int i, Nanoseconds since_enter) {
-    const int offset = round_half_even((1 - mode_button_entry(i, since_enter)) * 20);
+Rect preset_button(int i, Nanoseconds since_enter) {
+    const int offset = round_half_even((1 - preset_button_entry(i, since_enter)) * 20);
     const int y = kButtonsY + i * (kButtonH + kButtonGap) + offset;
     return {kButtonsX, y, kButtonsX + kButtonW, y + kButtonH};
 }
@@ -51,7 +51,7 @@ Rect settings_toggle(int row) {
 
 Rect settings_reset() {
     const int x = settings_panel().x1 + (kSettingsW - 180) / 2;
-    const int y = settings_row_y(7) + 6;
+    const int y = settings_row_y(kSettingsResetRow) + 4;
     return {x, y, x + 180, y + 32};
 }
 
@@ -63,7 +63,7 @@ Rect history_panel() {
 
 Rect history_export() {
     const Rect p = history_panel();
-    return {p.x1 + 20, p.y1 + 410, p.x1 + 240, p.y1 + 442};
+    return {p.x1 + 20, p.y1 + 398, p.x1 + 240, p.y1 + 428};
 }
 
 Rect profiles_panel() {

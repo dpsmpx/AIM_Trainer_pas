@@ -1,10 +1,9 @@
 #pragma once
 
-// Главное меню без окна — перенос UpdateMenuInput, StartScreen и
-// SwitchProfile образца (archive/pascal/AIM_Trainer.pas): выбор режима
-// наведением, запуск щелчком по кнопке или плашке, кнопки внизу и панели
-// поверх меню, туториал первого запуска, переключатель эффектов — щелчок
-// по пустому месту. Геометрия — core/layout.h.
+// Главное меню без окна: выбор набора замера наведением, запуск щелчком по
+// кнопке набора или плашке (D-37), кнопки внизу и панели поверх меню,
+// туториал первого запуска, переключатель эффектов — щелчок по пустому
+// месту. Геометрия — core/layout.h.
 //
 // Файлы меню не трогает: что записать и что прочитать, программа берёт из
 // take_requests.
@@ -22,22 +21,20 @@ namespace aim::core {
 
 enum class Panel : std::uint8_t { None, Help, Settings, Records, Achievements, History, Profiles };
 
-/// Записать профиль: изменились настройки, тема, туториал.
+/// Записать профиль: изменились настройки, тема, туториал, набор.
 struct SaveProfile {};
 /// Открыть другой профиль (1…4).
 struct SwitchProfile {
     int number = 1;
 };
-/// Открыта «История»: перечитать историю профиля.
-struct LoadHistory {};
 /// «Экспорт в CSV» в «Истории» (D-33).
 struct ExportHistory {};
 /// Показать папку сохранений в файловом менеджере (D-33).
 struct OpenDataFolder {};
 /// Выбрать папку сохранений системным диалогом (D-33).
 struct ChooseDataFolder {};
-using MenuRequest = std::variant<SaveProfile, SwitchProfile, LoadHistory, ExportHistory,
-                                 OpenDataFolder, ChooseDataFolder>;
+using MenuRequest =
+    std::variant<SaveProfile, SwitchProfile, ExportHistory, OpenDataFolder, ChooseDataFolder>;
 
 /// Шагов туториала первого запуска.
 inline constexpr int kTutorialSteps = 4;
@@ -48,19 +45,20 @@ public:
     /// show_tutorial — туториал при запуске: профиль его ещё не видел.
     Menu(Profile& profile, int profile_number, bool show_tutorial);
 
-    /// Меню показано в момент now: кнопки режимов появляются заново.
+    /// Меню показано в момент now: кнопки наборов появляются заново.
     void enter(Nanoseconds now);
-    /// Курсор над меню: кнопка режима под ним — выбранный режим, если панелей
-    /// и туториала нет (GetModeBtnAt).
+    /// Курсор над меню: кнопка набора под ним — выбранный набор, если
+    /// панелей и туториала нет.
     void hover(Vec2 cursor, Nanoseconds now);
 
-    std::optional<GameMode> click(const ClickInput& click) override;
+    std::optional<MeasureOptions> click(const ClickInput& click) override;
     void key(const KeyInput& key) override;
 
     /// Профиль сменился (программа открыла другой файл).
     void set_profile_number(int number) { profile_number_ = number; }
 
-    [[nodiscard]] int selected_mode() const { return selected_; }
+    /// Набор под курсором или выбранный последним (kPresets).
+    [[nodiscard]] int selected_preset() const { return selected_; }
     [[nodiscard]] Panel panel() const { return panel_; }
     [[nodiscard]] bool tutorial_shown() const { return tutorial_; }
     [[nodiscard]] int tutorial_step() const { return tutorial_step_; }
@@ -73,7 +71,8 @@ private:
     [[nodiscard]] Nanoseconds since_entered(Nanoseconds t) const;
     void close_tutorial();
     void click_settings(Vec2 p);
-    [[nodiscard]] std::optional<GameMode> start_selected() const;
+    /// Начать выбранный набор: он же — набор профиля.
+    MeasureOptions start_selected();
 
     Profile& profile_;
     int profile_number_;

@@ -1,13 +1,14 @@
 #pragma once
 
-// Экраны и переходы между ними — перенос главного цикла образца:
-// StartScreen, CountdownScreen, GameLoop, GameOverScreen
-// (archive/pascal/AIM_Trainer.pas, docs/ARCHITECTURE.md, §2).
+// Экраны и переходы между ними (docs/ARCHITECTURE.md, §12):
 //
-//   меню ──старт──► отсчёт 3 с ──► игра ──конец жизней, бомба, Esc──► Game Over
+//   меню ──старт──► отсчёт 3 с ──► замер ──жизни, время, бомба, Esc──► итог
 //    ▲  ◄──── M ─────┘   ▲          │ R (без записи)                  │ R
 //    │                   └──────────┘──────────────────────────────────┘
-//    └──── M (с записью) из игры; Space или M из Game Over
+//    └──── M (с записью) из замера; Space или M из итога
+//
+// Паузы нет: замер идёт непрерывно (D-40). У каждого замера — свой
+// генератор случайных чисел с записанным началом (D-39).
 //
 // Ввод — события по порядку их времени (щелчки со временем из D-24, клавиши).
 // Событие достаётся экрану, активному в момент разбора; после смены экрана
@@ -16,13 +17,15 @@
 // нажатие во время кадра не теряется (AUD-16).
 
 #include <cstdint>
+#include <functional>
+#include <memory>
 #include <optional>
 #include <span>
 #include <variant>
 #include <vector>
 
 #include "core/game.h"
-#include "core/modes.h"
+#include "core/measure.h"
 #include "core/mouse.h"
 #include "core/profile.h"
 #include "core/random.h"
@@ -34,7 +37,7 @@ namespace aim::core {
 enum class Screen : std::uint8_t { Menu, Countdown, Game, GameOver };
 
 /// Клавиши, которые читают экраны; остальные программа не передаёт.
-enum class Key : std::uint8_t { Escape, Space, P, R, M };
+enum class Key : std::uint8_t { Escape, Space, R, M };
 
 struct ClickInput {
     MouseButton button = MouseButton::Left;
@@ -49,8 +52,8 @@ struct KeyInput {
 
 using Input = std::variant<ClickInput, KeyInput>;
 
-/// Меню: что делает щелчок или клавиша. Полное меню — шаг «Экраны»;
-/// переходам нужно знать только, начат ли режим.
+/// Меню: что делает щелчок или клавиша. Переходам нужно знать только,
+/// начат ли замер и с какими опциями.
 class MenuInput {
 public:
     MenuInput() = default;
@@ -60,9 +63,9 @@ public:
     MenuInput& operator=(MenuInput&&) = delete;
     virtual ~MenuInput() = default;
 
-    /// Щелчок в меню; режим — если щелчок его запускает.
-    virtual std::optional<GameMode> click(const ClickInput& click) = 0;
-    /// Клавиша в меню (Esc закрывает панели — шаг «Экраны»).
+    /// Щелчок в меню; опции замера — если щелчок его запускает.
+    virtual std::optional<MeasureOptions> click(const ClickInput& click) = 0;
+    /// Клавиша в меню (Esc закрывает панели).
     virtual void key(const KeyInput& key) = 0;
 };
 
@@ -76,29 +79,40 @@ struct ScreenChanged {
 struct AchievementUnlocked {
     int id = 0;
 };
-/// Забег окончен и записан в профиль (FinishGameAndSaveStats образца); файлы
-/// пишет программа (app/player_files.h).
+/// Замер окончен и записан в профиль; файлы пишет программа
+/// (app/player_files.h).
 struct RunFinished {
-    GameSummary summary;
-    int leaderboard_place = -1;
+    RunRecord record;
+    bool new_best = false;  ///< лучший замер своего набора (D-38)
 };
 using FlowEvent = std::variant<ScreenChanged, GameEvent, AchievementUnlocked, RunFinished>;
 
+/// Генератор случайных чисел замера по его началу.
+using RandomFactory = std::function<std::unique_ptr<Random>(std::uint64_t seed)>;
+/// EngineRandom(seed).
+std::unique_ptr<Random> engine_random(std::uint64_t seed);
+
 class Flow {
 public:
-    Flow(Profile& profile, Random& rng, MenuInput& menu);
+    /// seeds — источник начал генераторов замеров; make_random — генератор
+    /// замера по началу (тесты дают заданную последовательность). now —
+    /// время записи замера (программа даёт местное время).
+    Flow(Profile& profile, Random& seeds, MenuInput& menu,
+         RandomFactory make_random = engine_random, std::function<LocalTime()> clock = {});
 
     /// Ввод кадра, по порядку времени. now — время кадра.
     void input(std::span<const Input> events, Nanoseconds now);
-    /// Кадр на момент now: отсчёт, забег. cursor — курсор в окне (Tracking).
+    /// Кадр на момент now: отсчёт, замер. cursor — курсор в окне.
     void update(Nanoseconds now, Vec2 cursor);
     /// Кадр на момент frame_time показан в presented_at (D-12).
     void frame_presented(Nanoseconds frame_time, Nanoseconds presented_at);
 
     [[nodiscard]] Screen screen() const { return screen_; }
-    [[nodiscard]] GameMode mode() const { return mode_; }
-    /// Забег — в игре и на Game Over (итоги и тепловая карта); иначе нет.
+    [[nodiscard]] const MeasureOptions& options() const { return options_; }
+    /// Замер — в игре и на итоге (итоги и тепловая карта); иначе нет.
     [[nodiscard]] const Game* game() const;
+    /// Итог последнего записанного замера; нет — пусто.
+    [[nodiscard]] const std::optional<RunFinished>& last_run() const { return last_run_; }
     /// Отсчёт: 3, 2, 1 на момент now; вне отсчёта — 0.
     [[nodiscard]] int countdown_value(Nanoseconds now) const;
 
@@ -114,14 +128,19 @@ private:
     bool handle(const Input& event);
 
     Profile& profile_;
-    Random& rng_;
+    Random& seeds_;
     MenuInput& menu_;
+    RandomFactory make_random_;
+    std::function<LocalTime()> clock_;
     Nanoseconds now_ = 0;    // время разбираемого кадра
-    bool finished_ = false;  // забег уже записан в профиль
+    bool finished_ = false;  // замер уже записан в профиль
     Screen screen_ = Screen::Menu;
-    GameMode mode_ = GameMode::Classic;
+    MeasureOptions options_;
     Nanoseconds countdown_started_ = 0;
+    std::uint64_t seed_ = 0;
+    std::unique_ptr<Random> run_random_;  // раньше game_: замер держит ссылку
     std::optional<Game> game_;
+    std::optional<RunFinished> last_run_;
     std::vector<FlowEvent> events_;
 };
 

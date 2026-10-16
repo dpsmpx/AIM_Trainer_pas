@@ -2,12 +2,12 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <format>
 #include <optional>
 #include <utility>
 #include <variant>
 
 #include "app/game_view.h"
-#include "core/history.h"
 #include "core/palette.h"
 #include "core/rounding.h"
 #include "core/rules.h"
@@ -32,7 +32,6 @@ Screens::Screens(SDL_Window* window, SDL_Renderer* renderer, Text& text, core::P
       rng_(rng),
       menu_(menu),
       sound_(sound) {
-    // Как образец при запуске: шрифт Consolas 14 (здесь — DejaVu, D-22).
     canvas_.font.size = 14;
 }
 
@@ -52,16 +51,6 @@ void Screens::save() {
 
 void Screens::play(core::Beep beep) {
     if (profile_.settings.sound) sound_.beep(beep);
-}
-
-void Screens::open_history() {
-    const std::optional<std::string> csv = files_.read_history();
-    const std::vector<core::SessionRow> rows =
-        csv ? core::read_sessions(*csv) : std::vector<core::SessionRow>{};
-    history_ = {.games = static_cast<int>(rows.size()),
-                .by_time_of_day = core::scores_by_time_of_day(rows),
-                .recent_reactions = core::recent_avg_reactions(rows),
-                .file_name = files_.history_file_name()};
 }
 
 void Screens::take_folder_choice() {
@@ -98,22 +87,35 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
                         menu_.enter(now);
                         menu_view_.enter(rng_, now);
                     } else if (s.to == core::Screen::Game) {
-                        // InitGameState образца: эффекты и след — заново.
+                        // Новый замер: эффекты и след — заново.
                         effects_.clear();
                         trail_.clear();
                     } else if (s.to == core::Screen::GameOver) {
-                        play(core::kGameOverBeep);  // PlayGameOverSound
+                        play(core::kGameOverBeep);
                     }
                 },
                 [&](const core::GameEvent& g) {
                     const int x = core::round_half_even(g.position.x);
                     const int y = core::round_half_even(g.position.y);
                     const core::Rgba color = th.circles.at(static_cast<std::size_t>(g.color));
+                    const bool screen = flow.options().stimulus == core::Stimulus::Screen;
                     switch (g.kind) {
                         case core::GameEventKind::Hit:
-                            effects_.hit(x, y, color, g.points, rng_, now);
                             play(core::kHitBeep);
+                            if (screen) {
+                                // Замер на цвет: реакция — надписью посреди окна.
+                                effects_.label(core::kWindowWidth / 2, core::kWindowHeight / 2,
+                                               std::format("{:.0f} мс", core::to_ms(g.reaction)),
+                                               core::kWhite, now);
+                                break;
+                            }
+                            effects_.hit(x, y, color, g.points, rng_, now);
                             if (g.accuracy >= core::kPreciseHit) effects_.precise_flash(now);
+                            break;
+                        case core::GameEventKind::FalseStart:
+                            play(core::kMissBeep);
+                            effects_.label(core::kWindowWidth / 2, core::kWindowHeight / 2,
+                                           "Фальстарт", core::Rgba{255, 120, 100, 255}, now);
                             break;
                         case core::GameEventKind::Tracked:
                             effects_.hit(x, y, color, g.points, rng_, now);
@@ -133,8 +135,8 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
                 },
                 [&](const core::RunFinished& run) {
                     std::string error;
-                    if (!files_.log_run(run.summary, error))
-                        message("Забег не записан в историю: " + error);
+                    if (!files_.log_run(run.record, error))
+                        message("Замер не записан в историю: " + error);
                     save();
                 },
             },
@@ -150,7 +152,6 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
                            for (std::string& m : messages)
                                message(std::move(m));
                        },
-                       [&](const core::LoadHistory&) { open_history(); },
                        [&](const core::ExportHistory&) {
                            std::string name;
                            std::string error;
@@ -174,9 +175,7 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
     switch (flow.screen()) {
         case core::Screen::Menu: menu_view_.update(now); break;
         case core::Screen::Game:
-            // UpdateCursorTrail — в каждом кадре забега, кроме паузы.
-            if (flow.game() != nullptr && !flow.game()->paused())
-                trail_.add(core::round_half_even(mouse.x), core::round_half_even(mouse.y));
+            trail_.add(core::round_half_even(mouse.x), core::round_half_even(mouse.y));
             break;
         case core::Screen::Countdown:
         case core::Screen::GameOver: break;
@@ -187,20 +186,18 @@ void Screens::render(const core::Flow& flow, core::Vec2 mouse, int fps, core::Na
     const core::Theme& th = theme();
     switch (flow.screen()) {
         case core::Screen::Menu:
-            menu_view_.render(canvas_, toasts_, th, menu_, profile_, history_, files_.folder(),
-                              mouse, now);
+            menu_view_.render(canvas_, toasts_, th, menu_, profile_, files_.folder(), mouse, now);
             break;
         case core::Screen::Countdown: render_countdown(canvas_, th, flow, now); break;
         case core::Screen::Game:
             if (const core::Game* g = flow.game()) {
                 render_game(canvas_, th, *g, effects_, trail_, fps, now);
                 toasts_.render(canvas_, now);
-                if (g->paused()) render_pause(canvas_);
             }
             break;
         case core::Screen::GameOver:
             if (const core::Game* g = flow.game()) {
-                render_game_over(canvas_, th, *g);
+                render_game_over(canvas_, th, *g, flow.last_run(), profile_);
                 toasts_.render(canvas_, now);
             }
             break;

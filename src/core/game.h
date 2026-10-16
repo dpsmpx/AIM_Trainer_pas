@@ -1,25 +1,25 @@
 #pragma once
 
-// Забег — перенос TGameState, ProcessClick и UpdateGame образца
-// (archive/pascal/AIM_Trainer.pas, docs/ARCHITECTURE.md, §7). Отличия —
-// нарочные:
+// Замер — по опциям конструктора (core/measure.h, D-37; docs/ARCHITECTURE.md,
+// §12):
 //
-//   * реакция — от показа первого кадра с целью до времени щелчка (D-12);
-//   * серию обрывает и истёкшая обычная цель (D-14, AUD-26);
+//   * стимул — цель на поле или смена цвета окна;
+//   * реакция — от показа первого кадра со стимулом до времени щелчка (D-12);
+//   * серию обрывает промах и истёкшая обычная цель (D-14);
 //   * щелчки разбираются до обновления кадра и по своему времени: щелчок,
 //     сделанный до истечения цели, засчитывается по ней (AUD-03);
-//   * часы — абсолютные; пауза сдвигает моменты цели, а не копит кадры.
+//   * паузы нет: замер идёт непрерывно (D-40);
+//   * конец — по жизням, по времени, на бомбе или по слову игрока.
 //
-// Что видно игроку и слышно — события (take_events): попадание, промах,
-// бомба, истечение цели, засчитанная наводка. Достижения по ним —
+// Что видно игроку и слышно — события (take_events). Достижения по ним —
 // core/profile.h.
 
 #include <array>
 #include <cstdint>
-#include <deque>
+#include <optional>
 #include <vector>
 
-#include "core/modes.h"
+#include "core/measure.h"
 #include "core/mouse.h"
 #include "core/random.h"
 #include "core/rules.h"
@@ -28,19 +28,13 @@
 
 namespace aim::core {
 
-/// Настройки, с которыми начат забег (из профиля, docs/ARCHITECTURE.md, §8.1).
-struct GameSettings {
-    int circle_size = 40;  ///< «Размер круга»: пик радиуса цели при масштабе 1
-    int lifetime_ms = 1000;  ///< «Время жизни»; режимы — по D-21
-    int lives = 15;          ///< «Жизни»
-};
-
 enum class GameEventKind : std::uint8_t {
-    Hit,      ///< попадание щелчком
-    Miss,     ///< промах щелчком: минус жизнь, серия обнулена
-    Bomb,     ///< щелчок по бомбе: конец забега
-    Expired,  ///< обычная цель истекла: минус жизнь, серия обнулена (D-14)
-    Tracked,  ///< Tracking: цель засчитана наводкой
+    Hit,  ///< попадание щелчком; у замера на цвет — реакция на смену цвета
+    Miss,  ///< промах щелчком: серия обнулена, по жизням — минус жизнь
+    Bomb,  ///< щелчок по бомбе: конец замера
+    Expired,  ///< обычная цель истекла: серия обнулена, по жизням — минус жизнь (D-14)
+    Tracked,  ///< цель засчитана наведением
+    FalseStart,  ///< замер на цвет: щелчок раньше смены цвета — промах
 };
 
 struct GameEvent {
@@ -54,66 +48,90 @@ struct GameEvent {
     int score = 0;             ///< счёт после события
 };
 
-/// Промахи по клеткам окна для экрана Game Over: [столбец][строка].
+/// Почему замер кончился.
+enum class EndReason : std::uint8_t {
+    None,    ///< ещё идёт
+    Lives,   ///< кончились жизни
+    Time,    ///< кончилось время
+    Bomb,    ///< щелчок по бомбе
+    GaveUp,  ///< Esc — конец попытки (D-40)
+    ToMenu,  ///< M — в меню
+};
+
+/// Промахи по клеткам окна для итога замера: [столбец][строка].
 using MissHeatmap = std::array<std::array<int, kHeatmapRows>, kHeatmapCols>;
 
-/// Итог забега — для рекордов, таблицы лидеров, истории и достижений.
+/// Итог замера — для рекордов, истории и достижений (D-38).
 struct GameSummary {
-    GameMode mode = GameMode::Classic;
+    MeasureOptions options;
+    std::uint64_t seed = 0;  ///< начало генератора замера (D-39)
     int score = 0;
     int hits = 0;
     int shots = 0;
-    int misses = 0;  ///< промахи щелчком
+    int misses = 0;   ///< промахи щелчком и фальстарты
+    int expired = 0;  ///< истёкшие обычные цели
+    int tracked = 0;  ///< цели, засчитанные наведением
     int max_combo = 0;
-    double accuracy = 0.0;         ///< попадания / выстрелы, %
-    double avg_reaction_ms = 0.0;  ///< средняя реакция попаданий, мс
-    double precision = 0.0;        ///< средняя точность попаданий, %
-    bool died_to_bomb = false;
-    std::vector<double> reactions_ms;  ///< последние реакции забега, по порядку
+    double accuracy = 0.0;            ///< попадания / выстрелы, %
+    double avg_reaction_ms = 0.0;     ///< средняя реакция попаданий, мс
+    double median_reaction_ms = 0.0;  ///< медиана реакции попаданий, мс
+    double precision = 0.0;           ///< средняя точность попаданий, %
+    int duration_ms = 0;              ///< от начала до конца замера
+    EndReason end = EndReason::None;
+    std::vector<double> reactions_ms;  ///< все реакции замера, по порядку
 };
+
+/// Медиана; пусто — 0.
+double median(std::vector<double> values);
 
 class Game {
 public:
-    /// Забег в режиме mode с момента start; первая цель — сразу и не бомба.
-    Game(GameMode mode, const GameSettings& settings, Random& rng, Nanoseconds start);
+    /// Замер с опциями options с момента start; первая цель — сразу и не
+    /// бомба, у замера на цвет — первая пауза.
+    Game(const MeasureOptions& options, Random& rng, Nanoseconds start);
 
-    /// Щелчок кнопкой в точку окна в момент t. Выстрелы — ЛКМ и ПКМ; другие
-    /// кнопки, Tracking, пауза и законченный забег щелчков не принимают.
+    /// Щелчок кнопкой в точку окна в момент t. По цели — ЛКМ и ПКМ, у
+    /// замера на цвет — ещё и СКМ; наведение и законченный замер щелчков не
+    /// принимают.
     void click(MouseButton button, Vec2 point, Nanoseconds t);
 
-    /// Кадр на момент now: истечение цели, движение и наводка (Tracking),
-    /// конец по жизням. cursor — курсор в окне (Tracking).
+    /// Кадр на момент now: конец по времени, истечение цели, движение и
+    /// наводка. cursor — курсор в окне.
     void update(Nanoseconds now, Vec2 cursor);
 
     /// Кадр, нарисованный на момент frame_time, показан в presented_at (D-12).
     void frame_presented(Nanoseconds frame_time, Nanoseconds presented_at);
 
-    void pause(Nanoseconds now);
-    void resume(Nanoseconds now);
-    /// Esc: забег окончен.
-    void give_up();
+    /// Конец по слову игрока: Esc или M.
+    void finish(EndReason why, Nanoseconds now);
 
-    [[nodiscard]] bool paused() const { return paused_; }
-    [[nodiscard]] bool over() const { return over_; }
-    [[nodiscard]] bool died_to_bomb() const { return died_to_bomb_; }
-    [[nodiscard]] GameMode mode() const { return mode_; }
+    [[nodiscard]] bool over() const { return end_ != EndReason::None; }
+    [[nodiscard]] EndReason end_reason() const { return end_; }
+    [[nodiscard]] const MeasureOptions& options() const { return options_; }
+    [[nodiscard]] bool screen_stimulus() const { return options_.stimulus == Stimulus::Screen; }
     [[nodiscard]] const Target& target() const { return target_; }
+    /// Замер на цвет: окно в момент t — уже другого цвета.
+    [[nodiscard]] bool signal_lit(Nanoseconds t) const { return t >= signal_at_; }
 
     [[nodiscard]] int score() const { return score_; }
     [[nodiscard]] int hits() const { return hits_; }
     [[nodiscard]] int shots() const { return shots_; }
     [[nodiscard]] int misses() const { return misses_; }
     [[nodiscard]] int lives_left() const { return max_lives_ - lost_; }
+    /// Окончание по времени: осталось на момент now.
+    [[nodiscard]] Nanoseconds time_left(Nanoseconds now) const;
     [[nodiscard]] int combo() const { return combo_; }
     [[nodiscard]] int max_combo() const { return max_combo_; }
     /// Попадания / выстрелы, %; без выстрелов — 0.
     [[nodiscard]] double accuracy() const;
     /// Средняя реакция попаданий, мс; без попаданий — 0.
     [[nodiscard]] double avg_reaction_ms() const;
+    /// Медиана реакции попаданий, мс; без попаданий — 0.
+    [[nodiscard]] double median_reaction_ms() const;
     /// Средняя точность попаданий, %; без попаданий — 0.
     [[nodiscard]] double precision() const;
-    /// Последние kReactionHistory реакций забега, старые первыми.
-    [[nodiscard]] const std::deque<Nanoseconds>& reactions() const { return reactions_; }
+    /// Реакции замера, по порядку.
+    [[nodiscard]] const std::vector<Nanoseconds>& reactions() const { return reactions_; }
     [[nodiscard]] const MissHeatmap& miss_heatmap() const { return heatmap_; }
 
     /// События с прошлого вызова, по порядку.
@@ -123,33 +141,42 @@ public:
 
 private:
     void respawn(Nanoseconds now);
-    void lose_life();
+    void next_signal(Nanoseconds from);
+    void lose_life(Nanoseconds at);
+    void end(EndReason why, Nanoseconds at);
     void record_miss(Vec2 point);
+    void click_screen(MouseButton button, Vec2 point, Nanoseconds t);
+    void click_target(MouseButton button, Vec2 point, Nanoseconds t);
+    void hit(Nanoseconds reaction);
 
-    GameMode mode_;
-    ModeRules rules_;
-    int circle_size_;
+    MeasureOptions options_;
+    TargetRules rules_;
     int max_lives_;
     Random& rng_;
     Target target_;
     int spawned_ = 0;
+    // Замер на цвет: когда окно сменит цвет и когда это показано.
+    Nanoseconds signal_at_ = 0;
+    std::optional<Nanoseconds> signal_shown_;
 
+    Nanoseconds start_;
+    Nanoseconds ends_at_ = 0;  // окончание по времени
     Nanoseconds last_update_;
-    Nanoseconds pause_started_ = 0;
-    bool paused_ = false;
-    bool over_ = false;
-    bool died_to_bomb_ = false;
+    Nanoseconds ended_at_ = 0;
+    EndReason end_ = EndReason::None;
 
     int score_ = 0;
     int hits_ = 0;
     int shots_ = 0;
     int misses_ = 0;
+    int expired_ = 0;
+    int tracked_ = 0;
     int lost_ = 0;
     int combo_ = 0;
     int max_combo_ = 0;
     Nanoseconds total_reaction_ = 0;
     double precision_sum_ = 0.0;
-    std::deque<Nanoseconds> reactions_;
+    std::vector<Nanoseconds> reactions_;
     MissHeatmap heatmap_{};
     std::vector<GameEvent> events_;
 };

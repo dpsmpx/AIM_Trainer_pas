@@ -13,8 +13,8 @@
 #include <string>
 #include <vector>
 
-#include "core/history.h"
 #include "core/profile_file.h"
+#include "core/runs.h"
 #include "core/text.h"
 
 namespace aim::app {
@@ -50,14 +50,14 @@ TEST_F(PlayerFilesTest, NewProfileIsWrittenWithDefaults) {
     const core::Profile p = f.load(messages_);
     EXPECT_TRUE(messages_.empty());
     EXPECT_EQ(f.profile_number(), 1);
-    EXPECT_EQ(disk_.read("profile1_stats.ini"),
-              core::write_stats(core::Profile{}, platform::kNewline));
-    EXPECT_EQ(p.settings.lives, core::Profile{}.settings.lives);
+    EXPECT_EQ(disk_.read("profile1.ini"), core::write_profile(core::Profile{}, platform::kNewline));
+    EXPECT_TRUE(p.runs.empty());
+    EXPECT_FALSE(disk_.exists("profile1_runs.csv")) << "история — с первым замером";
 }
 
 TEST_F(PlayerFilesTest, SavedProfileIsReadBack) {
     core::Profile p;
-    p.best_score = 321;
+    p.preset = 4;
     p.settings.theme = 2;
     {
         PlayerFiles f = files();
@@ -67,36 +67,35 @@ TEST_F(PlayerFilesTest, SavedProfileIsReadBack) {
     PlayerFiles again = files();
     const core::Profile read = again.load(messages_);
     EXPECT_TRUE(messages_.empty());
-    EXPECT_EQ(read.best_score, 321);
+    EXPECT_EQ(read.preset, 4);
     EXPECT_EQ(read.settings.theme, 2);
 }
 
-TEST_F(PlayerFilesTest, DamagedProfileIsCopiedAndReset) {
-    const std::string damaged = "[Stats]\nBestScore=много\nGamesPlayed=7\n";
-    ASSERT_TRUE(disk_.write("profile1_stats.ini", damaged, error_)) << error_;
+TEST_F(PlayerFilesTest, ForeignProfileIsCopiedAndReset) {
+    const std::string foreign = "[Stats]\nBestScore=10\nGamesPlayed=7\n";
+    ASSERT_TRUE(disk_.write("profile1.ini", foreign, error_)) << error_;
     PlayerFiles f = files();
     const core::Profile p = f.load(messages_);
-    EXPECT_EQ(p.games_played, 0);
+    EXPECT_EQ(p.preset, core::Profile{}.preset);
     EXPECT_EQ(messages_.size(), 1U);
-    EXPECT_EQ(disk_.read("profile1_corrupt_backup.txt"), damaged);
-    EXPECT_EQ(disk_.read("profile1_stats.ini"),
-              core::write_stats(core::Profile{}, platform::kNewline));
+    EXPECT_EQ(disk_.read("profile1_corrupt_backup.txt"), foreign);
+    EXPECT_EQ(disk_.read("profile1.ini"), core::write_profile(core::Profile{}, platform::kNewline));
 }
 
 TEST_F(PlayerFilesTest, OutOfRangeValueIsResetAndWritten) {
     core::Profile p;
-    p.games_played = 5;
-    std::string text = core::write_stats(p, platform::kNewline);
-    const std::string from = "SetLives=15";
-    text.replace(text.find(from), from.size(), "SetLives=99");
-    ASSERT_TRUE(disk_.write("profile1_stats.ini", text, error_)) << error_;
+    p.preset = 3;
+    std::string text = core::write_profile(p, platform::kNewline);
+    const std::string from = "lives=15";
+    text.replace(text.find(from), from.size(), "lives=99");
+    ASSERT_TRUE(disk_.write("profile1.ini", text, error_)) << error_;
 
     PlayerFiles f = files();
     const core::Profile read = f.load(messages_);
     EXPECT_EQ(messages_.size(), 1U);
-    EXPECT_EQ(read.games_played, 5);
-    EXPECT_EQ(read.settings.lives, core::Profile{}.settings.lives);
-    EXPECT_EQ(disk_.read("profile1_stats.ini"), core::write_stats(read, platform::kNewline));
+    EXPECT_EQ(read.preset, 3);
+    EXPECT_EQ(read.settings.preset.lives, core::Profile{}.settings.preset.lives);
+    EXPECT_EQ(disk_.read("profile1.ini"), core::write_profile(read, platform::kNewline));
 }
 
 TEST_F(PlayerFilesTest, LastProfileIsRemembered) {
@@ -109,7 +108,7 @@ TEST_F(PlayerFilesTest, LastProfileIsRemembered) {
     again.load(messages_);
     EXPECT_TRUE(messages_.empty());
     EXPECT_EQ(again.profile_number(), 3);
-    EXPECT_TRUE(disk_.exists("profile3_stats.ini"));
+    EXPECT_TRUE(disk_.exists("profile3.ini"));
 }
 
 TEST_F(PlayerFilesTest, EffectsFlagDoesNotCarryToNewProfile) {
@@ -121,21 +120,28 @@ TEST_F(PlayerFilesTest, EffectsFlagDoesNotCarryToNewProfile) {
     EXPECT_EQ(other.settings.menu_effects, core::Profile{}.settings.menu_effects);
 }
 
-TEST_F(PlayerFilesTest, HistoryHasOneHeaderAndARowPerRun) {
+TEST_F(PlayerFilesTest, HistoryHasVersionHeaderAndARowPerRunAndIsReadBack) {
     PlayerFiles f = files();
     f.load(messages_);
-    core::GameSummary run;
-    run.mode = core::GameMode::Flick;
-    run.score = 77;
+    core::RunRecord run;
+    run.summary.options = core::preset_options(4, {});
+    run.summary.score = 77;
     ASSERT_TRUE(f.log_run(run, error_)) << error_;
     ASSERT_TRUE(f.log_run(run, error_)) << error_;
 
-    const std::string csv = disk_.read("profile1_sessions.csv").value_or("");
+    const std::string csv = disk_.read("profile1_runs.csv").value_or("");
     const std::vector<std::string_view> lines = core::split_lines(csv);
-    ASSERT_EQ(lines.size(), 3U);
-    EXPECT_EQ(lines[0], core::kSessionsHeader);
-    EXPECT_NE(lines[1].find(",Flick,77,"), std::string_view::npos);
-    EXPECT_EQ(core::read_sessions(csv).size(), 2U);
+    ASSERT_EQ(lines.size(), 4U);
+    EXPECT_EQ(lines[0], core::kRunsVersionLine);
+    EXPECT_EQ(lines[1], core::kRunsHeader);
+    EXPECT_EQ(lines[2], core::run_line(run));
+    // Испорченная строка пропускается, и игрок видит, сколько.
+    ASSERT_TRUE(disk_.append("profile1_runs.csv", std::string("broken\n"), error_)) << error_;
+    PlayerFiles again = files();
+    const core::Profile p = again.load(messages_);
+    EXPECT_EQ(p.runs.size(), 2U);
+    EXPECT_EQ(p.runs.back().summary.score, 77);
+    EXPECT_EQ(messages_.size(), 1U);
 }
 
 TEST_F(PlayerFilesTest, ExportCopiesHistoryNextToProfile) {
@@ -143,12 +149,12 @@ TEST_F(PlayerFilesTest, ExportCopiesHistoryNextToProfile) {
     f.load(messages_);
     std::string name;
     EXPECT_FALSE(f.export_history({}, name, error_)) << "истории ещё нет";
-    core::GameSummary run;
-    run.score = 5;
+    core::RunRecord run;
+    run.summary.score = 5;
     ASSERT_TRUE(f.log_run(run, error_)) << error_;
     ASSERT_TRUE(f.export_history({.year = 2026, .month = 10, .day = 16}, name, error_)) << error_;
     EXPECT_EQ(name, "export_profile1_20261016.csv");
-    EXPECT_EQ(disk_.read(name), disk_.read("profile1_sessions.csv"));
+    EXPECT_EQ(disk_.read(name), disk_.read("profile1_runs.csv"));
 }
 
 TEST_F(PlayerFilesTest, ChangeFolderCopiesFilesAndIsRemembered) {
@@ -156,23 +162,24 @@ TEST_F(PlayerFilesTest, ChangeFolderCopiesFilesAndIsRemembered) {
     {
         PlayerFiles f = files();
         core::Profile p = f.load(messages_);
-        p.best_score = 77;
+        p.settings.preset.lives = 27;
         ASSERT_TRUE(f.save(p, error_)) << error_;
         ASSERT_TRUE(f.log_run({}, error_)) << error_;
         const std::optional<core::Profile> moved = f.change_folder(other, kWhen, messages_);
         ASSERT_TRUE(moved.has_value());
-        EXPECT_EQ(moved.value_or(core::Profile{}).best_score, 77);
+        EXPECT_EQ(moved.value_or(core::Profile{}).settings.preset.lives, 27);
         EXPECT_EQ(f.folder(), other);
     }
     const platform::Storage target(other);
-    EXPECT_TRUE(target.exists("profile1_stats.ini"));
-    EXPECT_TRUE(target.exists("profile1_sessions.csv"));
-    EXPECT_TRUE(disk_.exists("profile1_stats.ini")) << "старая папка не тронута";
+    EXPECT_TRUE(target.exists("profile1.ini"));
+    EXPECT_TRUE(target.exists("profile1_runs.csv"));
+    EXPECT_TRUE(disk_.exists("profile1.ini")) << "старая папка не тронута";
     // Перезапуск: папка — из aim_trainer.ini папки по умолчанию.
     PlayerFiles again = files();
     const core::Profile read = again.load(messages_);
     EXPECT_EQ(again.folder(), other);
-    EXPECT_EQ(read.best_score, 77);
+    EXPECT_EQ(read.settings.preset.lives, 27);
+    EXPECT_EQ(read.runs.size(), 1U);
 }
 
 TEST_F(PlayerFilesTest, ChangeFolderReplacesSavesThereKeepingCopies) {
@@ -180,23 +187,23 @@ TEST_F(PlayerFilesTest, ChangeFolderReplacesSavesThereKeepingCopies) {
     const platform::Storage theirs(other);
     ASSERT_TRUE(SDL_CreateDirectory(other.c_str()));
     core::Profile their_profile;
-    their_profile.best_score = 999;
-    const std::string their_text = core::write_stats(their_profile, platform::kNewline);
-    ASSERT_TRUE(theirs.write("profile1_stats.ini", their_text, error_));
-    ASSERT_TRUE(theirs.write("profile3_stats.ini", their_text, error_));
+    their_profile.settings.preset.lives = 29;
+    const std::string their_text = core::write_profile(their_profile, platform::kNewline);
+    ASSERT_TRUE(theirs.write("profile1.ini", their_text, error_));
+    ASSERT_TRUE(theirs.write("profile3.ini", their_text, error_));
     PlayerFiles f = files();
     core::Profile mine = f.load(messages_);
-    mine.best_score = 5;
+    mine.settings.preset.lives = 5;
     ASSERT_TRUE(f.save(mine, error_)) << error_;
     messages_.clear();
     const std::optional<core::Profile> moved = f.change_folder(other, kWhen, messages_);
     ASSERT_TRUE(moved.has_value());
-    EXPECT_EQ(moved.value_or(core::Profile{}).best_score, 5)
+    EXPECT_EQ(moved.value_or(core::Profile{}).settings.preset.lives, 5)
         << "сохранения прежней папки — в новой";
     const platform::Storage backup(other + "backup_20261016_1532/");
-    EXPECT_EQ(backup.read("profile1_stats.ini"), their_text) << "заменённый файл не потерян";
-    EXPECT_EQ(theirs.read("profile3_stats.ini"), their_text) << "чего в прежней нет — не тронуто";
-    EXPECT_FALSE(backup.exists("profile3_stats.ini"));
+    EXPECT_EQ(backup.read("profile1.ini"), their_text) << "заменённый файл не потерян";
+    EXPECT_EQ(theirs.read("profile3.ini"), their_text) << "чего в прежней нет — не тронуто";
+    EXPECT_FALSE(backup.exists("profile3.ini"));
     ASSERT_GE(messages_.size(), 2U);
     EXPECT_NE(messages_[1].find("backup_20261016_1532"), std::string::npos) << messages_[1];
 }
@@ -207,13 +214,13 @@ TEST_F(PlayerFilesTest, SecondChangeInAMinuteGetsItsOwnBackup) {
     core::Profile p = f.load(messages_);
     // Туда-обратно с правкой профиля: в папке по умолчанию заменяется дважды.
     for (const std::string& to : {other, dir_, other, dir_}) {
-        ++p.best_score;
+        ++p.settings.preset.lives;
         ASSERT_TRUE(f.save(p, error_)) << error_;
         ASSERT_TRUE(f.change_folder(to, kWhen, messages_).has_value()) << to;
     }
-    EXPECT_TRUE(platform::Storage(dir_ + "backup_20261016_1532/").exists("profile1_stats.ini"));
-    EXPECT_TRUE(platform::Storage(dir_ + "backup_20261016_1532_2/").exists("profile1_stats.ini"));
-    EXPECT_EQ(f.load(messages_).best_score, 4);
+    EXPECT_TRUE(platform::Storage(dir_ + "backup_20261016_1532/").exists("profile1.ini"));
+    EXPECT_TRUE(platform::Storage(dir_ + "backup_20261016_1532_2/").exists("profile1.ini"));
+    EXPECT_EQ(f.load(messages_).settings.preset.lives, 19);
 }
 
 TEST_F(PlayerFilesTest, UnreadableOldFolderKeepsTheChoice) {

@@ -1,9 +1,9 @@
 #pragma once
 
-// Файлы игрока программы: профиль, история, экспорт, последний профиль и
-// папка сохранений (D-11, D-30, D-33) — текст из core/profile_file.h и
-// core/history.h, файлы — platform/storage.h. Ошибки записи не молчат
-// (AUD-17): каждая — строка для уведомления игроку.
+// Файлы игрока программы: профиль, история замеров, экспорт, последний
+// профиль и папка сохранений (D-30, D-33, D-38) — текст из
+// core/profile_file.h и core/runs.h, файлы — platform/storage.h. Ошибки
+// записи не молчат (AUD-17): каждая — строка для уведомления игроку.
 //
 // Папок две: по умолчанию — там aim_trainer.ini (последний профиль и
 // выбранная папка), и папка сохранений — там файлы игрока; пока игрок не
@@ -13,10 +13,9 @@
 #include <string>
 #include <vector>
 
-#include "core/game.h"
-#include "core/history.h"
 #include "core/profile.h"
 #include "core/profile_file.h"
+#include "core/runs.h"
 #include "platform/storage.h"
 
 namespace aim::app {
@@ -33,18 +32,19 @@ public:
     /// Папка сохранений из aim_trainer.ini и профиль, открытый последним
     /// (AUD-21). Выбранная папка недоступна — папка по умолчанию и сообщение.
     core::Profile load(std::vector<std::string>& messages);
-    /// Профиль number (1…kProfileCount): он же — последний открытый. Нет
-    /// файла — профиль по умолчанию и записать его, как у образца;
-    /// повреждённый файл — копия profileN_corrupt_backup.txt и то же; поля вне
-    /// диапазона — сброшены и записаны (AUD-07). messages — что сказать игроку.
+    /// Профиль number (1…kProfileCount) с историей замеров: он же —
+    /// последний открытый. Нет файла — профиль по умолчанию и записать его;
+    /// файл не этого формата — копия profileN_corrupt_backup.txt и то же;
+    /// поля вне смысла — сброшены и записаны (AUD-07); испорченные строки
+    /// истории — пропущены. messages — что сказать игроку.
     core::Profile open(int number, std::vector<std::string>& messages);
 
-    /// Записать профиль (и номер последнего). false — error для уведомления.
+    /// Записать профиль без истории (и номер последнего). false — error для
+    /// уведомления.
     bool save(const core::Profile& profile, std::string& error);
-    /// Дописать забег в историю (заголовок — если файла ещё нет).
-    bool log_run(const core::GameSummary& summary, std::string& error);
-    /// История профиля целиком; нет файла — пусто.
-    [[nodiscard]] std::optional<std::string> read_history() const;
+    /// Дописать замер в историю (строка версии и заголовок — если файла ещё
+    /// нет).
+    bool log_run(const core::RunRecord& run, std::string& error);
     /// Имя файла истории профиля.
     [[nodiscard]] std::string history_file_name() const;
 

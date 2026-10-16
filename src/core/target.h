@@ -1,19 +1,18 @@
 #pragma once
 
-// Цель — перенос TCircle образца (archive/pascal/AimCircle.pas,
-// docs/ARCHITECTURE.md, §5). Отличия — нарочные:
+// Цель замера (docs/ARCHITECTURE.md, §12). Правила — из опций замера
+// (core/measure.h, D-37):
 //
-//   * время — абсолютное на часах программы, а не остаток жизни: радиус и
-//     попадание считаются на момент щелчка, а не обработки (AUD-03);
-//   * координаты вещественные, граница Tracking — по своему радиусу и выше
-//     HUD (AUD-04, AUD-18);
+//   * время — абсолютное на часах программы: радиус и попадание считаются
+//     на момент щелчка, а не обработки (AUD-03);
+//   * координаты вещественные, движущаяся цель отскакивает по своему
+//     радиусу и выше HUD (AUD-04, AUD-18);
 //   * засчитать можно только показанную цель: реакция — от первого
-//     показанного кадра с ней (D-12);
-//   * Tracking и Flick — по D-21 (правила режима — core/modes.h).
+//     показанного кадра с ней (D-12).
 
 #include <optional>
 
-#include "core/modes.h"
+#include "core/measure.h"
 #include "core/mouse.h"
 #include "core/random.h"
 #include "core/time.h"
@@ -36,13 +35,13 @@ class Target {
 public:
     /// Новая цель в момент now. prev — центр прежней цели: новая — не ближе
     /// двух своих радиусов, до kSpawnAttempts попыток. allow_bomb — можно ли
-    /// этой цели быть бомбой (не первая цель забега; режим решает сам).
+    /// этой цели быть бомбой (не первая цель замера; правила решают сами).
     ///
     /// Порядок обращений к rng (для тестов): unit — масштаб; between x, y —
-    /// место, по паре на попытку; between(0, 1) — цвет (Dual); unit — бомба
-    /// (если режим и allow_bomb разрешают); unit — направление и between —
-    /// скорость (Tracking).
-    static Target spawn(const ModeRules& rules, int max_radius, Vec2 prev, bool allow_bomb,
+    /// место, по паре на попытку; between(0, 1) — цвет (кнопки по цвету);
+    /// unit — бомба (если правила и allow_bomb разрешают); unit —
+    /// направление и between — скорость (движение).
+    static Target spawn(const TargetRules& rules, int max_radius, Vec2 prev, bool allow_bomb,
                         Nanoseconds now, Random& rng);
 
     /// Радиус в момент t: растущей цели — треугольник 0 → пик → 0 за жизнь,
@@ -58,10 +57,10 @@ public:
     /// половина — к чётному, как у образца.
     [[nodiscard]] int points(double multiplier) const;
 
-    /// Tracking: сдвиг за dt; от края окна и HUD отскакивает по своему радиусу.
+    /// Движение: сдвиг за dt; от края окна и HUD отскакивает по своему радиусу.
     void move(Nanoseconds dt);
 
-    /// Tracking: курсор за dt. На цели наводка копится, вне — тает вдвое
+    /// Наведение: курсор за dt. На цели наводка копится, вне — тает вдвое
     /// быстрее; true — набрано kTrackingHold, цель засчитана.
     bool hover(Vec2 cursor, Nanoseconds dt);
 
@@ -69,24 +68,21 @@ public:
     /// цель в нём видна впервые — отсюда реакция (D-12).
     void mark_shown(Nanoseconds frame_time, Nanoseconds presented_at);
 
-    /// Сдвинуть все моменты цели на by — время паузы не идёт в жизнь цели.
-    void shift(Nanoseconds by);
-
     [[nodiscard]] Vec2 center() const { return center_; }
     [[nodiscard]] Vec2 velocity() const { return velocity_; }
     [[nodiscard]] double size_factor() const { return size_factor_; }
     [[nodiscard]] int peak_radius() const { return peak_radius_; }
-    /// 0 — синяя (ЛКМ), 1 — красная (ПКМ, только Dual).
+    /// 0 — синяя (ЛКМ), 1 — красная (ПКМ, только кнопки по цвету).
     [[nodiscard]] int color() const { return color_; }
     [[nodiscard]] bool is_bomb() const { return bomb_; }
     [[nodiscard]] Nanoseconds spawned_at() const { return spawned_at_; }
     [[nodiscard]] Nanoseconds expires_at() const { return expires_at_; }
     [[nodiscard]] std::optional<Nanoseconds> shown_at() const { return shown_at_; }
-    /// Tracking: накопленная наводка.
+    /// Наведение: накопленная наводка.
     [[nodiscard]] Nanoseconds hover_progress() const { return hover_; }
 
 private:
-    ModeRules rules_;
+    TargetRules rules_;
     Vec2 center_;
     Vec2 velocity_;  // px/с
     double size_factor_ = 1.0;
