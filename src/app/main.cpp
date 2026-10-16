@@ -10,6 +10,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
+#include <algorithm>
 #include <charconv>
 #include <cstdint>
 #include <format>
@@ -36,6 +37,11 @@ using aim::core::kDarkBackground;
 constexpr const char* kTitle = "Aim Trainer";
 // Ожидание события, пока рисовать нечего: каркас не крутит кадры впустую.
 constexpr Sint32 kIdleWaitMs = 16;
+// Сырое нажатие и событие SDL приходят в разные потоки одновременно, и
+// изредка событие разбирается раньше, чем поток сырого ввода поставил метку
+// (под Wine — 2 клика из 300, метка позже на 0,1–0,9 мс). Тогда сырое нажатие
+// ждём, но не дольше этого и пока оно ещё может попасть в окно сопоставления.
+constexpr Nanoseconds kRawWaitNs = 2'000'000;
 
 struct Options {
     int frames = 0;  // 0 — до закрытия окна
@@ -150,6 +156,20 @@ int main(int argc, char* argv[]) {
                 clicks.add(press);
             fresh.clear();
         };
+        const auto click_time = [&](MouseButton button, Nanoseconds event_time) {
+            take_raw();
+            ClickTime click = clicks.resolve(button, event_time);
+            const Nanoseconds deadline =
+                std::min(SDL_GetTicksNS() + kRawWaitNs, event_time + ClickTimer::kRawAfterEvent);
+            for (Nanoseconds now = SDL_GetTicksNS();
+                 click.source == ClickTimeSource::Event && raw_mouse.active() && now < deadline;
+                 now = SDL_GetTicksNS()) {
+                raw_mouse.wait_for_press(deadline - now);
+                take_raw();
+                click = clicks.resolve(button, event_time);
+            }
+            return click;
+        };
 
         bool running = true;
         int frame = 0;
@@ -169,9 +189,8 @@ int main(int argc, char* argv[]) {
                         // у них нет (D-24).
                         const bool from_mouse = event.button.which != SDL_TOUCH_MOUSEID &&
                                                 event.button.which != SDL_PEN_MOUSEID;
-                        take_raw();
                         const ClickTime click =
-                            from_mouse ? clicks.resolve(*button, event.button.timestamp)
+                            from_mouse ? click_time(*button, event.button.timestamp)
                                        : ClickTime{event.button.timestamp, ClickTimeSource::Event};
                         SDL_SetWindowTitle(window,
                                            describe_click(*button, event.button.x, event.button.y,

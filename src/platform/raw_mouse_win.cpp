@@ -13,6 +13,7 @@
 #include <windows.h>
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstddef>
 #include <mutex>
@@ -62,7 +63,8 @@ struct RawMouse::Impl {
     bool started = false;  // под mutex; active и problem пишутся до него
     bool active = false;
     std::string problem;
-    std::vector<core::RawPress> queue;  // под mutex
+    std::vector<core::RawPress> queue;   // под mutex
+    std::condition_variable pressed_cv;  // в queue новые нажатия
 
     void run();
     void handle(HRAWINPUT input, core::Nanoseconds time);
@@ -154,18 +156,21 @@ void RawMouse::Impl::handle(HRAWINPUT input, core::Nanoseconds time) {
     // перестановка — как у SDL (WIN_SwapButtons): у события без устройства
     // (сенсорная панель, SendInput) кнопки уже переставлены.
     const bool swap = data.header.hDevice != nullptr && GetSystemMetrics(SM_SWAPBUTTON) != 0;
-    const std::lock_guard lock(mutex);
-    const auto push = [&](MouseButton button) {
-        if (queue.size() >= kMaxQueued) queue.erase(queue.begin());
-        queue.push_back({time, button});
-    };
-    if ((flags & RI_MOUSE_LEFT_BUTTON_DOWN) != 0)
-        push(swap ? MouseButton::Right : MouseButton::Left);
-    if ((flags & RI_MOUSE_RIGHT_BUTTON_DOWN) != 0)
-        push(swap ? MouseButton::Left : MouseButton::Right);
-    if ((flags & RI_MOUSE_MIDDLE_BUTTON_DOWN) != 0) push(MouseButton::Middle);
-    if ((flags & RI_MOUSE_BUTTON_4_DOWN) != 0) push(MouseButton::X1);
-    if ((flags & RI_MOUSE_BUTTON_5_DOWN) != 0) push(MouseButton::X2);
+    {
+        const std::lock_guard lock(mutex);
+        const auto push = [&](MouseButton button) {
+            if (queue.size() >= kMaxQueued) queue.erase(queue.begin());
+            queue.push_back({time, button});
+        };
+        if ((flags & RI_MOUSE_LEFT_BUTTON_DOWN) != 0)
+            push(swap ? MouseButton::Right : MouseButton::Left);
+        if ((flags & RI_MOUSE_RIGHT_BUTTON_DOWN) != 0)
+            push(swap ? MouseButton::Left : MouseButton::Right);
+        if ((flags & RI_MOUSE_MIDDLE_BUTTON_DOWN) != 0) push(MouseButton::Middle);
+        if ((flags & RI_MOUSE_BUTTON_4_DOWN) != 0) push(MouseButton::X1);
+        if ((flags & RI_MOUSE_BUTTON_5_DOWN) != 0) push(MouseButton::X2);
+    }
+    pressed_cv.notify_one();
 }
 
 RawMouse::RawMouse() : impl_(std::make_unique<Impl>()) {
@@ -212,6 +217,14 @@ void RawMouse::drain(std::vector<core::RawPress>& out) {
     const std::lock_guard lock(impl_->mutex);
     out.insert(out.end(), impl_->queue.begin(), impl_->queue.end());
     impl_->queue.clear();
+}
+
+bool RawMouse::wait_for_press(core::Nanoseconds timeout) {
+    if (!impl_->active) return false;
+    std::unique_lock lock(impl_->mutex);
+    return impl_->pressed_cv.wait_for(
+        lock, std::chrono::nanoseconds(static_cast<std::chrono::nanoseconds::rep>(timeout)),
+        [this] { return !impl_->queue.empty(); });
 }
 
 }  // namespace aim::platform

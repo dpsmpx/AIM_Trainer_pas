@@ -42,6 +42,10 @@ public:
     /// Дописать в out нажатия, пришедшие с прошлого вызова, по порядку времени.
     void drain(std::vector<core::RawPress>& out);
 
+    /// Ждать нажатия не дольше timeout, нс: true — есть нажатия для drain.
+    /// Поток будит ожидание сразу, как поставил метку. Без потока — сразу false.
+    bool wait_for_press(core::Nanoseconds timeout);
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

@@ -22,4 +22,8 @@ const std::string& RawMouse::problem() const {
 
 void RawMouse::drain(std::vector<core::RawPress>& /*out*/) {}
 
+bool RawMouse::wait_for_press(core::Nanoseconds /*timeout*/) {
+    return false;
+}
+
 }  // namespace aim::platform

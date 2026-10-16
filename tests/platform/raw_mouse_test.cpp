@@ -27,6 +27,14 @@ TEST_F(RawMouseTest, StartsAndRegistersMouse) {
     mouse.drain(presses);  // без нажатий — пусто, но и не падает
 }
 
+TEST_F(RawMouseTest, WaitWithoutPressesTimesOut) {
+    RawMouse mouse;
+    ASSERT_TRUE(mouse.active()) << mouse.problem();
+    const Uint64 start = SDL_GetTicksNS();
+    EXPECT_FALSE(mouse.wait_for_press(2'000'000));
+    EXPECT_GE(SDL_GetTicksNS() - start, 1'000'000U);  // ждало, а не вернулось сразу
+}
+
 TEST_F(RawMouseTest, OnlyOneReceiverPerProcess) {
     const RawMouse first;
     const RawMouse second;
@@ -53,6 +61,9 @@ TEST_F(RawMouseTest, NotAvailableOutsideWindows) {
     std::vector<core::RawPress> presses;
     mouse.drain(presses);
     EXPECT_TRUE(presses.empty());
+    const Uint64 start = SDL_GetTicksNS();
+    EXPECT_FALSE(mouse.wait_for_press(1'000'000'000));
+    EXPECT_LT(SDL_GetTicksNS() - start, 100'000'000U);  // без потока — сразу, а не через секунду
 }
 
 #endif
