@@ -5,6 +5,7 @@
 compile_commands.json
 .cache/
 CMakeUserPresets.json
+__pycache__/
 
 # Сборка PascalABC.NET
 *.exe
