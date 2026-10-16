@@ -78,7 +78,10 @@ aim_own_code(aim_platform)
 
 # Программа: окно и главный цикл. WIN32 — без окна консоли; WinMain даёт
 # SDL_main.h.
-add_executable(AimTrainer WIN32 src/app/main.cpp)
+add_executable(AimTrainer WIN32
+    src/app/draw.cpp
+    src/app/main.cpp
+    src/app/screens.cpp)
 target_link_libraries(AimTrainer PRIVATE aim_platform)
 aim_own_code(AimTrainer)
 

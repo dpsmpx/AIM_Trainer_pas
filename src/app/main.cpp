@@ -1,6 +1,8 @@
-// Aim Trainer, C++-версия — каркас (D-08, D-25): окно 800×600 (D-02), главный
-// цикл и время клика из своего потока сырого ввода (D-24). Экраны и режимы —
-// следующие шаги переноса (ROADMAP/ROADMAP.md, task-cpp).
+// Aim Trainer, C++-версия (D-08, D-25): окно 800×600 (D-02) и главный цикл.
+// Шаг «Время и ввод»: часы кадра — SDL_GetTicksNS; щелчок — точка из события
+// SDL и время из своего потока сырого ввода (D-24); клавиши — события, по
+// физическому положению; реакция — от показа кадра с целью (D-12). Экраны
+// пока временные (app/screens.h); профиль — в памяти до шага «Файлы профиля».
 //
 //   AimTrainer [--frames N] [--screenshot файл.bmp]
 //
@@ -18,9 +20,14 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <variant>
 #include <vector>
 
+#include "app/screens.h"
 #include "core/click_time.h"
+#include "core/flow.h"
+#include "core/profile.h"
+#include "core/random.h"
 #include "core/screen.h"
 #include "platform/raw_mouse.h"
 
@@ -32,16 +39,17 @@ using aim::core::ClickTimeSource;
 using aim::core::MouseButton;
 using aim::core::Nanoseconds;
 
-using aim::core::kDarkBackground;
-
 constexpr const char* kTitle = "Aim Trainer";
-// Ожидание события, пока рисовать нечего: каркас не крутит кадры впустую.
-constexpr Sint32 kIdleWaitMs = 16;
 // Сырое нажатие и событие SDL приходят в разные потоки одновременно, и
 // изредка событие разбирается раньше, чем поток сырого ввода поставил метку
 // (под Wine — 2 клика из 300, метка позже на 0,1–0,9 мс). Тогда сырое нажатие
 // ждём, но не дольше этого и пока оно ещё может попасть в окно сопоставления.
 constexpr Nanoseconds kRawWaitNs = 2'000'000;
+// Предел частоты кадров — как у образца (TARGET_FPS = 240, LimitFrameRate):
+// цикл не жжёт ядро впустую, а кадр короче, чем у любого монитора.
+constexpr Nanoseconds kMinFrame = 1'000'000'000 / 240;
+// Уведомление о достижении — 3 с, как у образца.
+constexpr Nanoseconds kToastTime = 3'000'000'000;
 
 struct Options {
     int frames = 0;  // 0 — до закрытия окна
@@ -75,6 +83,19 @@ std::optional<MouseButton> to_button(Uint8 sdl_button) {
         case SDL_BUTTON_RIGHT: return MouseButton::Right;
         case SDL_BUTTON_X1: return MouseButton::X1;
         case SDL_BUTTON_X2: return MouseButton::X2;
+        default: return std::nullopt;
+    }
+}
+
+// Клавиши — по физическому положению (scancode), как виртуальные коды
+// образца: P, R, M работают и в русской раскладке.
+std::optional<aim::core::Key> to_key(SDL_Scancode scancode) {
+    switch (scancode) {
+        case SDL_SCANCODE_ESCAPE: return aim::core::Key::Escape;
+        case SDL_SCANCODE_SPACE: return aim::core::Key::Space;
+        case SDL_SCANCODE_P: return aim::core::Key::P;
+        case SDL_SCANCODE_R: return aim::core::Key::R;
+        case SDL_SCANCODE_M: return aim::core::Key::M;
         default: return std::nullopt;
     }
 }
@@ -115,6 +136,25 @@ bool save_screenshot(SDL_Renderer* renderer, const std::string& path) {
     return saved;
 }
 
+// Частота кадров для HUD: кадров за последнюю целую секунду.
+class FpsCounter {
+public:
+    void frame(Nanoseconds now) {
+        ++count_;
+        if (now - since_ >= 1'000'000'000) {
+            fps_ = count_;
+            count_ = 0;
+            since_ = now;
+        }
+    }
+    [[nodiscard]] int fps() const { return fps_; }
+
+private:
+    Nanoseconds since_ = 0;
+    int count_ = 0;
+    int fps_ = 0;
+};
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -136,6 +176,7 @@ int main(int argc, char* argv[]) {
         SDL_Quit();
         return 1;
     }
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
     int status = 0;
     {
@@ -145,8 +186,13 @@ int main(int argc, char* argv[]) {
                 SDL_VERSIONNUM_MAJOR(SDL_GetVersion()), SDL_VERSIONNUM_MINOR(SDL_GetVersion()),
                 SDL_VERSIONNUM_MICRO(SDL_GetVersion()), SDL_GetRendererName(renderer),
                 raw_state.c_str());
-        SDL_SetWindowTitle(
-            window, std::format("{} — каркас C++: сырой ввод мыши {}", kTitle, raw_state).c_str());
+        SDL_SetWindowTitle(window,
+                           std::format("{} — C++: сырой ввод мыши {}", kTitle, raw_state).c_str());
+
+        aim::core::Profile profile;
+        aim::core::EngineRandom rng(SDL_GetPerformanceCounter());
+        aim::app::TempMenu menu;
+        aim::core::Flow flow(profile, rng, menu);
 
         ClickTimer clicks;
         std::vector<aim::core::RawPress> fresh;
@@ -171,17 +217,26 @@ int main(int argc, char* argv[]) {
             return click;
         };
 
+        FpsCounter fps;
+        aim::app::Overlay overlay;
+        Nanoseconds toast_until = 0;
+        std::vector<aim::core::Input> inputs;
         bool running = true;
         int frame = 0;
         while (running) {
+            const Nanoseconds frame_start = SDL_GetTicksNS();
+            inputs.clear();
             SDL_Event event;
-            bool have_event = SDL_WaitEventTimeout(&event, kIdleWaitMs);
-            while (have_event) {
+            while (SDL_PollEvent(&event)) {
                 switch (event.type) {
                     case SDL_EVENT_QUIT: running = false; break;
-                    case SDL_EVENT_KEY_DOWN:
-                        if (event.key.key == SDLK_ESCAPE) running = false;
+                    case SDL_EVENT_KEY_DOWN: {
+                        if (event.key.repeat) break;
+                        if (const auto key = to_key(event.key.scancode))
+                            inputs.emplace_back(
+                                aim::core::KeyInput{.key = *key, .time = event.key.timestamp});
                         break;
+                    }
                     case SDL_EVENT_MOUSE_BUTTON_DOWN: {
                         const std::optional<MouseButton> button = to_button(event.button.button);
                         if (!button) break;
@@ -196,18 +251,35 @@ int main(int argc, char* argv[]) {
                                            describe_click(*button, event.button.x, event.button.y,
                                                           event.button.timestamp, click)
                                                .c_str());
+                        inputs.emplace_back(
+                            aim::core::ClickInput{.button = *button,
+                                                  .position = {event.button.x, event.button.y},
+                                                  .time = click.time});
                         break;
                     }
                     default: break;
                 }
-                have_event = SDL_PollEvent(&event);
             }
             take_raw();
-            clicks.forget_old(SDL_GetTicksNS());
 
-            SDL_SetRenderDrawColor(renderer, kDarkBackground.r, kDarkBackground.g,
-                                   kDarkBackground.b, SDL_ALPHA_OPAQUE);
-            SDL_RenderClear(renderer);
+            const Nanoseconds now = SDL_GetTicksNS();
+            clicks.forget_old(now);
+            float mx = 0;
+            float my = 0;
+            SDL_GetMouseState(&mx, &my);
+            flow.input(inputs, now);
+            flow.update(now, {mx, my});
+            for (const aim::core::FlowEvent& e : flow.take_events()) {
+                if (const auto* a = std::get_if<aim::core::AchievementUnlocked>(&e)) {
+                    overlay.toast = std::format("Achievement unlocked: {} of {}", a->id + 1,
+                                                aim::core::kAchievementCount);
+                    toast_until = now + kToastTime;
+                }
+            }
+            if (now >= toast_until) overlay.toast.clear();
+            overlay.fps = fps.fps();
+
+            aim::app::render(renderer, flow, profile, now, overlay);
             ++frame;
             const bool last = options->frames > 0 && frame >= options->frames;
             if (last && !options->screenshot.empty() &&
@@ -216,7 +288,13 @@ int main(int argc, char* argv[]) {
                 status = 1;
             }
             SDL_RenderPresent(renderer);
+            // Кадр нарисован на момент now и показан сейчас: отсюда реакция (D-12).
+            flow.frame_presented(now, SDL_GetTicksNS());
+            fps.frame(now);
             if (last) running = false;
+
+            const Nanoseconds spent = SDL_GetTicksNS() - frame_start;
+            if (spent < kMinFrame) SDL_DelayPrecise(kMinFrame - spent);
         }
     }
 

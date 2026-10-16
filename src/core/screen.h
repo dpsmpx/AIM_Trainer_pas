@@ -3,7 +3,7 @@
 // Окно и фон — общие для программы и её проверок (AUD-22: константы не
 // дублируются).
 
-#include <cstdint>
+#include "core/palette.h"
 
 namespace aim::core {
 
@@ -11,14 +11,7 @@ namespace aim::core {
 constexpr int kWindowWidth = 800;
 constexpr int kWindowHeight = 600;
 
-struct Rgb {
-    std::uint8_t r = 0;
-    std::uint8_t g = 0;
-    std::uint8_t b = 0;
-};
-
-/// Фон темы «Тёмная» оригинала (InitThemes в AIM_Trainer.pas); темы целиком —
-/// шаг «Экраны».
-constexpr Rgb kDarkBackground{28, 28, 32};
+/// Фон темы «Тёмная» — темы по умолчанию.
+inline constexpr Rgba kDarkBackground = kThemes[0].background;
 
 }  // namespace aim::core

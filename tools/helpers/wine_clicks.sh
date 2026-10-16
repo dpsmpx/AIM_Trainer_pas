@@ -32,7 +32,7 @@ setsid wine "$EXE" >/dev/null 2>&1 &
 W=
 for _ in $(seq 1 60); do
     W="$(xdotool search --name "Aim Trainer" 2>/dev/null | head -1 || true)"
-    if [ -n "$W" ] && xdotool getwindowname "$W" 2>/dev/null | grep -q 'каркас'; then break; fi
+    if [ -n "$W" ] && xdotool getwindowname "$W" 2>/dev/null | grep -q 'C++'; then break; fi
     sleep 0.5
 done
 [ -n "$W" ] || { echo "окно не появилось" >&2; exit 1; }

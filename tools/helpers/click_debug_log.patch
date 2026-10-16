@@ -13,11 +13,10 @@ time pending», src 0 — сырой ввод, 1 — событие SDL). Так
     git apply -R tools/helpers/click_debug_log.patch
 
 Журнал — в каталоге запуска (под Wine — текущий каталог скрипта).
-Снят с src/app/main.cpp коммита 7e1559c; git apply пропускает этот текст.
-
+Снят с src/app/main.cpp шага «Время и ввод» (после 3a6441a); git apply пропускает этот текст.
 --- a/src/app/main.cpp
 +++ b/src/app/main.cpp
-@@ -12,6 +12,7 @@
+@@ -14,6 +14,7 @@
  
  #include <algorithm>
  #include <charconv>
@@ -25,7 +24,7 @@ time pending», src 0 — сырой ввод, 1 — событие SDL). Так
  #include <cstdint>
  #include <format>
  #include <optional>
-@@ -26,6 +27,9 @@
+@@ -33,6 +34,9 @@
  
  namespace {
  
@@ -35,7 +34,7 @@ time pending», src 0 — сырой ввод, 1 — событие SDL). Так
  using aim::core::ClickTime;
  using aim::core::ClickTimer;
  using aim::core::ClickTimeSource;
-@@ -152,8 +156,13 @@
+@@ -198,8 +202,13 @@
          std::vector<aim::core::RawPress> fresh;
          const auto take_raw = [&] {
              raw_mouse.drain(fresh);
@@ -50,7 +49,7 @@ time pending», src 0 — сырой ввод, 1 — событие SDL). Так
              fresh.clear();
          };
          const auto click_time = [&](MouseButton button, Nanoseconds event_time) {
-@@ -192,6 +201,13 @@
+@@ -247,6 +256,13 @@
                          const ClickTime click =
                              from_mouse ? click_time(*button, event.button.timestamp)
                                         : ClickTime{event.button.timestamp, ClickTimeSource::Event};
