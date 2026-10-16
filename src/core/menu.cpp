@@ -17,7 +17,7 @@ Menu::Menu(Profile& profile, int profile_number, bool show_tutorial)
     : profile_(profile),
       profile_number_(profile_number),
       tutorial_(show_tutorial),
-      selected_(std::clamp(profile.preset, 0, kPresetCount - 1)) {}
+      selected_(std::clamp(profile.preset, 0, kMenuItems - 1)) {}
 
 void Menu::enter(Nanoseconds now) {
     entered_at_ = now;
@@ -25,7 +25,7 @@ void Menu::enter(Nanoseconds now) {
 
 void Menu::hover(Vec2 cursor, Nanoseconds now) {
     if (tutorial_ || panel_ != Panel::None) return;
-    for (int i = 0; i < kPresetCount; ++i) {
+    for (int i = 0; i < kMenuItems; ++i) {
         if (preset_button(i, since_entered(now)).contains(cursor)) {
             selected_ = i;
             return;
@@ -125,6 +125,7 @@ std::optional<MeasureOptions> Menu::click(const ClickInput& click) {
             if (!profiles_panel().contains(p)) panel_ = Panel::None;
             return std::nullopt;
         case Panel::Settings: click_settings(p); return std::nullopt;
+        case Panel::Constructor: return click_constructor(p);
         case Panel::None: break;
     }
     constexpr std::array<std::pair<MiniButton, Panel>, 6> kOpens{{
@@ -142,9 +143,14 @@ std::optional<MeasureOptions> Menu::click(const ClickInput& click) {
             return std::nullopt;
         }
     }
-    for (int i = 0; i < kPresetCount; ++i) {
+    for (int i = 0; i < kMenuItems; ++i) {
         if (preset_button(i, since_entered(click.time)).contains(p)) {
             selected_ = i;
+            // «Свой набор» сперва открывает конструктор; набор — сразу замер.
+            if (i == kCustomItem) {
+                panel_ = Panel::Constructor;
+                return std::nullopt;
+            }
             return start_selected();
         }
     }
@@ -157,6 +163,41 @@ std::optional<MeasureOptions> Menu::click(const ClickInput& click) {
 
 void Menu::scroll_help(int lines) {
     help_scroll_ = std::clamp(help_scroll_ + lines, 0, kHelpMaxScroll);
+}
+
+std::optional<MeasureOptions> Menu::click_constructor(Vec2 p) {
+    MeasureOptions& o = profile_.custom;
+    // Заготовка — набор с общими настройками: только заполняет опции.
+    for (int i = 0; i < kPresetCount; ++i) {
+        if (constructor_preset(i).contains(p)) {
+            o = preset_options(i, profile_.settings.preset);
+            requests_.emplace_back(SaveProfile{});
+            return std::nullopt;
+        }
+    }
+    for (int r = 0; r < kOptionRows; ++r) {
+        const auto row = static_cast<OptionRow>(r);
+        // Опция, которая к замеру не относится, не правится.
+        if (!constructor_row(r).contains(p) || !option_applies(o, row)) continue;
+        if (option_toggles(row)) {
+            toggle_option(o, row);
+        } else if (constructor_minus(r).contains(p)) {
+            step_option(o, row, -1);
+        } else if (constructor_plus(r).contains(p)) {
+            step_option(o, row, 1);
+        } else {
+            return std::nullopt;
+        }
+        requests_.emplace_back(SaveProfile{});
+        return std::nullopt;
+    }
+    if (constructor_start().contains(p)) {
+        panel_ = Panel::None;
+        selected_ = kCustomItem;
+        return start_selected();
+    }
+    if (!constructor_panel().contains(p)) panel_ = Panel::None;
+    return std::nullopt;
 }
 
 void Menu::click_records(Vec2 p) {

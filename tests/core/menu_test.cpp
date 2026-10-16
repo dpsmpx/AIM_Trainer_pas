@@ -120,6 +120,56 @@ TEST_F(MenuTest, InformationPanelsCloseOnAnyClick) {
     }
 }
 
+TEST_F(MenuTest, CustomItemOpensConstructorAndStartsItsOptions) {
+    // «Свой набор» — шестая кнопка: щелчок открывает конструктор, а не замер.
+    EXPECT_EQ(menu_.click(click_at(center(preset_button(kCustomItem, kLater)))), std::nullopt);
+    ASSERT_EQ(menu_.panel(), Panel::Constructor);
+    EXPECT_EQ(menu_.selected_preset(), kCustomItem);
+    menu_.take_requests();
+    // Заготовка «Флик» заполняет опции, ничего не запуская.
+    menu_.click(click_at(center(constructor_preset(4))));
+    EXPECT_EQ(profile_.custom, preset_options(4, profile_.settings.preset));
+    // Переключатель и шаги.
+    menu_.click(click_at(center(constructor_row(static_cast<int>(OptionRow::Ending)))));
+    EXPECT_EQ(profile_.custom.ending, Ending::Time);
+    const int amount = static_cast<int>(OptionRow::Amount);
+    menu_.click(click_at(center(constructor_plus(amount))));
+    EXPECT_EQ(profile_.custom.duration_s, 70);
+    menu_.click(click_at(center(constructor_minus(amount))));
+    menu_.click(click_at(center(constructor_minus(amount))));
+    EXPECT_EQ(profile_.custom.duration_s, 50);
+    // Щелчок по строке мимо «−»/«+» — ничего.
+    menu_.click(click_at(center(constructor_row(amount))));
+    EXPECT_EQ(profile_.custom.duration_s, 50);
+    EXPECT_EQ(count<SaveProfile>(menu_.take_requests()), 5) << "каждая правка записывается";
+    // Опция не к замеру не правится: у смены цвета размера цели нет.
+    menu_.click(click_at(center(constructor_row(static_cast<int>(OptionRow::Stimulus)))));
+    const int size = static_cast<int>(OptionRow::Size);
+    menu_.click(click_at(center(constructor_plus(size))));
+    EXPECT_EQ(profile_.custom.target_size, 40);
+    menu_.click(click_at(center(constructor_row(static_cast<int>(OptionRow::Stimulus)))));
+    // «Начать замер» — опции «Своего набора», панель закрыта, пункт запомнен.
+    const std::optional<MeasureOptions> started =
+        menu_.click(click_at(center(constructor_start())));
+    ASSERT_TRUE(started.has_value());
+    EXPECT_EQ(started.value_or(MeasureOptions{}), normalized(profile_.custom));
+    EXPECT_EQ(started.value_or(MeasureOptions{}).duration_s, 50);
+    EXPECT_FALSE(started.value_or(MeasureOptions{}).grows) << "Флик — сразу полная";
+    EXPECT_EQ(menu_.panel(), Panel::None);
+    EXPECT_EQ(profile_.preset, kCustomItem);
+    // Плашка при выбранном «Своём наборе» запускает его же.
+    EXPECT_EQ(menu_.click(click_at(center(kPlate))), normalized(profile_.custom));
+}
+
+TEST_F(MenuTest, ConstructorClosesOnClickOutsideAndEsc) {
+    menu_.click(click_at(center(preset_button(kCustomItem, kLater))));
+    menu_.click(click_at({5, 5}));
+    EXPECT_EQ(menu_.panel(), Panel::None);
+    menu_.click(click_at(center(preset_button(kCustomItem, kLater))));
+    menu_.key({.key = Key::Escape, .time = kLater});
+    EXPECT_EQ(menu_.panel(), Panel::None);
+}
+
 TEST_F(MenuTest, RecordsRowAsksForItsReplay) {
     // Два набора в истории: свежий — сверху (D-38).
     RunRecord classic;

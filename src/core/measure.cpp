@@ -128,16 +128,153 @@ MeasureOptions preset_options(int index, const PresetSettings& settings) {
     return normalized(o);
 }
 
-std::optional<std::string_view> preset_name(const MeasureOptions& options) {
+std::optional<int> preset_index(const MeasureOptions& options) {
     const MeasureOptions o = normalized(options);
-    for (const Preset& preset : kPresets) {
-        const MeasureOptions p = normalized(preset.options);
+    for (int i = 0; i < kPresetCount; ++i) {
+        const MeasureOptions p = normalized(kPresets.at(static_cast<std::size_t>(i)).options);
         if (o.stimulus == p.stimulus && o.action == p.action &&
             o.color_buttons == p.color_buttons && o.moving == p.moving && o.grows == p.grows &&
             o.bombs == p.bombs)
-            return preset.name;
+            return i;
     }
     return std::nullopt;
+}
+
+std::optional<std::string_view> preset_name(const MeasureOptions& options) {
+    if (const std::optional<int> i = preset_index(options))
+        return kPresets.at(static_cast<std::size_t>(*i)).name;
+    return std::nullopt;
+}
+
+int preset_like(const MeasureOptions& options) {
+    if (const std::optional<int> i = preset_index(options)) return *i;
+    const MeasureOptions o = normalized(options);
+    if (o.stimulus == Stimulus::Screen) return 0;
+    if (o.action == Action::Hover) return 3;
+    if (o.color_buttons) return 2;
+    if (!o.grows) return 4;
+    return 1;
+}
+
+bool option_applies(const MeasureOptions& o, OptionRow row) {
+    const bool target = o.stimulus == Stimulus::Target;
+    const bool click = target && o.action == Action::Click;
+    switch (row) {
+        case OptionRow::Stimulus:
+        case OptionRow::Ending:
+        case OptionRow::Amount: return true;
+        case OptionRow::Action:
+        case OptionRow::Moving:
+        case OptionRow::Appear:
+        case OptionRow::Size:
+        case OptionRow::Lifetime: return target;
+        case OptionRow::Buttons:
+        case OptionRow::Bombs: return click;
+    }
+    return false;
+}
+
+bool option_toggles(OptionRow row) {
+    return row != OptionRow::Size && row != OptionRow::Lifetime && row != OptionRow::Amount;
+}
+
+void toggle_option(MeasureOptions& o, OptionRow row) {
+    switch (row) {
+        case OptionRow::Stimulus:
+            o.stimulus = o.stimulus == Stimulus::Target ? Stimulus::Screen : Stimulus::Target;
+            break;
+        case OptionRow::Action:
+            o.action = o.action == Action::Click ? Action::Hover : Action::Click;
+            break;
+        case OptionRow::Buttons: o.color_buttons = !o.color_buttons; break;
+        case OptionRow::Moving: o.moving = !o.moving; break;
+        case OptionRow::Appear: o.grows = !o.grows; break;
+        case OptionRow::Bombs: o.bombs = !o.bombs; break;
+        case OptionRow::Ending:
+            o.ending = o.ending == Ending::Lives ? Ending::Time : Ending::Lives;
+            break;
+        case OptionRow::Size:
+        case OptionRow::Lifetime:
+        case OptionRow::Amount: break;
+    }
+}
+
+void step_option(MeasureOptions& o, OptionRow row, int delta) {
+    switch (row) {
+        case OptionRow::Size:
+            o.target_size =
+                std::clamp(o.target_size + delta * kTargetSizeStep, kMinTargetSize, kMaxTargetSize);
+            break;
+        case OptionRow::Lifetime:
+            o.lifetime_ms =
+                std::clamp(o.lifetime_ms + delta * kLifetimeStepMs, kMinLifetimeMs, kMaxLifetimeMs);
+            break;
+        case OptionRow::Amount:
+            if (o.ending == Ending::Lives) {
+                o.lives = std::clamp(o.lives + delta, kMinLives, kMaxLives);
+            } else {
+                o.duration_s =
+                    std::clamp(o.duration_s + delta * kDurationStepS, kMinDurationS, kMaxDurationS);
+            }
+            break;
+        case OptionRow::Stimulus:
+        case OptionRow::Action:
+        case OptionRow::Buttons:
+        case OptionRow::Moving:
+        case OptionRow::Appear:
+        case OptionRow::Bombs:
+        case OptionRow::Ending: break;
+    }
+}
+
+std::string_view option_label(const MeasureOptions& o, OptionRow row) {
+    switch (row) {
+        case OptionRow::Stimulus: return "Стимул";
+        case OptionRow::Action: return "Действие";
+        case OptionRow::Buttons: return "Кнопки";
+        case OptionRow::Moving: return "Движение";
+        case OptionRow::Appear: return "Появление";
+        case OptionRow::Bombs: return "Бомбы";
+        case OptionRow::Size: return "Размер цели";
+        case OptionRow::Lifetime: return "Жизнь цели";
+        case OptionRow::Ending: return "Окончание";
+        case OptionRow::Amount: return o.ending == Ending::Lives ? "Жизни" : "Время замера";
+    }
+    return {};
+}
+
+std::string option_value(const MeasureOptions& o, OptionRow row) {
+    switch (row) {
+        case OptionRow::Stimulus:
+            return o.stimulus == Stimulus::Screen ? "смена цвета окна" : "цель";
+        case OptionRow::Action: return o.action == Action::Hover ? "наведение" : "щелчок";
+        case OptionRow::Buttons: return o.color_buttons ? "по цвету цели" : "ЛКМ";
+        case OptionRow::Moving: return o.moving ? "да" : "нет";
+        case OptionRow::Appear: return o.grows ? "рост и сжатие" : "сразу полная";
+        case OptionRow::Bombs: return o.bombs ? "да" : "нет";
+        case OptionRow::Size: return std::format("{} px", o.target_size);
+        case OptionRow::Lifetime: return std::format("{} мс", o.lifetime_ms);
+        case OptionRow::Ending: return o.ending == Ending::Lives ? "по жизням" : "по времени";
+        case OptionRow::Amount:
+            return o.ending == Ending::Lives ? std::format("{}", o.lives)
+                                             : std::format("{} с", o.duration_s);
+    }
+    return {};
+}
+
+int reset_out_of_range(MeasureOptions& o) {
+    const MeasureOptions defaults;
+    int reset = 0;
+    const auto check = [&](int& value, int lo, int hi, int fallback) {
+        if (value >= lo && value <= hi) return;
+        value = fallback;
+        ++reset;
+    };
+    check(o.target_size, kMinTargetSize, kMaxTargetSize, defaults.target_size);
+    check(o.lifetime_ms, kMinLifetimeMs, kMaxLifetimeMs, defaults.lifetime_ms);
+    check(o.lives, kMinLives, kMaxLives, defaults.lives);
+    check(o.duration_s, kMinDurationS, kMaxDurationS, defaults.duration_s);
+    return reset;
 }
 
 std::string_view combo_name(const MeasureOptions& options) {

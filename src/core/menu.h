@@ -1,9 +1,10 @@
 #pragma once
 
 // Главное меню без окна: выбор набора замера наведением, запуск щелчком по
-// кнопке набора или плашке (D-37), кнопки внизу и панели поверх меню,
-// туториал первого запуска, переключатель эффектов — щелчок по пустому
-// месту. Геометрия — core/layout.h.
+// кнопке набора или плашке (D-37), «Свой набор» — конструктор со всеми
+// опциями замера, кнопки внизу и панели поверх меню, туториал первого
+// запуска, переключатель эффектов — щелчок по пустому месту. Геометрия —
+// core/layout.h.
 //
 // Файлы меню не трогает: что записать и что прочитать, программа берёт из
 // take_requests.
@@ -19,7 +20,16 @@
 
 namespace aim::core {
 
-enum class Panel : std::uint8_t { None, Help, Settings, Records, Achievements, History, Profiles };
+enum class Panel : std::uint8_t {
+    None,
+    Help,
+    Settings,
+    Records,
+    Achievements,
+    History,
+    Profiles,
+    Constructor,  ///< «Свой набор» (D-37)
+};
 
 /// Записать профиль: изменились настройки, тема, туториал, набор.
 struct SaveProfile {};
@@ -66,7 +76,8 @@ public:
     /// Профиль сменился (программа открыла другой файл).
     void set_profile_number(int number) { profile_number_ = number; }
 
-    /// Набор под курсором или выбранный последним (kPresets).
+    /// Пункт под курсором или выбранный последним: набор (kPresets) или
+    /// kCustomItem.
     [[nodiscard]] int selected_preset() const { return selected_; }
     [[nodiscard]] Panel panel() const { return panel_; }
     [[nodiscard]] bool tutorial_shown() const { return tutorial_; }
@@ -84,6 +95,8 @@ private:
     void click_settings(Vec2 p);
     void click_help(Vec2 p);
     void click_records(Vec2 p);
+    /// Щелчок в конструкторе; «Начать» — опции «Своего набора».
+    std::optional<MeasureOptions> click_constructor(Vec2 p);
     void scroll_help(int lines);
     /// Прокрутка по высоте курсора на полосе: верх — начало, низ — конец.
     void scroll_help_to(double y);

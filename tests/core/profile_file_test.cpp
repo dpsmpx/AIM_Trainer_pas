@@ -22,6 +22,17 @@ TEST(ProfileFile, WriteThenReadKeepsEverything) {
     p.settings.theme = 2;
     p.achievements[1] = true;
     p.achievements[7] = true;
+    p.custom = {.stimulus = Stimulus::Screen,
+                .action = Action::Hover,
+                .color_buttons = true,
+                .moving = true,
+                .grows = false,
+                .bombs = false,
+                .target_size = 22,
+                .lifetime_ms = 4200,
+                .ending = Ending::Time,
+                .lives = 3,
+                .duration_s = 120};
     const std::string text = write_profile(p, "\r\n");
     EXPECT_TRUE(text.starts_with(kProfileVersionLine));
     const LoadedProfile loaded = read_profile(text);
@@ -32,6 +43,20 @@ TEST(ProfileFile, WriteThenReadKeepsEverything) {
     EXPECT_EQ(loaded.profile.settings.preset.ending, Ending::Time);
     EXPECT_TRUE(loaded.profile.achievements[7]);
     EXPECT_FALSE(loaded.profile.achievements[0]);
+    EXPECT_EQ(loaded.profile.custom, p.custom) << "«Свой набор» — как оставлен, даже не к замеру";
+}
+
+TEST(ProfileFile, CustomItemAndItsBadValues) {
+    const std::string text = std::string(kProfileVersionLine) +
+                             "\npreset=5\ncustom.stimulus=laser\ncustom.buttons=color\n"
+                             "custom.size=500\ncustom.lives=7\n";
+    const LoadedProfile loaded = read_profile(text);
+    EXPECT_EQ(loaded.profile.preset, kCustomItem);
+    EXPECT_EQ(loaded.profile.custom.stimulus, Stimulus::Target) << "слово не то — по умолчанию";
+    EXPECT_TRUE(loaded.profile.custom.color_buttons);
+    EXPECT_EQ(loaded.profile.custom.target_size, 40) << "вне границ — по умолчанию";
+    EXPECT_EQ(loaded.profile.custom.lives, 7);
+    EXPECT_EQ(loaded.reset_fields.size(), 2U) << "custom.stimulus и custom";
 }
 
 TEST(ProfileFile, ForeignFileIsCorrupt) {

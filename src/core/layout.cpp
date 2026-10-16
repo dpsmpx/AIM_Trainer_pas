@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "core/help.h"
+#include "core/measure.h"
 #include "core/rounding.h"
 
 namespace aim::core {
@@ -66,6 +67,43 @@ Rect help_track() {
     const Rect p = help_panel();
     const int top = p.y1 + kHelpTop;
     return {p.x2 - 22, top, p.x2 - 12, top + kHelpVisibleLines * kHelpLineH};
+}
+
+Rect constructor_panel() {
+    const int x = (kW - kConstructorW) / 2;
+    const int y = (kH - kConstructorH) / 2;
+    return {x, y, x + kConstructorW, y + kConstructorH};
+}
+
+Rect constructor_preset(int i) {
+    const Rect p = constructor_panel();
+    constexpr int kGap = 6;
+    constexpr int kChipW = (kConstructorW - 32 - (kPresetCount - 1) * kGap) / kPresetCount;
+    const int x = p.x1 + 16 + i * (kChipW + kGap);
+    return {x, p.y1 + 50, x + kChipW, p.y1 + 78};
+}
+
+Rect constructor_row(int row) {
+    const Rect p = constructor_panel();
+    const int y = p.y1 + 90 + row * kConstructorRowH;
+    return {p.x1 + 16, y, p.x2 - 16, y + kConstructorRowH - 4};
+}
+
+Rect constructor_minus(int row) {
+    const Rect r = constructor_row(row);
+    return {r.x2 - 150, r.y1, r.x2 - 122, r.y2};
+}
+
+Rect constructor_plus(int row) {
+    const Rect r = constructor_row(row);
+    return {r.x2 - 28, r.y1, r.x2, r.y2};
+}
+
+Rect constructor_start() {
+    const Rect p = constructor_panel();
+    const int x = (p.x1 + p.x2) / 2 - 90;
+    const int y = p.y1 + 90 + kOptionRows * kConstructorRowH + 6;
+    return {x, y, x + 180, y + 34};
 }
 
 Rect records_panel() {

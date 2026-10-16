@@ -212,8 +212,70 @@ void render_settings(Canvas& c, const core::Settings& s, std::string_view folder
                          "панели — закрыть.");
 }
 
-// Рекорды наборов (D-38): лучший замер и среднее за N, свежие наборы первыми.
-// Рекорды наборов; у строки с реплеем — «▶»: щелчок проигрывает его (D-39).
+// «Свой набор» (D-37): заготовки-наборы, строки опций, «Начать». Опция, которая
+// к замеру не относится, — бледная и с прочерком.
+void render_constructor(Canvas& c, const core::Profile& profile) {
+    const Rect p = core::constructor_panel();
+    panel_back(c, p);
+    panel_title(c, p, 10, "Свой набор");
+    const core::MeasureOptions& o = profile.custom;
+    // Заготовки: набор того же вида — ярче.
+    const std::optional<int> same = core::preset_index(o);
+    c.font.size = 10;
+    for (int i = 0; i < core::kPresetCount; ++i) {
+        const Rect r = core::constructor_preset(i);
+        c.brush = with_alpha(core::kPresetLooks.at(static_cast<std::size_t>(i)).button,
+                             same == i ? 255 : 110);
+        c.pen = argb(0, 0, 0, 0);
+        fill_round_rect(c, r, 6, 6);
+        c.font_color = kClWhite;
+        text_centered(c, r, core::kPresets.at(static_cast<std::size_t>(i)).name);
+    }
+    c.font.size = 13;
+    for (int r = 0; r < core::kOptionRows; ++r) {
+        const auto row = static_cast<core::OptionRow>(r);
+        const Rect box = core::constructor_row(r);
+        const bool on = core::option_applies(o, row);
+        c.brush = argb(on ? 45 : 15, 255, 255, 255);
+        c.pen = argb(0, 0, 0, 0);
+        fill_round_rect(c, box, 8, 8);
+        const int ty = box.y1 + (box.y2 - box.y1 - 17) / 2;
+        c.brush = argb(0, 0, 0, 0);
+        c.font_color = on ? argb(230, 220, 220, 220) : argb(110, 200, 200, 200);
+        c.text_out(box.x1 + 12, ty, core::option_label(o, row));
+        const std::string value = on ? core::option_value(o, row) : "—";
+        if (core::option_toggles(row)) {
+            c.font_color = on ? argb(255, 120, 200, 255) : argb(110, 200, 200, 200);
+            c.text_out(box.x2 - 12 - c.text_width(value), ty, value);
+            continue;
+        }
+        const Rect minus = core::constructor_minus(r);
+        const Rect plus = core::constructor_plus(r);
+        if (on) {
+            for (const Rect& b : {minus, plus}) {
+                c.brush = argb(150, 255, 255, 255);
+                fill_round_rect(c, b, 6, 6);
+            }
+            c.font_color = argb(255, 30, 30, 34);
+            text_centered(c, minus, "-");
+            text_centered(c, plus, "+");
+        }
+        c.font_color = on ? kClWhite : argb(110, 200, 200, 200);
+        c.draw_text_centered(minus.x2, box.y1, plus.x1, box.y2, value);
+    }
+    const Rect start = core::constructor_start();
+    c.brush = argb(230, 46, 160, 90);
+    c.pen = argb(0, 0, 0, 0);
+    fill_round_rect(c, start, 10, 10);
+    c.font_color = kClWhite;
+    c.font.weight = Weight::Bold;
+    text_centered(c, start, "Начать замер");
+    c.font.weight = Weight::Normal;
+    panel_footer(c, p, "Заготовка заполняет опции · Esc или клик вне панели — закрыть");
+}
+
+// Рекорды наборов (D-38): лучший замер и среднее за N, свежие наборы первыми;
+// у строки с реплеем — «▶»: щелчок проигрывает его (D-39).
 void render_records(Canvas& c, const core::Profile& profile, const PlayerFiles& files) {
     const Rect p = core::records_panel();
     panel_back(c, p);
@@ -352,7 +414,8 @@ void render_profiles(Canvas& c, int current) {
 
 // Тексты туториала.
 constexpr std::array<std::string_view, core::kTutorialSteps> kTutorial{
-    "Добро пожаловать в DP AIM Trainer! Выбери набор замера — замер начнётся через 3 секунды.",
+    "Добро пожаловать в DP AIM Trainer! Выбери набор замера — замер начнётся через 3 секунды. "
+    "«Свой набор» — любые опции.",
     "«Реакция на цвет»: щёлкни, как только окно сменит цвет. Раньше — фальстарт.",
     "С целями: чем ближе к центру — тем выше точность. Бомбы (белый крест) лучше не трогать!",
     "Esc — закончить замер, R — заново, M — в меню. Рекорд — у каждого набора свой. Удачи!",
@@ -480,7 +543,7 @@ void MenuView::render_particles(Canvas& c, const core::Profile& profile, core::V
     }
 }
 
-void MenuView::render_plate(Canvas& c, const core::Theme& theme, int preset,
+void MenuView::render_plate(Canvas& c, const core::Theme& theme, std::string_view title, int kind,
                             core::Vec2 mouse) const {
     const Rect& plate = core::kPlate;
     const int x = plate.x1;
@@ -508,12 +571,10 @@ void MenuView::render_plate(Canvas& c, const core::Theme& theme, int preset,
     c.brush = argb(0, 0, 0, 0);
     c.font.weight = Weight::Bold;
 
-    const auto index = static_cast<std::size_t>(preset);
-    const core::PresetLook& look = core::kPresetLooks.at(index);
+    const core::PresetLook& look = core::kPresetLooks.at(static_cast<std::size_t>(kind));
     const int ax = x + w / 2;
     const int ay = y + h / 2 + 12;
     const double t = timer_mod(2000) / 2000;
-    const std::string_view title = core::kPresets.at(index).name;
     c.text_out(x + (w - c.text_width(title)) / 2, y + 14, title);
     c.font.weight = Weight::Normal;
 
@@ -526,7 +587,7 @@ void MenuView::render_plate(Canvas& c, const core::Theme& theme, int preset,
     const auto fading = [](double u) {
         return u > 0.85 ? round_int(255 * (1 - (u - 0.85) / 0.15)) : 255;
     };
-    switch (preset) {
+    switch (kind) {
         case 0: {  // окно меняет цвет: пауза, затем сигнал на 0,6 с
             const double cycle = timer_mod(2400) / 2400;
             const bool lit = cycle > 0.75;
@@ -613,17 +674,26 @@ void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const
     c.clear_window(theme.background);
     render_particles(c, profile, mouse);
     const int preset = menu.selected_preset();
-    render_plate(c, theme, preset, mouse);
+    const bool custom = preset == core::kCustomItem;
+    // Опции выбранного пункта: набор с общими настройками или «Свой набор».
+    const core::MeasureOptions options = core::item_options(profile, preset);
+    const auto item_name = [](int i) {
+        return i == core::kCustomItem ? std::string_view("Свой набор")
+                                      : core::kPresets.at(static_cast<std::size_t>(i)).name;
+    };
+    render_plate(c, theme, item_name(preset), custom ? core::preset_like(options) : preset, mouse);
 
-    // Кнопки наборов: появление каскадом; выбранная — ярче.
+    // Кнопки наборов и «Своего набора»: появление каскадом; выбранная — ярче.
     const core::Nanoseconds since = now > menu.entered_at() ? now - menu.entered_at() : 0;
-    for (int i = 0; i < core::kPresetCount; ++i) {
+    for (int i = 0; i < core::kMenuItems; ++i) {
         const int entry = round_int(255 * core::preset_button_entry(i, since));
         const Rect b = core::preset_button(i, since);
         const bool selected = preset == i;
         const int base = (selected ? 255 : 120) * entry / 255;
-        const core::PresetLook& look = core::kPresetLooks.at(static_cast<std::size_t>(i));
-        c.brush = with_alpha(look.button, base);
+        const core::Rgba button = i == core::kCustomItem
+                                      ? core::kCustomButton
+                                      : core::kPresetLooks.at(static_cast<std::size_t>(i)).button;
+        c.brush = with_alpha(button, base);
         c.pen = argb(80 * entry / 255, 255, 255, 255);
         c.pen_width = 1;
         fill_round_rect(c, b, 8, 8);
@@ -638,7 +708,7 @@ void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const
         c.font_color = argb(entry, 255, 255, 255);
         c.brush = argb(0, 0, 0, 0);
         c.font.weight = Weight::Bold;
-        const std::string_view name = core::kPresets.at(static_cast<std::size_t>(i)).name;
+        const std::string_view name = item_name(i);
         const int tw = c.text_width(name);
         c.text_out(b.x1 + (core::kButtonW - tw) / 2, b.y1 + (core::kButtonH - 16) / 2, name);
         c.font.weight = Weight::Normal;
@@ -653,15 +723,16 @@ void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const
     c.font_color = argb(220, 255, 255, 255);
     const int max_chars = round_int(330.0 / c.text_width("W"));
     int ly = d.y1 + 14;
-    for (const std::string& line : description_lines(
-             core::kPresets.at(static_cast<std::size_t>(preset)).description, max_chars)) {
+    const std::string description =
+        custom ? std::format("Свои опции: {}. Щелчок — конструктор.", core::describe_short(options))
+               : std::string(core::kPresets.at(static_cast<std::size_t>(preset)).description);
+    for (const std::string& line : description_lines(description, max_chars)) {
         c.brush = argb(0, 0, 0, 0);
         c.text_out(d.x1 + 12, ly, line);
         ly += 18;
     }
 
     // График: главная мера последних замеров выбранного набора (D-38).
-    const core::MeasureOptions options = core::preset_options(preset, profile.settings.preset);
     const int n = profile.settings.average_runs;
     const std::vector<double> recent =
         core::recent_primary(profile.runs, options, static_cast<std::size_t>(n));
@@ -759,6 +830,7 @@ void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const
             render_history(c, profile, core::runs_file_name(menu.profile_number()));
             break;
         case core::Panel::Profiles: render_profiles(c, menu.profile_number()); break;
+        case core::Panel::Constructor: render_constructor(c, profile); break;
         case core::Panel::None: break;
     }
     if (menu.tutorial_shown()) render_tutorial(c, menu.tutorial_step());

@@ -95,11 +95,51 @@ struct PresetSettings {
 
 /// Опции набора index с общими настройками.
 MeasureOptions preset_options(int index, const PresetSettings& settings);
-/// Имя набора, к которому относится замер (по стимулу, действию, кнопкам,
+/// Набор, к которому относится замер (по стимулу, действию, кнопкам,
 /// движению, появлению и бомбам); не набор — пусто.
+std::optional<int> preset_index(const MeasureOptions& options);
+/// Имя такого набора; не набор — пусто.
 std::optional<std::string_view> preset_name(const MeasureOptions& options);
+/// Набор того же вида, а не того — ближайший по главной опции: смена цвета,
+/// наведение, кнопки по цвету, сразу полная цель; иначе «Классика». Для
+/// плашки-превью «Своего набора».
+int preset_like(const MeasureOptions& options);
 /// Имя набора для игрока: набор или «Свой набор».
 std::string_view combo_name(const MeasureOptions& options);
+
+// ---- Конструктор «Своего набора» (D-37) ----
+
+/// Строки конструктора по порядку.
+enum class OptionRow : std::uint8_t {
+    Stimulus,  ///< цель или смена цвета окна
+    Action,    ///< щелчок или наведение
+    Buttons,   ///< ЛКМ или по цвету цели
+    Moving,
+    Appear,  ///< рост и сжатие или сразу полная
+    Bombs,
+    Size,
+    Lifetime,
+    Ending,  ///< по жизням или по времени
+    Amount,  ///< жизни или секунды — по окончанию
+};
+inline constexpr int kOptionRows = 10;
+
+/// Строка влияет на замер (как в normalized): у смены цвета нет цели и её
+/// опций, у наведения — кнопок и бомб. Остальные не правятся.
+bool option_applies(const MeasureOptions& options, OptionRow row);
+/// Строка — переключатель; иначе — «−»/«+».
+bool option_toggles(OptionRow row);
+/// Переключить строку-переключатель.
+void toggle_option(MeasureOptions& options, OptionRow row);
+/// Шаг строки «−»/«+» на delta ступеней в границах: размер, жизнь цели,
+/// жизни или секунды.
+void step_option(MeasureOptions& options, OptionRow row, int delta);
+/// Подпись строки и её значение для игрока.
+std::string_view option_label(const MeasureOptions& options, OptionRow row);
+std::string option_value(const MeasureOptions& options, OptionRow row);
+/// Опции вне границ — по умолчанию; для прочитанных из файла. Возвращает,
+/// сколько полей сброшено.
+int reset_out_of_range(MeasureOptions& options);
 
 /// Как живёт и засчитывается цель — из опций.
 struct TargetRules {

@@ -40,6 +40,19 @@ std::string write_profile(const Profile& p, std::string_view newline) {
     line(std::format("sound={}", s.sound ? 1 : 0));
     line(std::format("menu_effects={}", s.menu_effects ? 1 : 0));
     line(std::format("theme={}", s.theme));
+    // «Свой набор» (D-37): все опции словами, как в истории.
+    const MeasureOptions& c = p.custom;
+    line(std::format("custom.stimulus={}", stimulus_word(c.stimulus)));
+    line(std::format("custom.action={}", action_word(c.action)));
+    line(std::format("custom.buttons={}", c.color_buttons ? "color" : "left"));
+    line(std::format("custom.moving={}", c.moving ? 1 : 0));
+    line(std::format("custom.appear={}", c.grows ? "grow" : "full"));
+    line(std::format("custom.bombs={}", c.bombs ? 1 : 0));
+    line(std::format("custom.size={}", c.target_size));
+    line(std::format("custom.lifetime_ms={}", c.lifetime_ms));
+    line(std::format("custom.ending={}", ending_word(c.ending)));
+    line(std::format("custom.lives={}", c.lives));
+    line(std::format("custom.duration_s={}", c.duration_s));
     for (std::size_t i = 0; i < kAchievements.size(); ++i)
         line(std::format("achievement.{}={}", kAchievements.at(i).key,
                          p.achievements.at(i) ? 1 : 0));
@@ -62,6 +75,12 @@ bool apply(std::string_view key, std::string_view value, Profile& p) {
         out = value == "1";
         return true;
     };
+    // Слово из двух: yes — true, no — false.
+    const auto as_word = [&](bool& out, std::string_view yes, std::string_view no) {
+        if (value != yes && value != no) return false;
+        out = value == yes;
+        return true;
+    };
     if (key == "tutorial_seen") return as_bool(p.tutorial_seen);
     if (key == "preset") return as_int(p.preset);
     if (key == "target_size") return as_int(s.preset.target_size);
@@ -76,6 +95,30 @@ bool apply(std::string_view key, std::string_view value, Profile& p) {
     if (key == "sound") return as_bool(s.sound);
     if (key == "menu_effects") return as_bool(s.menu_effects);
     if (key == "theme") return as_int(s.theme);
+    MeasureOptions& c = p.custom;
+    if (key == "custom.stimulus") {
+        const std::optional<Stimulus> v = parse_stimulus(value);
+        if (v) c.stimulus = *v;
+        return v.has_value();
+    }
+    if (key == "custom.action") {
+        const std::optional<Action> v = parse_action(value);
+        if (v) c.action = *v;
+        return v.has_value();
+    }
+    if (key == "custom.buttons") return as_word(c.color_buttons, "color", "left");
+    if (key == "custom.moving") return as_bool(c.moving);
+    if (key == "custom.appear") return as_word(c.grows, "grow", "full");
+    if (key == "custom.bombs") return as_bool(c.bombs);
+    if (key == "custom.size") return as_int(c.target_size);
+    if (key == "custom.lifetime_ms") return as_int(c.lifetime_ms);
+    if (key == "custom.ending") {
+        const std::optional<Ending> v = parse_ending(value);
+        if (v) c.ending = *v;
+        return v.has_value();
+    }
+    if (key == "custom.lives") return as_int(c.lives);
+    if (key == "custom.duration_s") return as_int(c.duration_s);
     if (key.starts_with("achievement.")) {
         const std::string_view name = key.substr(12);
         for (std::size_t i = 0; i < kAchievements.size(); ++i)
@@ -103,11 +146,12 @@ LoadedProfile read_profile(std::string_view text) {
         if (!apply(key, raw.substr(eq + 1), p)) loaded.reset_fields.emplace_back(key);
     }
     const Profile defaults;
-    if (p.preset < 0 || p.preset >= kPresetCount) {
+    if (p.preset < 0 || p.preset >= kMenuItems) {
         p.preset = defaults.preset;
         loaded.reset_fields.emplace_back("preset");
     }
     if (reset_out_of_range(p.settings) > 0) loaded.reset_fields.emplace_back("settings");
+    if (reset_out_of_range(p.custom) > 0) loaded.reset_fields.emplace_back("custom");
     return loaded;
 }
 

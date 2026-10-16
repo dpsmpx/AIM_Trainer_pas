@@ -33,11 +33,12 @@ inline constexpr Rect kPlate{50, 40, 50 + 330, 40 + 240};  ///< плашка-п�
 inline constexpr int kButtonsX = 420;
 inline constexpr int kButtonsY = 40;
 inline constexpr int kButtonW = 330;
-inline constexpr int kButtonH = 30;
-inline constexpr int kButtonGap = 6;
-inline constexpr Rect kDescription{420, 222, 420 + 330, 222 + 68};
+inline constexpr int kButtonH = 26;
+inline constexpr int kButtonGap = 5;
+inline constexpr Rect kDescription{420, 226, 420 + 330, 226 + 68};
 
-/// Кнопка набора i через since_enter после входа в меню: появляется
+/// Кнопка пункта i (наборы, затем «Свой набор») через since_enter после
+/// входа в меню: появляется
 /// каскадом — через i·80 мс, за 400 мс, снизу на 20 px.
 Rect preset_button(int i, Nanoseconds since_enter);
 /// Доля появления кнопки i, 0…1.
@@ -83,6 +84,19 @@ inline constexpr int kHelpLineH = 22;  ///< строка справки
 Rect help_panel();
 /// Полоса прокрутки справки: щелчок по ней — прокрутка к месту.
 Rect help_track();
+
+// ---- Конструктор «Своего набора» (D-37) ----
+inline constexpr int kConstructorW = 680;
+inline constexpr int kConstructorH = 500;
+inline constexpr int kConstructorRowH = 32;  ///< шаг строк опций
+Rect constructor_panel();
+/// Заготовка — набор i: щелчок заполняет опции.
+Rect constructor_preset(int i);
+/// Строка опции row (OptionRow) целиком: щелчок переключает.
+Rect constructor_row(int row);
+Rect constructor_minus(int row);
+Rect constructor_plus(int row);
+Rect constructor_start();
 
 // ---- Рекорды наборов ----
 inline constexpr int kRecordsW = 760;

@@ -22,6 +22,7 @@ add_executable(aim_core_tests
     core/click_time_test.cpp
     core/flow_test.cpp
     core/game_test.cpp
+    core/measure_test.cpp
     core/menu_test.cpp
     core/particles_test.cpp
     core/profile_file_test.cpp

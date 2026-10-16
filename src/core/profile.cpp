@@ -91,8 +91,13 @@ int reset_out_of_range(Settings& settings) {
     return reset;
 }
 
+MeasureOptions item_options(const Profile& profile, int item) {
+    if (item == kCustomItem) return normalized(profile.custom);
+    return preset_options(item, profile.settings.preset);
+}
+
 MeasureOptions selected_options(const Profile& profile) {
-    return preset_options(profile.preset, profile.settings.preset);
+    return item_options(profile, profile.preset);
 }
 
 bool unlock(Profile& profile, int achievement) {

@@ -64,5 +64,7 @@ inline constexpr std::array<PresetLook, kPresetCount> kPresetLooks{{
     {{60, 179, 113}, {46, 139, 87}, {46, 139, 87}},
     {{255, 140, 0}, {255, 165, 0}, {255, 165, 0}},
 }};
+/// Кнопка «Своего набора» (D-37).
+inline constexpr Rgba kCustomButton{110, 110, 130};
 
 }  // namespace aim::core

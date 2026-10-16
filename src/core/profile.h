@@ -64,15 +64,24 @@ inline constexpr int kScoreAchievement = 1000;
 inline constexpr double kFastReactionMs = 150.0;
 
 // ---- Профиль ----
+/// Пункт меню «Свой набор» — после наборов kPresets (D-37).
+inline constexpr int kCustomItem = kPresetCount;
+inline constexpr int kMenuItems = kPresetCount + 1;
+
 struct Profile {
     Settings settings;
-    int preset = 1;  ///< выбранный набор меню (kPresets)
+    int preset = 1;  ///< выбранный пункт меню: набор (kPresets) или kCustomItem
+    /// Опции «Своего набора», как их оставил игрок: опции, которые к замеру
+    /// не относятся, хранятся и вернутся вместе со своим стимулом.
+    MeasureOptions custom;
     bool tutorial_seen = false;
     std::array<bool, kAchievementCount> achievements{};
     std::vector<RunRecord> runs;  ///< история замеров, по порядку
 };
 
-/// Опции выбранного набора с общими настройками.
+/// Опции пункта меню item: набор с общими настройками или «Свой набор».
+MeasureOptions item_options(const Profile& profile, int item);
+/// Опции выбранного пункта меню.
 MeasureOptions selected_options(const Profile& profile);
 
 /// Открыть достижение; true — открыто сейчас, а не раньше.

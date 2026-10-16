@@ -1,7 +1,7 @@
 #pragma once
 
 // Главное меню и панели поверх него на холсте app/canvas.h: наборы замера
-// (D-37), рекорд и среднее за N выбранного набора (D-38), график его
+// и «Свой набор» с конструктором (D-37), рекорд и среднее за N выбранного набора (D-38), график его
 // последних замеров, рекорды всех наборов (щелчок по набору — его реплей,
 // D-39), история замеров с параметрами.
 // Что открыто и что выбрано — core/menu.h.
@@ -45,7 +45,9 @@ public:
 
 private:
     void render_particles(Canvas& canvas, const core::Profile& profile, core::Vec2 mouse) const;
-    void render_plate(Canvas& canvas, const core::Theme& theme, int preset, core::Vec2 mouse) const;
+    /// Плашка-превью: заголовок title, анимация набора kind (kPresets).
+    void render_plate(Canvas& canvas, const core::Theme& theme, std::string_view title, int kind,
+                      core::Vec2 mouse) const;
 
     core::Particles particles_;
     double anim_ms_ = 0;  ///< MenuAnimTimer: время в меню, мс
