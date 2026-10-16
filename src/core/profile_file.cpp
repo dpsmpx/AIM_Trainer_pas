@@ -1,5 +1,6 @@
 #include "core/profile_file.h"
 
+#include <algorithm>
 #include <array>
 #include <charconv>
 #include <cmath>
@@ -210,17 +211,59 @@ std::string app_state_file_name() {
     return "aim_trainer.ini";
 }
 
-std::string write_app_state(int last_profile, std::string_view newline) {
-    return std::format("[App]{}LastProfile={}{}", newline, last_profile, newline);
+std::string write_app_state(const AppState& state, std::string_view newline) {
+    std::string out = std::format("[App]{}LastProfile={}{}", newline, state.last_profile, newline);
+    if (!state.data_dir.empty()) out += std::format("DataDir={}{}", state.data_dir, newline);
+    return out;
 }
 
-int read_last_profile(std::string_view text) {
+AppState read_app_state(std::string_view text) {
+    AppState state;
     for (const std::string_view raw : split_lines(text)) {
-        if (!raw.starts_with("LastProfile=")) continue;
-        const std::optional<int> n = parse_int(raw.substr(12));
-        if (n && *n >= 1 && *n <= kProfileCount) return *n;
+        if (raw.starts_with("LastProfile=")) {
+            const std::optional<int> n = parse_int(raw.substr(12));
+            if (n && *n >= 1 && *n <= kProfileCount) state.last_profile = *n;
+        } else if (raw.starts_with("DataDir=")) {
+            state.data_dir = std::string(raw.substr(8));
+        }
     }
-    return 1;
+    return state;
+}
+
+namespace {
+
+// prefix, затем цифры, затем suffix.
+bool numbered(std::string_view name, std::string_view prefix, std::string_view suffix) {
+    if (name.size() <= prefix.size() + suffix.size() || !name.starts_with(prefix) ||
+        !name.ends_with(suffix))
+        return false;
+    const std::string_view digits =
+        name.substr(prefix.size(), name.size() - prefix.size() - suffix.size());
+    return std::all_of(digits.begin(), digits.end(), [](char c) { return c >= '0' && c <= '9'; });
+}
+
+}  // namespace
+
+bool is_player_file(std::string_view name) {
+    if (numbered(name, "profile", "_stats.ini") || numbered(name, "profile", "_sessions.csv") ||
+        numbered(name, "profile", "_corrupt_backup.txt"))
+        return true;
+    // export_profileN_ГГГГММДД.csv
+    if (name.size() <= 18 || !name.starts_with("export_profile") || !name.ends_with(".csv"))
+        return false;
+    const std::string_view middle = name.substr(14, name.size() - 14 - 4);
+    const std::size_t sep = middle.find('_');
+    if (sep == std::string_view::npos || sep == 0 || middle.size() - sep - 1 != 8) return false;
+    return std::all_of(middle.begin(), middle.end(),
+                       [](char c) { return c == '_' || (c >= '0' && c <= '9'); }) &&
+           middle.find('_', sep + 1) == std::string_view::npos;
+}
+
+std::string backup_folder_name(const LocalTime& when, int attempt) {
+    std::string name = std::format("backup_{:04}{:02}{:02}_{:02}{:02}", when.year, when.month,
+                                   when.day, when.hour, when.minute);
+    if (attempt > 1) name += std::format("_{}", attempt);
+    return name;
 }
 
 }  // namespace aim::core

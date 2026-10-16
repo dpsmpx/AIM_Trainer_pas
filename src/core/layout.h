@@ -56,16 +56,20 @@ Rect mini_button(MiniButton b);
 
 // ---- Настройки ----
 inline constexpr int kSettingsW = 420;
-inline constexpr int kSettingsH = 390;
+/// Выше, чем у образца (390), на две строки папки сохранений (D-33).
+inline constexpr int kSettingsH = 470;
 inline constexpr int kSettingsRowH = 40;
 inline constexpr int kSettingsButton = 34;
 Rect settings_panel();
 /// Верх строки настроек: 0 — размер, 1 — время жизни, 2 — жизни, 3 — звук,
-/// 4 — тема, 5 — сброс.
+/// 4 — тема, 5 — открыть папку сохранений, 6 — выбрать её (D-33), 7 — сброс.
 int settings_row_y(int row);
 Rect settings_minus(int row);
 Rect settings_plus(int row);
-Rect settings_toggle(int row);  ///< строка-кнопка: 3 — звук, 4 — тема
+/// Строка-кнопка: 3 — звук, 4 — тема, 5 и 6 — папка сохранений.
+Rect settings_toggle(int row);
+inline constexpr int kSettingsOpenFolderRow = 5;
+inline constexpr int kSettingsChooseFolderRow = 6;
 Rect settings_reset();
 
 // ---- История и профили ----

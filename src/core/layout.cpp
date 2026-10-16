@@ -51,7 +51,7 @@ Rect settings_toggle(int row) {
 
 Rect settings_reset() {
     const int x = settings_panel().x1 + (kSettingsW - 180) / 2;
-    const int y = settings_row_y(5) + 6;
+    const int y = settings_row_y(7) + 6;
     return {x, y, x + 180, y + 32};
 }
 

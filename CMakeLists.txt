@@ -76,12 +76,12 @@ aim_own_code(aim_core)
 
 # SDL3 и системные вызовы (D-25); свой поток сырого ввода — только Windows (D-24).
 if(WIN32)
-    add_library(aim_platform STATIC
-        src/platform/raw_mouse_win.cpp src/platform/sound.cpp src/platform/storage.cpp)
+    add_library(aim_platform STATIC src/platform/raw_mouse_win.cpp)
 else()
-    add_library(aim_platform STATIC
-        src/platform/raw_mouse_none.cpp src/platform/sound.cpp src/platform/storage.cpp)
+    add_library(aim_platform STATIC src/platform/raw_mouse_none.cpp)
 endif()
+target_sources(aim_platform PRIVATE
+    src/platform/folders.cpp src/platform/sound.cpp src/platform/storage.cpp)
 target_link_libraries(aim_platform PUBLIC aim_core SDL3::SDL3)
 aim_own_code(aim_platform)
 

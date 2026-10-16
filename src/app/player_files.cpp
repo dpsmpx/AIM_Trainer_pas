@@ -10,8 +10,6 @@
 
 namespace aim::app {
 
-namespace {
-
 core::LocalTime local_now() {
     core::LocalTime t;
     SDL_Time now = 0;
@@ -26,18 +24,30 @@ core::LocalTime local_now() {
     return t;
 }
 
-}  // namespace
+PlayerFiles::PlayerFiles(std::optional<platform::Storage> home, std::string problem)
+    : home_(std::move(home)), storage_(home_), problem_(std::move(problem)) {}
 
-PlayerFiles::PlayerFiles(std::optional<platform::Storage> storage, std::string problem)
-    : storage_(std::move(storage)), problem_(std::move(problem)) {}
+std::string PlayerFiles::folder() const {
+    return storage_ ? storage_->dir() : std::string{};
+}
 
 core::Profile PlayerFiles::load(std::vector<std::string>& messages) {
-    if (storage_) {
-        if (const auto state = storage_->read(core::app_state_file_name())) {
-            remembered_ = core::read_last_profile(*state);
+    if (home_) {
+        if (const auto state = home_->read(core::app_state_file_name()))
+            remembered_ = core::read_app_state(*state);
+        if (!remembered_.data_dir.empty()) {
+            std::string problem;
+            if (auto chosen = platform::Storage::open(remembered_.data_dir, problem)) {
+                storage_ = std::move(chosen);
+                data_dir_ = remembered_.data_dir;
+            } else {
+                messages.push_back(
+                    std::format("Папка сохранений {} недоступна ({}): файлы — в папке по умолчанию",
+                                remembered_.data_dir, problem));
+            }
         }
     }
-    return open(remembered_, messages);
+    return open(remembered_.last_profile, messages);
 }
 
 core::Profile PlayerFiles::open(int number, std::vector<std::string>& messages) {
@@ -69,8 +79,8 @@ core::Profile PlayerFiles::open(int number, std::vector<std::string>& messages) 
         messages.push_back(std::format("Профиль {}: неверных значений сброшено — {}", number_,
                                        loaded.reset_fields.size()));
         save_or_say(loaded.profile);
-    } else if (number_ != remembered_) {
-        if (!remember(error)) messages.push_back("Номер профиля не записан: " + error);
+    } else if (!remember(error)) {
+        messages.push_back("Номер профиля не записан: " + error);
     }
     return loaded.profile;
 }
@@ -86,15 +96,18 @@ bool PlayerFiles::save(const core::Profile& profile, std::string& error) {
 }
 
 bool PlayerFiles::remember(std::string& error) {
-    if (!storage_) {
+    if (!home_) {
         error = "no player folder";
         return false;
     }
-    if (number_ == remembered_ && storage_->exists(core::app_state_file_name())) return true;
-    if (!storage_->write(core::app_state_file_name(),
-                         core::write_app_state(number_, platform::kNewline), error))
+    const core::AppState state{.last_profile = number_, .data_dir = data_dir_};
+    if (state.last_profile == remembered_.last_profile && state.data_dir == remembered_.data_dir &&
+        home_->exists(core::app_state_file_name()))
+        return true;
+    if (!home_->write(core::app_state_file_name(), core::write_app_state(state, platform::kNewline),
+                      error))
         return false;
-    remembered_ = number_;
+    remembered_ = state;
     return true;
 }
 
@@ -121,6 +134,95 @@ bool PlayerFiles::log_run(const core::GameSummary& summary, std::string& error) 
     text += core::session_line(summary, local_now());
     text += platform::kNewline;
     return storage_->append(name, text, error);
+}
+
+bool PlayerFiles::export_history(const core::LocalTime& when, std::string& file_name,
+                                 std::string& error) {
+    const std::optional<std::string> history = read_history();
+    if (!history || !storage_) {
+        // Как образец: «нет данных для экспорта».
+        error = "нет данных для экспорта";
+        return false;
+    }
+    file_name = core::export_file_name(number_, when);
+    return storage_->write(file_name, *history, error);
+}
+
+std::optional<core::Profile> PlayerFiles::change_folder(const std::string& dir,
+                                                        const core::LocalTime& when,
+                                                        std::vector<std::string>& messages) {
+    std::string problem;
+    std::optional<platform::Storage> target = platform::Storage::open(dir, problem);
+    if (!target || !target->writable(problem)) {
+        messages.push_back(std::format("Папка {} не подходит: {}", dir, problem));
+        return std::nullopt;
+    }
+    if (storage_ && target->dir() == storage_->dir()) {
+        messages.emplace_back("Эта папка уже — папка сохранений");
+        return std::nullopt;
+    }
+    if (storage_ && !copy_saves(*storage_, *target, when, messages)) return std::nullopt;
+    // Вернулся в папку по умолчанию — в aim_trainer.ini ей строка не нужна.
+    data_dir_ = home_ && target->dir() == home_->dir() ? std::string{} : dir;
+    storage_ = std::move(target);
+    return open(number_, messages);
+}
+
+bool PlayerFiles::copy_saves(const platform::Storage& from, const platform::Storage& target,
+                             const core::LocalTime& when, std::vector<std::string>& messages) {
+    // Копия, не перенос: прежняя папка остаётся как была (D-33). Файл с тем
+    // же именем в новой папке не теряется — сперва его копия в backup_… (D-35).
+    std::optional<platform::Storage> backup;
+    std::string backup_name;
+    int copied = 0;
+    std::string error;
+    // Список не прочитан — не «0 файлов»: иначе новая папка без сохранений
+    // выглядела бы потерей прогресса.
+    const std::optional<std::vector<std::string>> names = from.files(error);
+    if (!names) {
+        messages.push_back(std::format("Папка сохранений не читается: {} — папка прежняя", error));
+        return false;
+    }
+    for (const std::string& name : *names) {
+        if (!core::is_player_file(name)) continue;
+        const std::optional<std::string> data = from.read(name);
+        if (!data) {
+            messages.push_back(std::format("Файл {} не читается — папка прежняя", name));
+            return false;
+        }
+        const std::optional<std::string> there = target.read(name);
+        if (there == data) continue;  // уже такой же
+        if (there) {
+            if (!backup) backup = backup_folder(target, when, backup_name, error);
+            if (!backup || !backup->write(name, *there, error)) {
+                messages.push_back(std::format(
+                    "Копия файла {} новой папки не записана: {} — папка прежняя", name, error));
+                return false;
+            }
+        }
+        if (!target.write(name, *data, error)) {
+            messages.push_back(
+                std::format("Файл {} не скопирован: {} — папка прежняя", name, error));
+            return false;
+        }
+        ++copied;
+    }
+    // Два уведомления, а не одно: длинная строка шире окна.
+    messages.push_back(std::format("Папка сохранений сменилась, файлов скопировано: {}", copied));
+    if (backup) messages.push_back("Прежние файлы этой папки — в " + backup_name);
+    return true;
+}
+
+std::optional<platform::Storage> PlayerFiles::backup_folder(const platform::Storage& target,
+                                                            const core::LocalTime& when,
+                                                            std::string& name, std::string& error) {
+    for (int attempt = 1; attempt <= 99; ++attempt) {
+        name = core::backup_folder_name(when, attempt);
+        if (target.exists(name)) continue;
+        return platform::Storage::open(target.path(name), error);
+    }
+    error = "все имена backup_… заняты";
+    return std::nullopt;
 }
 
 }  // namespace aim::app

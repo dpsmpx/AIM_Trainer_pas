@@ -14,6 +14,7 @@
 #include <string_view>
 #include <vector>
 
+#include "core/history.h"
 #include "core/profile.h"
 
 namespace aim::core {
@@ -46,10 +47,25 @@ LoadedProfile read_stats(std::string_view text);
 /// Вещественное, как real.ToString() образца: до 15 значащих цифр, точка.
 std::string format_real(double value);
 
-/// Файл состояния программы: последний открытый профиль (AUD-21).
+/// Состояние программы — aim_trainer.ini в папке по умолчанию: последний
+/// открытый профиль (AUD-21) и выбранная папка сохранений (D-33).
+struct AppState {
+    int last_profile = 1;
+    std::string data_dir;  ///< пусто — папка по умолчанию
+};
+
 std::string app_state_file_name();
-std::string write_app_state(int last_profile, std::string_view newline);
-/// Последний профиль; нет файла, ключа или номер вне 1…4 — профиль 1.
-int read_last_profile(std::string_view text);
+std::string write_app_state(const AppState& state, std::string_view newline);
+/// Нет файла, ключа или номер вне 1…4 — профиль 1; нет DataDir — пусто.
+AppState read_app_state(std::string_view text);
+
+/// Файл игрока — то, что копируется в новую папку сохранений (D-33, D-35):
+/// profileN_stats.ini, profileN_sessions.csv, profileN_corrupt_backup.txt,
+/// export_profileN_ГГГГММДД.csv.
+bool is_player_file(std::string_view name);
+
+/// Папка для файлов новой папки сохранений, заменённых копией из прежней
+/// (D-35): backup_ГГГГММДД_ЧЧММ, со второй попытки — с «_N» на конце.
+std::string backup_folder_name(const LocalTime& when, int attempt);
 
 }  // namespace aim::core

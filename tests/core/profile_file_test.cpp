@@ -222,9 +222,38 @@ TEST(ProfileFile, NamesAndAppState) {
     EXPECT_EQ(stats_file_name(2), "profile2_stats.ini");
     EXPECT_EQ(sessions_file_name(3), "profile3_sessions.csv");
     EXPECT_EQ(corrupt_backup_file_name(1), "profile1_corrupt_backup.txt");
-    EXPECT_EQ(read_last_profile(write_app_state(3, "\r\n")), 3);
-    EXPECT_EQ(read_last_profile("LastProfile=9\n"), 1);
-    EXPECT_EQ(read_last_profile(""), 1);
+    EXPECT_EQ(
+        read_app_state(write_app_state({.last_profile = 3, .data_dir = {}}, "\r\n")).last_profile,
+        3);
+    EXPECT_EQ(read_app_state("LastProfile=9\n").last_profile, 1);
+    EXPECT_EQ(read_app_state("").last_profile, 1);
+}
+
+TEST(ProfileFile, AppStateKeepsChosenFolder) {
+    // Путь с пробелами, кириллицей и «=» — как есть (D-33).
+    const AppState state{.last_profile = 2, .data_dir = "D:\\Мои игры\\a=b\\"};
+    const AppState read = read_app_state(write_app_state(state, "\r\n"));
+    EXPECT_EQ(read.last_profile, 2);
+    EXPECT_EQ(read.data_dir, state.data_dir);
+    EXPECT_EQ(write_app_state({.last_profile = 1, .data_dir = {}}, "\n"), "[App]\nLastProfile=1\n")
+        << "без выбранной папки — файл как раньше";
+}
+
+TEST(ProfileFile, PlayerFilesForFolderChange) {
+    for (const char* name : {"profile1_stats.ini", "profile4_sessions.csv",
+                             "profile2_corrupt_backup.txt", "export_profile3_20261016.csv"})
+        EXPECT_TRUE(is_player_file(name)) << name;
+    for (const char* name :
+         {"aim_trainer.ini", "profile_stats.ini", "profile1_stats.ini.tmp",
+          "export_profile1_2026.csv", "export_profile_20261016.csv", "notes.txt"})
+        EXPECT_FALSE(is_player_file(name)) << name;
+}
+
+TEST(ProfileFile, BackupFolderNameHasMinuteAndAttempt) {
+    const LocalTime when{.year = 2026, .month = 10, .day = 6, .hour = 9, .minute = 5};
+    EXPECT_EQ(backup_folder_name(when, 1), "backup_20261006_0905");
+    EXPECT_EQ(backup_folder_name(when, 2), "backup_20261006_0905_2");
+    EXPECT_FALSE(is_player_file(backup_folder_name(when, 1))) << "папка копий не копируется";
 }
 
 TEST(History, LineLikeOriginal) {

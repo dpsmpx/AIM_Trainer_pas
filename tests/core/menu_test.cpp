@@ -153,6 +153,28 @@ TEST_F(MenuTest, SettingsStepToggleResetAndClose) {
     EXPECT_EQ(menu_.panel(), Panel::None);
 }
 
+TEST_F(MenuTest, DataFolderRowsAndExportAreRequests) {
+    menu_.click(click_at(center(mini_button(MiniButton::Settings))));
+    menu_.click(click_at(center(settings_toggle(kSettingsOpenFolderRow))));
+    menu_.click(click_at(center(settings_toggle(kSettingsChooseFolderRow))));
+    std::vector<MenuRequest> r = menu_.take_requests();
+    EXPECT_EQ(count<OpenDataFolder>(r), 1);
+    EXPECT_EQ(count<ChooseDataFolder>(r), 1);
+    EXPECT_EQ(menu_.panel(), Panel::Settings);
+    // Строки папки — выше сброса и внутри панели.
+    EXPECT_LT(settings_toggle(kSettingsChooseFolderRow).y2, settings_reset().y1);
+    EXPECT_LT(settings_reset().y2, settings_panel().y2 - 44)
+        << "под сбросом — подпись в две строки";
+    menu_.key({.key = Key::Escape, .time = kLater});
+
+    menu_.click(click_at(center(mini_button(MiniButton::History))));
+    menu_.take_requests();
+    menu_.click(click_at(center(history_export())));
+    r = menu_.take_requests();
+    EXPECT_EQ(count<ExportHistory>(r), 1);
+    EXPECT_EQ(menu_.panel(), Panel::History);
+}
+
 TEST_F(MenuTest, ProfilesSwitchOnlyToAnother) {
     menu_.click(click_at(center(mini_button(MiniButton::Profile))));
     ASSERT_EQ(menu_.panel(), Panel::Profiles);

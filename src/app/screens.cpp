@@ -23,9 +23,10 @@ struct Overload : Fs... {
 
 }  // namespace
 
-Screens::Screens(SDL_Renderer* renderer, Text& text, core::Profile& profile, PlayerFiles& files,
-                 core::Random& rng, core::Menu& menu, platform::Sound& sound)
-    : canvas_(renderer, text),
+Screens::Screens(SDL_Window* window, SDL_Renderer* renderer, Text& text, core::Profile& profile,
+                 PlayerFiles& files, core::Random& rng, core::Menu& menu, platform::Sound& sound)
+    : window_(window),
+      canvas_(renderer, text),
       profile_(profile),
       files_(files),
       rng_(rng),
@@ -61,6 +62,26 @@ void Screens::open_history() {
                 .by_time_of_day = core::scores_by_time_of_day(rows),
                 .recent_reactions = core::recent_avg_reactions(rows),
                 .file_name = files_.history_file_name()};
+}
+
+void Screens::take_folder_choice() {
+    const std::optional<platform::FolderChoice> choice = folder_picker_.take();
+    if (!choice) return;
+    if (!choice->error.empty()) {
+        message("Выбор папки недоступен: " + choice->error);
+        return;
+    }
+    if (choice->path.empty()) return;  // отмена
+    // Несохранённое (переключатель эффектов) — в прежнюю папку до копирования.
+    save();
+    std::vector<std::string> messages;
+    if (std::optional<core::Profile> moved =
+            files_.change_folder(choice->path, local_now(), messages)) {
+        profile_ = *moved;
+        menu_.set_profile_number(files_.profile_number());
+    }
+    for (std::string& m : messages)
+        message(std::move(m));
 }
 
 void Screens::before_input(const core::Flow& flow, core::Vec2 mouse, core::Nanoseconds now) {
@@ -130,9 +151,26 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
                                message(std::move(m));
                        },
                        [&](const core::LoadHistory&) { open_history(); },
+                       [&](const core::ExportHistory&) {
+                           std::string name;
+                           std::string error;
+                           if (files_.export_history(local_now(), name, error))
+                               message("CSV экспортирован: " + name);
+                           else
+                               message("Ошибка экспорта: " + error);
+                       },
+                       [&](const core::OpenDataFolder&) {
+                           std::string error;
+                           if (!platform::open_folder(files_.folder(), error))
+                               message("Папка не открылась: " + error);
+                       },
+                       [&](const core::ChooseDataFolder&) {
+                           folder_picker_.show(window_, files_.folder());
+                       },
                    },
                    r);
     }
+    take_folder_choice();
     switch (flow.screen()) {
         case core::Screen::Menu: menu_view_.update(now); break;
         case core::Screen::Game:
@@ -149,7 +187,8 @@ void Screens::render(const core::Flow& flow, core::Vec2 mouse, int fps, core::Na
     const core::Theme& th = theme();
     switch (flow.screen()) {
         case core::Screen::Menu:
-            menu_view_.render(canvas_, toasts_, th, menu_, profile_, history_, mouse, now);
+            menu_view_.render(canvas_, toasts_, th, menu_, profile_, history_, files_.folder(),
+                              mouse, now);
             break;
         case core::Screen::Countdown: render_countdown(canvas_, th, flow, now); break;
         case core::Screen::Game:

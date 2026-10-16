@@ -1,6 +1,7 @@
 // Файлы игрока программы (D-11, D-30): новый профиль сразу записан, как у
 // образца; повреждённый — копия и умолчания; последний профиль запоминается
-// (AUD-21); у истории один заголовок. Каталоги — временные в текущем.
+// (AUD-21); у истории один заголовок; экспорт и смена папки сохранений
+// (D-33, D-35). Каталоги — временные в текущем.
 
 #include "app/player_files.h"
 
@@ -24,6 +25,9 @@ std::string test_dir() {
     return std::string("player_files_test_") +
            ::testing::UnitTest::GetInstance()->current_test_info()->name() + "/";
 }
+
+// Время смены папки — для имени backup_… (D-35).
+constexpr core::LocalTime kWhen{.year = 2026, .month = 10, .day = 16, .hour = 15, .minute = 32};
 
 class PlayerFilesTest : public ::testing::Test {
 protected:
@@ -132,6 +136,128 @@ TEST_F(PlayerFilesTest, HistoryHasOneHeaderAndARowPerRun) {
     EXPECT_EQ(lines[0], core::kSessionsHeader);
     EXPECT_NE(lines[1].find(",Flick,77,"), std::string_view::npos);
     EXPECT_EQ(core::read_sessions(csv).size(), 2U);
+}
+
+TEST_F(PlayerFilesTest, ExportCopiesHistoryNextToProfile) {
+    PlayerFiles f = files();
+    f.load(messages_);
+    std::string name;
+    EXPECT_FALSE(f.export_history({}, name, error_)) << "истории ещё нет";
+    core::GameSummary run;
+    run.score = 5;
+    ASSERT_TRUE(f.log_run(run, error_)) << error_;
+    ASSERT_TRUE(f.export_history({.year = 2026, .month = 10, .day = 16}, name, error_)) << error_;
+    EXPECT_EQ(name, "export_profile1_20261016.csv");
+    EXPECT_EQ(disk_.read(name), disk_.read("profile1_sessions.csv"));
+}
+
+TEST_F(PlayerFilesTest, ChangeFolderCopiesFilesAndIsRemembered) {
+    const std::string other = dir_ + "other/";
+    {
+        PlayerFiles f = files();
+        core::Profile p = f.load(messages_);
+        p.best_score = 77;
+        ASSERT_TRUE(f.save(p, error_)) << error_;
+        ASSERT_TRUE(f.log_run({}, error_)) << error_;
+        const std::optional<core::Profile> moved = f.change_folder(other, kWhen, messages_);
+        ASSERT_TRUE(moved.has_value());
+        EXPECT_EQ(moved.value_or(core::Profile{}).best_score, 77);
+        EXPECT_EQ(f.folder(), other);
+    }
+    const platform::Storage target(other);
+    EXPECT_TRUE(target.exists("profile1_stats.ini"));
+    EXPECT_TRUE(target.exists("profile1_sessions.csv"));
+    EXPECT_TRUE(disk_.exists("profile1_stats.ini")) << "старая папка не тронута";
+    // Перезапуск: папка — из aim_trainer.ini папки по умолчанию.
+    PlayerFiles again = files();
+    const core::Profile read = again.load(messages_);
+    EXPECT_EQ(again.folder(), other);
+    EXPECT_EQ(read.best_score, 77);
+}
+
+TEST_F(PlayerFilesTest, ChangeFolderReplacesSavesThereKeepingCopies) {
+    const std::string other = dir_ + "theirs/";
+    const platform::Storage theirs(other);
+    ASSERT_TRUE(SDL_CreateDirectory(other.c_str()));
+    core::Profile their_profile;
+    their_profile.best_score = 999;
+    const std::string their_text = core::write_stats(their_profile, platform::kNewline);
+    ASSERT_TRUE(theirs.write("profile1_stats.ini", their_text, error_));
+    ASSERT_TRUE(theirs.write("profile3_stats.ini", their_text, error_));
+    PlayerFiles f = files();
+    core::Profile mine = f.load(messages_);
+    mine.best_score = 5;
+    ASSERT_TRUE(f.save(mine, error_)) << error_;
+    messages_.clear();
+    const std::optional<core::Profile> moved = f.change_folder(other, kWhen, messages_);
+    ASSERT_TRUE(moved.has_value());
+    EXPECT_EQ(moved.value_or(core::Profile{}).best_score, 5)
+        << "сохранения прежней папки — в новой";
+    const platform::Storage backup(other + "backup_20261016_1532/");
+    EXPECT_EQ(backup.read("profile1_stats.ini"), their_text) << "заменённый файл не потерян";
+    EXPECT_EQ(theirs.read("profile3_stats.ini"), their_text) << "чего в прежней нет — не тронуто";
+    EXPECT_FALSE(backup.exists("profile3_stats.ini"));
+    ASSERT_GE(messages_.size(), 2U);
+    EXPECT_NE(messages_[1].find("backup_20261016_1532"), std::string::npos) << messages_[1];
+}
+
+TEST_F(PlayerFilesTest, SecondChangeInAMinuteGetsItsOwnBackup) {
+    const std::string other = dir_ + "other/";
+    PlayerFiles f = files();
+    core::Profile p = f.load(messages_);
+    // Туда-обратно с правкой профиля: в папке по умолчанию заменяется дважды.
+    for (const std::string& to : {other, dir_, other, dir_}) {
+        ++p.best_score;
+        ASSERT_TRUE(f.save(p, error_)) << error_;
+        ASSERT_TRUE(f.change_folder(to, kWhen, messages_).has_value()) << to;
+    }
+    EXPECT_TRUE(platform::Storage(dir_ + "backup_20261016_1532/").exists("profile1_stats.ini"));
+    EXPECT_TRUE(platform::Storage(dir_ + "backup_20261016_1532_2/").exists("profile1_stats.ini"));
+    EXPECT_EQ(f.load(messages_).best_score, 4);
+}
+
+TEST_F(PlayerFilesTest, UnreadableOldFolderKeepsTheChoice) {
+    const std::string target = dir_.substr(0, dir_.size() - 1) + "_target/";
+    PlayerFiles f = files();
+    f.load(messages_);
+    std::filesystem::remove_all(dir_);  // папку сохранений унесли из-под программы
+    messages_.clear();
+    EXPECT_FALSE(f.change_folder(target, kWhen, messages_).has_value())
+        << "пустой список — не «0 файлов»";
+    EXPECT_EQ(f.folder(), dir_);
+    EXPECT_EQ(messages_.size(), 1U);
+    std::filesystem::remove_all(target);
+}
+
+TEST_F(PlayerFilesTest, SameFolderIsNotAChange) {
+    PlayerFiles f = files();
+    f.load(messages_);
+    messages_.clear();
+    EXPECT_FALSE(f.change_folder(dir_, kWhen, messages_).has_value());
+    EXPECT_EQ(messages_.size(), 1U) << "игрок видит, что папка та же";
+}
+
+TEST_F(PlayerFilesTest, BackToDefaultFolderForgetsTheChoice) {
+    PlayerFiles f = files();
+    f.load(messages_);
+    ASSERT_TRUE(f.change_folder(dir_ + "other/", kWhen, messages_).has_value());
+    ASSERT_TRUE(f.change_folder(dir_, kWhen, messages_).has_value());
+    EXPECT_EQ(f.folder(), dir_);
+    const core::AppState state = core::read_app_state(disk_.read("aim_trainer.ini").value_or(""));
+    EXPECT_TRUE(state.data_dir.empty()) << "папке по умолчанию строка DataDir не нужна";
+}
+
+TEST_F(PlayerFilesTest, UnavailableChosenFolderFallsBackToDefault) {
+    ASSERT_TRUE(
+        disk_.write("aim_trainer.ini",
+                    core::write_app_state({.last_profile = 1, .data_dir = dir_ + "file_not_dir"},
+                                          platform::kNewline),
+                    error_));
+    ASSERT_TRUE(disk_.write("file_not_dir", "x", error_));
+    PlayerFiles f = files();
+    f.load(messages_);
+    EXPECT_EQ(f.folder(), dir_);
+    ASSERT_EQ(messages_.size(), 1U);
 }
 
 TEST_F(PlayerFilesTest, NoFolderSaysSoAndKeepsProfileInMemory) {

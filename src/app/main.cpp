@@ -207,11 +207,12 @@ int main(int argc, char* argv[]) {
 
         std::string problem;
         std::optional<aim::platform::Storage> storage =
-            aim::platform::Storage::open_user_folder(problem);
-        SDL_Log("папка игрока: %s", storage ? storage->dir().c_str() : problem.c_str());
+            aim::platform::Storage::default_folder(problem);
+        SDL_Log("папка по умолчанию: %s", storage ? storage->dir().c_str() : problem.c_str());
         aim::app::PlayerFiles files(std::move(storage), problem);
         std::vector<std::string> messages;
         aim::core::Profile profile = files.load(messages);
+        if (files.available()) SDL_Log("папка сохранений: %s", files.folder().c_str());
 
         aim::core::EngineRandom rng(SDL_GetPerformanceCounter());
         // Туториал — при запуске, если профиль его ещё не видел (как образец).
@@ -219,7 +220,7 @@ int main(int argc, char* argv[]) {
         aim::core::Flow flow(profile, rng, menu);
         aim::platform::Sound sound;
         if (!sound.active()) SDL_Log("звука нет: %s", sound.problem().c_str());
-        aim::app::Screens screens(renderer, *text, profile, files, rng, menu, sound);
+        aim::app::Screens screens(window, renderer, *text, profile, files, rng, menu, sound);
         screens.start(SDL_GetTicksNS());
         for (std::string& m : messages)
             screens.message(std::move(m));

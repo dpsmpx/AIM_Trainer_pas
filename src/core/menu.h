@@ -30,7 +30,14 @@ struct SwitchProfile {
 };
 /// Открыта «История»: перечитать историю профиля.
 struct LoadHistory {};
-using MenuRequest = std::variant<SaveProfile, SwitchProfile, LoadHistory>;
+/// «Экспорт в CSV» в «Истории» (D-33).
+struct ExportHistory {};
+/// Показать папку сохранений в файловом менеджере (D-33).
+struct OpenDataFolder {};
+/// Выбрать папку сохранений системным диалогом (D-33).
+struct ChooseDataFolder {};
+using MenuRequest = std::variant<SaveProfile, SwitchProfile, LoadHistory, ExportHistory,
+                                 OpenDataFolder, ChooseDataFolder>;
 
 /// Шагов туториала первого запуска.
 inline constexpr int kTutorialSteps = 4;

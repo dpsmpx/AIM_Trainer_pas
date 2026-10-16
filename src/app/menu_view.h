@@ -8,6 +8,7 @@
 #include <array>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "app/canvas.h"
@@ -44,9 +45,10 @@ public:
     /// Меню целиком, в порядке образца: фон, частицы, плашка, кнопки,
     /// описание, график, рекорды, кнопки внизу, уведомление, открытая панель,
     /// туториал.
+    /// data_folder — папка сохранений для панели настроек (D-33).
     void render(Canvas& canvas, Toasts& toasts, const core::Theme& theme, const core::Menu& menu,
-                const core::Profile& profile, const HistoryView& history, core::Vec2 mouse,
-                core::Nanoseconds now) const;
+                const core::Profile& profile, const HistoryView& history,
+                std::string_view data_folder, core::Vec2 mouse, core::Nanoseconds now) const;
 
 private:
     void render_particles(Canvas& canvas, const core::Profile& profile, core::Vec2 mouse) const;

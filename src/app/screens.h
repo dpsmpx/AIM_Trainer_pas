@@ -21,14 +21,15 @@
 #include "core/profile.h"
 #include "core/random.h"
 #include "core/tone.h"
+#include "platform/folders.h"
 #include "platform/sound.h"
 
 namespace aim::app {
 
 class Screens {
 public:
-    Screens(SDL_Renderer* renderer, Text& text, core::Profile& profile, PlayerFiles& files,
-            core::Random& rng, core::Menu& menu, platform::Sound& sound);
+    Screens(SDL_Window* window, SDL_Renderer* renderer, Text& text, core::Profile& profile,
+            PlayerFiles& files, core::Random& rng, core::Menu& menu, platform::Sound& sound);
 
     /// Программа запущена в момент now: меню появляется.
     void start(core::Nanoseconds now);
@@ -45,11 +46,14 @@ public:
 
 private:
     void save();
+    /// Ответ диалога выбора папки сохранений (D-33): перейти на неё.
+    void take_folder_choice();
     /// Звук, если он включён в настройках.
     void play(core::Beep beep);
     void open_history();
     [[nodiscard]] const core::Theme& theme() const;
 
+    SDL_Window* window_;
     Canvas canvas_;
     core::Profile& profile_;
     PlayerFiles& files_;
@@ -61,6 +65,7 @@ private:
     CursorTrail trail_;
     Toasts toasts_;
     HistoryView history_;
+    platform::FolderPicker folder_picker_;
 };
 
 }  // namespace aim::app

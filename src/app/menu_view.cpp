@@ -118,7 +118,23 @@ void render_help(Canvas& c) {
     c.draw_text_centered(p.x1, p.y2 - 26, p.x2, p.y2 - 6, "Клик — закрыть");
 }
 
-void render_settings(Canvas& c, const core::Settings& s) {
+// Путь, обрезанный слева до ширины width: «…\Roaming\AimTrainer\».
+std::string fit_path(Canvas& c, std::string_view prefix, std::string_view path, int width) {
+    std::string tail(path);
+    const auto text = [&](bool cut) { return std::string(prefix) + (cut ? "…" : "") + tail; };
+    bool cut = false;
+    while (!tail.empty() && c.text_width(text(cut)) > width) {
+        // Отбросить первый знак UTF-8.
+        std::size_t next = 1;
+        while (next < tail.size() && (static_cast<unsigned char>(tail[next]) & 0xC0U) == 0x80U)
+            ++next;
+        tail.erase(0, next);
+        cut = true;
+    }
+    return text(cut);
+}
+
+void render_settings(Canvas& c, const core::Settings& s, std::string_view folder) {
     const Rect p = core::settings_panel();
     panel_back(c, p);
     c.font.size = 20;
@@ -158,6 +174,12 @@ void render_settings(Canvas& c, const core::Settings& s) {
     };
     toggle(3, std::string("Звук: ") + (s.sound ? "ON" : "OFF"));
     toggle(4, "Тема: " + std::string(core::kThemes.at(static_cast<std::size_t>(s.theme)).name));
+    // Папка сохранений (D-33) — мельче: путь длинный.
+    c.font.size = 13;
+    toggle(core::kSettingsOpenFolderRow, "Открыть папку сохранений");
+    const Rect folder_row = core::settings_toggle(core::kSettingsChooseFolderRow);
+    toggle(core::kSettingsChooseFolderRow,
+           fit_path(c, "Папка: ", folder, folder_row.x2 - folder_row.x1 - 16));
 
     const Rect reset = core::settings_reset();
     c.brush = argb(160, 90, 90, 95);
@@ -285,7 +307,14 @@ void render_history(Canvas& c, const HistoryView& h) {
             c.fill_circle(pts[0].x, pts[0].y, 3);
         }
     }
-    // «Экспорт в CSV» — после ответа автора, куда класть файл (TODO.md).
+    // «Экспорт в CSV» — в папку сохранений (D-33).
+    const Rect export_button = core::history_export();
+    c.brush = argb(160, 90, 90, 95);
+    c.pen = argb(0, 0, 0, 0);
+    fill_round_rect(c, export_button, 8, 8);
+    c.font.size = 12;
+    c.font_color = kClWhite;
+    text_centered(c, export_button, "Экспорт в CSV");
     c.font.size = 10;
     c.font_color = argb(170, 180, 180, 180);
     c.draw_text_centered(p.x1 + 250, p.y1 + 410, p.x1 + 500, p.y1 + 442, h.file_name);
@@ -563,8 +592,8 @@ void MenuView::render_plate(Canvas& c, int mode, core::Vec2 mouse) const {
 }
 
 void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const core::Menu& menu,
-                      const core::Profile& profile, const HistoryView& history, core::Vec2 mouse,
-                      core::Nanoseconds now) const {
+                      const core::Profile& profile, const HistoryView& history,
+                      std::string_view data_folder, core::Vec2 mouse, core::Nanoseconds now) const {
     c.clear_window(theme.background);
     render_particles(c, profile, mouse);
     render_plate(c, menu.selected_mode(), mouse);
@@ -680,7 +709,7 @@ void MenuView::render(Canvas& c, Toasts& toasts, const core::Theme& theme, const
 
     switch (menu.panel()) {
         case core::Panel::Help: render_help(c); break;
-        case core::Panel::Settings: render_settings(c, profile.settings); break;
+        case core::Panel::Settings: render_settings(c, profile.settings, data_folder); break;
         case core::Panel::Records: render_leaderboard(c, profile.leaderboard); break;
         case core::Panel::Achievements: render_achievements(c, profile); break;
         case core::Panel::History: render_history(c, history); break;

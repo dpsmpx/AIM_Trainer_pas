@@ -41,17 +41,23 @@ bool write_io(const std::string& path, std::string_view name, const char* mode,
 
 }  // namespace
 
-std::optional<Storage> Storage::open_user_folder(std::string& problem) {
-    if (const char* forced = SDL_getenv("AIM_TRAINER_DATA_DIR");
-        forced != nullptr && *forced != '\0') {
-        std::string dir = forced;
-        if (!dir.ends_with('/') && !dir.ends_with('\\')) dir += '/';
-        if (!SDL_CreateDirectory(dir.c_str())) {
-            problem = SDL_GetError();
-            return std::nullopt;
-        }
-        return Storage(std::move(dir));
+std::optional<Storage> Storage::open(std::string dir, std::string& problem) {
+    if (dir.empty()) {
+        problem = "empty folder path";
+        return std::nullopt;
     }
+    if (!dir.ends_with('/') && !dir.ends_with('\\')) dir += '/';
+    if (!SDL_CreateDirectory(dir.c_str())) {
+        problem = SDL_GetError();
+        return std::nullopt;
+    }
+    return Storage(std::move(dir));
+}
+
+std::optional<Storage> Storage::default_folder(std::string& problem) {
+    if (const char* forced = SDL_getenv("AIM_TRAINER_DATA_DIR");
+        forced != nullptr && *forced != '\0')
+        return open(forced, problem);
     // Пустая организация — уровня «организации» в пути нет (D-30).
     char* pref = SDL_GetPrefPath("", kAppFolder);
     if (pref == nullptr) {
@@ -96,6 +102,33 @@ bool Storage::append(std::string_view name, std::string_view data, std::string& 
 
 bool Storage::exists(std::string_view name) const {
     return SDL_GetPathInfo(path(name).c_str(), nullptr);
+}
+
+std::optional<std::vector<std::string>> Storage::files(std::string& error) const {
+    struct Listing {
+        const std::string* dir;
+        std::vector<std::string> names;
+    } listing{&dir_, {}};
+    const auto callback = [](void* userdata, const char* /*dirname*/,
+                             const char* fname) -> SDL_EnumerationResult {
+        auto* l = static_cast<Listing*>(userdata);
+        SDL_PathInfo info{};
+        if (SDL_GetPathInfo((*l->dir + fname).c_str(), &info) && info.type == SDL_PATHTYPE_FILE)
+            l->names.emplace_back(fname);
+        return SDL_ENUM_CONTINUE;
+    };
+    if (!SDL_EnumerateDirectory(dir_.c_str(), callback, &listing)) {
+        error = SDL_GetError();
+        return std::nullopt;
+    }
+    return listing.names;
+}
+
+bool Storage::writable(std::string& error) const {
+    constexpr std::string_view kProbe = "aim_trainer_write_probe.tmp";
+    if (!write_io(path(kProbe), kProbe, "wb", "ok", error)) return false;
+    SDL_RemovePath(path(kProbe).c_str());
+    return true;
 }
 
 }  // namespace aim::platform

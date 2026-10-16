@@ -57,6 +57,10 @@ void Menu::click_settings(Vec2 p) {
     } else if (settings_toggle(4).contains(p)) {
         profile_.settings.theme = (profile_.settings.theme + 1) % kThemeCount;
         requests_.emplace_back(SaveProfile{});
+    } else if (settings_toggle(kSettingsOpenFolderRow).contains(p)) {
+        requests_.emplace_back(OpenDataFolder{});
+    } else if (settings_toggle(kSettingsChooseFolderRow).contains(p)) {
+        requests_.emplace_back(ChooseDataFolder{});
     } else if (settings_reset().contains(p)) {
         reset_settings(profile_.settings);
         requests_.emplace_back(SaveProfile{});
@@ -83,8 +87,10 @@ std::optional<GameMode> Menu::click(const ClickInput& click) {
             panel_ = Panel::None;
             return std::nullopt;
         case Panel::History:
-            // «Экспорт в CSV» — после ответа автора (TODO.md).
-            if (!history_panel().contains(p)) panel_ = Panel::None;
+            if (history_export().contains(p))
+                requests_.emplace_back(ExportHistory{});
+            else if (!history_panel().contains(p))
+                panel_ = Panel::None;
             return std::nullopt;
         case Panel::Profiles:
             for (int n = 1; n <= kProfileCount; ++n) {
