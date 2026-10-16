@@ -18,7 +18,12 @@ else()
     set(_aim_discovery_timeout 10)
 endif()
 
-add_executable(aim_core_tests core/click_time_test.cpp)
+add_executable(aim_core_tests
+    core/click_time_test.cpp
+    core/game_test.cpp
+    core/profile_test.cpp
+    core/random_test.cpp
+    core/target_test.cpp)
 target_link_libraries(aim_core_tests PRIVATE aim_core GTest::gtest_main)
 aim_own_code(aim_core_tests)
 gtest_discover_tests(aim_core_tests DISCOVERY_MODE PRE_TEST

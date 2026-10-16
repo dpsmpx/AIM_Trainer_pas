@@ -8,15 +8,10 @@
 #include <cstdint>
 #include <vector>
 
+#include "core/mouse.h"
+#include "core/time.h"
+
 namespace aim::core {
-
-/// Время на часах программы, нс. В программе — SDL_GetTicksNS: те же часы у
-/// показа кадра, у события SDL и у потока сырого ввода (D-12, D-24).
-using Nanoseconds = std::uint64_t;
-
-/// Логическая кнопка мыши — после перестановки кнопок для левши, как в
-/// событиях SDL.
-enum class MouseButton : std::uint8_t { Left, Middle, Right, X1, X2 };
 
 /// Нажатие из своего потока сырого ввода (D-24).
 struct RawPress {
