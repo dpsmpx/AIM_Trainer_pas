@@ -60,18 +60,21 @@ add_library(aim_core STATIC
     src/core/click_time.cpp
     src/core/flow.cpp
     src/core/game.cpp
+    src/core/history.cpp
     src/core/modes.cpp
     src/core/profile.cpp
+    src/core/profile_file.cpp
     src/core/random.cpp
-    src/core/target.cpp)
+    src/core/target.cpp
+    src/core/text.cpp)
 target_include_directories(aim_core PUBLIC src)
 aim_own_code(aim_core)
 
 # SDL3 и системные вызовы (D-25); свой поток сырого ввода — только Windows (D-24).
 if(WIN32)
-    add_library(aim_platform STATIC src/platform/raw_mouse_win.cpp)
+    add_library(aim_platform STATIC src/platform/raw_mouse_win.cpp src/platform/storage.cpp)
 else()
-    add_library(aim_platform STATIC src/platform/raw_mouse_none.cpp)
+    add_library(aim_platform STATIC src/platform/raw_mouse_none.cpp src/platform/storage.cpp)
 endif()
 target_link_libraries(aim_platform PUBLIC aim_core SDL3::SDL3)
 aim_own_code(aim_platform)
@@ -81,6 +84,7 @@ aim_own_code(aim_platform)
 add_executable(AimTrainer WIN32
     src/app/draw.cpp
     src/app/main.cpp
+    src/app/player_files.cpp
     src/app/screens.cpp)
 target_link_libraries(AimTrainer PRIVATE aim_platform)
 aim_own_code(AimTrainer)

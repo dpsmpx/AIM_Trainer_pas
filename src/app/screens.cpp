@@ -41,7 +41,7 @@ Rgba with_alpha(Rgba c, int alpha) {
     return c;
 }
 
-void render_menu(SDL_Renderer* r, const core::Profile& p) {
+void render_menu(SDL_Renderer* r, const core::Profile& p, const Overlay& overlay) {
     core::Vec2 mouse;
     {
         float mx = 0;
@@ -67,6 +67,7 @@ void render_menu(SDL_Renderer* r, const core::Profile& p) {
                     p.best_score, p.best_accuracy, p.best_precision, p.best_avg_reaction);
     text(r, 16, 548, best, 1.5F, kDim);
     text(r, 16, 572, std::format("Games: {}", p.games_played), 1.5F, kDim);
+    text(r, 510, 572, std::format("Profile {}", overlay.profile), 1.5F, kDim);
 }
 
 void render_countdown(SDL_Renderer* r, const core::Flow& flow, core::Nanoseconds now) {
@@ -201,15 +202,18 @@ void render(SDL_Renderer* renderer, const core::Flow& flow, const core::Profile&
     set_color(renderer, theme.background);
     SDL_RenderClear(renderer);
     switch (flow.screen()) {
-        case core::Screen::Menu: render_menu(renderer, profile); break;
+        case core::Screen::Menu: render_menu(renderer, profile, overlay); break;
         case core::Screen::Countdown: render_countdown(renderer, flow, now); break;
         case core::Screen::Game: render_game(renderer, flow, theme, now, overlay); break;
         case core::Screen::GameOver: render_game_over(renderer, flow); break;
     }
     if (!overlay.toast.empty()) {
-        const float w = text_width(overlay.toast, 1.5F) + 24;
+        // Длинное сообщение (ошибка файла) — мельче, чтобы поместилось.
+        const float scale = text_width(overlay.toast, 1.5F) + 24 <= kW - 16 ? 1.5F : 1.0F;
+        const float w = text_width(overlay.toast, scale) + 24;
         fill_rect(renderer, (kW - w) / 2, 8, w, 28, {40, 40, 46, 230});
-        text_centered(renderer, kW / 2, 16, overlay.toast, 1.5F, theme.accent);
+        text_centered(renderer, kW / 2, scale > 1.0F ? 16.0F : 18.0F, overlay.toast, scale,
+                      theme.accent);
     }
 }
 

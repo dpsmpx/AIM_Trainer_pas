@@ -61,11 +61,15 @@ void reset_settings(Settings& settings) {
     settings.sound = defaults.sound;
 }
 
-void clamp_settings(Settings& settings) {
-    settings.circle_size = std::clamp(settings.circle_size, kMinCircleSize, kMaxCircleSize);
-    settings.lifetime_ms = std::clamp(settings.lifetime_ms, kMinLifetimeMs, kMaxLifetimeMs);
-    settings.lives = std::clamp(settings.lives, kMinLives, kMaxLives);
-    if (settings.theme < 0 || settings.theme >= kThemeCount) settings.theme = 0;
+void reset_out_of_range(Settings& settings) {
+    const Settings defaults;
+    const auto check = [](int& value, int low, int high, int fallback) {
+        if (value < low || value > high) value = fallback;
+    };
+    check(settings.circle_size, kMinCircleSize, kMaxCircleSize, defaults.circle_size);
+    check(settings.lifetime_ms, kMinLifetimeMs, kMaxLifetimeMs, defaults.lifetime_ms);
+    check(settings.lives, kMinLives, kMaxLives, defaults.lives);
+    check(settings.theme, 0, kThemeCount - 1, defaults.theme);
 }
 
 GameSettings game_settings(const Settings& settings) {
@@ -132,12 +136,25 @@ FinishResult finish_game(Profile& profile, const GameSummary& summary) {
     try_unlock(kVeteran, profile.games_played >= kVeteranGames);
     try_unlock(kDualMaster, summary.mode == GameMode::Dual && summary.score >= kDualMasterScore);
 
-    for (const double r : summary.reactions_ms) {
-        profile.reactions.push_back(round_half_even(r));
-        if (profile.reactions.size() > static_cast<std::size_t>(kReactionHistory))
-            profile.reactions.pop_front();
-    }
+    for (const double r : summary.reactions_ms)
+        profile.reactions.push(round_half_even(r));
     return result;
+}
+
+void ReactionRing::push(int value_ms) {
+    values[static_cast<std::size_t>(next)] = value_ms;
+    next = (next + 1) % kReactionHistory;
+    count = std::min(count + 1, kReactionHistory);
+}
+
+std::vector<int> ReactionRing::in_order() const {
+    std::vector<int> out;
+    out.reserve(static_cast<std::size_t>(count));
+    // Неполное кольцо — с нуля; полное — со следующей записи, она старейшая.
+    const int first = count < kReactionHistory ? 0 : next;
+    for (int i = 0; i < count; ++i)
+        out.push_back(values[static_cast<std::size_t>((first + i) % kReactionHistory)]);
+    return out;
 }
 
 }  // namespace aim::core

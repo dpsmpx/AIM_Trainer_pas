@@ -22,6 +22,7 @@ add_executable(aim_core_tests
     core/click_time_test.cpp
     core/flow_test.cpp
     core/game_test.cpp
+    core/profile_file_test.cpp
     core/profile_test.cpp
     core/random_test.cpp
     core/target_test.cpp)
@@ -30,10 +31,20 @@ aim_own_code(aim_core_tests)
 gtest_discover_tests(aim_core_tests DISCOVERY_MODE PRE_TEST
                      DISCOVERY_TIMEOUT ${_aim_discovery_timeout})
 
-add_executable(aim_platform_tests platform/sdl_version_test.cpp platform/raw_mouse_test.cpp)
+add_executable(aim_platform_tests
+    platform/raw_mouse_test.cpp
+    platform/sdl_version_test.cpp
+    platform/storage_test.cpp)
 target_link_libraries(aim_platform_tests PRIVATE aim_platform GTest::gtest_main)
 aim_own_code(aim_platform_tests)
 gtest_discover_tests(aim_platform_tests DISCOVERY_MODE PRE_TEST
+                     DISCOVERY_TIMEOUT ${_aim_discovery_timeout})
+
+# Слой программы без окна: файлы игрока.
+add_executable(aim_app_tests app/player_files_test.cpp ../src/app/player_files.cpp)
+target_link_libraries(aim_app_tests PRIVATE aim_platform GTest::gtest_main)
+aim_own_code(aim_app_tests)
+gtest_discover_tests(aim_app_tests DISCOVERY_MODE PRE_TEST
                      DISCOVERY_TIMEOUT ${_aim_discovery_timeout})
 
 # Программа целиком: три кадра без экрана и снимок последнего; проверка

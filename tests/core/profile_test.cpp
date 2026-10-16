@@ -44,13 +44,21 @@ TEST(Settings, ResetKeepsThemeAndEffects) {
     EXPECT_EQ(s.theme, 1);
 }
 
-TEST(Settings, ClampFromFile) {
+TEST(Settings, OutOfRangeFromFileGoesToDefault) {
+    // Как LoadStats образца: не к границе, а к умолчанию; внутри границ — как есть.
     Settings s{.circle_size = 7, .lifetime_ms = 99999, .lives = -3, .theme = 5};
-    clamp_settings(s);
-    EXPECT_EQ(s.circle_size, kMinCircleSize);
-    EXPECT_EQ(s.lifetime_ms, kMaxLifetimeMs);
-    EXPECT_EQ(s.lives, kMinLives);
+    reset_out_of_range(s);
+    EXPECT_EQ(s.circle_size, 40);
+    EXPECT_EQ(s.lifetime_ms, 1000);
+    EXPECT_EQ(s.lives, 15);
     EXPECT_EQ(s.theme, 0);
+    Settings edge{
+        .circle_size = kMaxCircleSize, .lifetime_ms = kMinLifetimeMs, .lives = 29, .theme = 2};
+    reset_out_of_range(edge);
+    EXPECT_EQ(edge.circle_size, kMaxCircleSize);
+    EXPECT_EQ(edge.lifetime_ms, kMinLifetimeMs);
+    EXPECT_EQ(edge.lives, 29);
+    EXPECT_EQ(edge.theme, 2);
     const GameSettings g = game_settings(Settings{});
     EXPECT_EQ(g.circle_size, 40);
     EXPECT_EQ(g.lifetime_ms, 1000);
@@ -156,16 +164,28 @@ TEST(FinishGame, AchievementsOnFinish) {
 TEST(FinishGame, ReactionHistoryKeepsLastFiftyInOrder) {
     Profile p;
     for (int i = 0; i < 40; ++i)
-        p.reactions.push_back(1000 + i);
+        p.reactions.push(1000 + i);
     GameSummary s = summary_of(GameMode::Classic, 0, 0, 0, 0, 0);
     for (int i = 0; i < 20; ++i)
         s.reactions_ms.push_back(200.0 + i + 0.5);
     finish_game(p, s);
-    ASSERT_EQ(p.reactions.size(), 50U);
-    EXPECT_EQ(p.reactions.front(), 1010);
-    EXPECT_EQ(p.reactions[29], 1039);
-    EXPECT_EQ(p.reactions[30], 200) << "200,5 → к чётному";
-    EXPECT_EQ(p.reactions.back(), 220) << "219,5 → к чётному";
+    EXPECT_EQ(p.reactions.count, 50);
+    EXPECT_EQ(p.reactions.next, 10) << "кольцо: 60 записей, следующая — на место 10";
+    const std::vector<int> order = p.reactions.in_order();
+    ASSERT_EQ(order.size(), 50U);
+    EXPECT_EQ(order.front(), 1010);
+    EXPECT_EQ(order[29], 1039);
+    EXPECT_EQ(order[30], 200) << "200,5 → к чётному";
+    EXPECT_EQ(order.back(), 220) << "219,5 → к чётному";
+}
+
+TEST(ReactionRing, PartialRingFromZero) {
+    ReactionRing ring;
+    ring.push(5);
+    ring.push(7);
+    EXPECT_EQ(ring.count, 2);
+    EXPECT_EQ(ring.next, 2);
+    EXPECT_EQ(ring.in_order(), (std::vector<int>{5, 7}));
 }
 
 TEST(Achievements, OnHitEvents) {

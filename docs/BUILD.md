@@ -118,8 +118,10 @@ tools/gui.sh compare a.png b.png    # число несовпавших пикс
 ```
 
 То же с `port` вместо `ref` — C++-версия (пресет `linux-gcc`, экран `:96`).
-Оригинал пишет файлы профиля в `build/ref` (AUD-17); `tools/gui.sh ref
-build` начинает с чистого каталога, `tools/gui.sh ref clean` — удаляет
+Оригинал пишет файлы профиля в `build/ref` (AUD-17), C++-версия — в
+`build/gui/port/data` (`AIM_TRAINER_DATA_DIR`, D-30), а не в папку
+пользователя сессии; `tools/gui.sh ЦЕЛЬ dir` печатает папку. `tools/gui.sh
+ref build` начинает с чистого каталога, `tools/gui.sh ЦЕЛЬ clean` — удаляет
 только файлы игрока.
 
 Вспомогательные скрипты сессий — `tools/helpers/` (D-27):

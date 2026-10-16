@@ -77,7 +77,7 @@ struct AchievementUnlocked {
     int id = 0;
 };
 /// Забег окончен и записан в профиль (FinishGameAndSaveStats образца); файлы
-/// — шаг «Файлы профиля».
+/// пишет программа (app/player_files.h).
 struct RunFinished {
     GameSummary summary;
     int leaderboard_place = -1;

@@ -2,7 +2,8 @@
 // Шаг «Время и ввод»: часы кадра — SDL_GetTicksNS; щелчок — точка из события
 // SDL и время из своего потока сырого ввода (D-24); клавиши — события, по
 // физическому положению; реакция — от показа кадра с целью (D-12). Экраны
-// пока временные (app/screens.h); профиль — в памяти до шага «Файлы профиля».
+// пока временные (app/screens.h). Профиль и история — в папке игрока (D-11,
+// D-30; app/player_files.h).
 //
 //   AimTrainer [--frames N] [--screenshot файл.bmp]
 //
@@ -15,14 +16,17 @@
 #include <algorithm>
 #include <charconv>
 #include <cstdint>
+#include <deque>
 #include <format>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <utility>
 #include <variant>
 #include <vector>
 
+#include "app/player_files.h"
 #include "app/screens.h"
 #include "core/click_time.h"
 #include "core/flow.h"
@@ -30,6 +34,7 @@
 #include "core/random.h"
 #include "core/screen.h"
 #include "platform/raw_mouse.h"
+#include "platform/storage.h"
 
 namespace {
 
@@ -48,7 +53,7 @@ constexpr Nanoseconds kRawWaitNs = 2'000'000;
 // Предел частоты кадров — как у образца (TARGET_FPS = 240, LimitFrameRate):
 // цикл не жжёт ядро впустую, а кадр короче, чем у любого монитора.
 constexpr Nanoseconds kMinFrame = 1'000'000'000 / 240;
-// Уведомление о достижении — 3 с, как у образца.
+// Уведомление — 3 с, как у образца; несколько — по очереди.
 constexpr Nanoseconds kToastTime = 3'000'000'000;
 
 struct Options {
@@ -189,7 +194,20 @@ int main(int argc, char* argv[]) {
         SDL_SetWindowTitle(window,
                            std::format("{} — C++: сырой ввод мыши {}", kTitle, raw_state).c_str());
 
-        aim::core::Profile profile;
+        std::deque<std::string> toasts;
+        std::string problem;
+        std::optional<aim::platform::Storage> storage =
+            aim::platform::Storage::open_user_folder(problem);
+        SDL_Log("папка игрока: %s", storage ? storage->dir().c_str() : problem.c_str());
+        aim::app::PlayerFiles files(std::move(storage), problem);
+        std::vector<std::string> messages;
+        aim::core::Profile profile = files.load(messages);
+        toasts.insert(toasts.end(), messages.begin(), messages.end());
+        const auto save = [&] {
+            std::string error;
+            if (!files.save(profile, error)) toasts.push_back("Profile not saved: " + error);
+        };
+
         aim::core::EngineRandom rng(SDL_GetPerformanceCounter());
         aim::app::TempMenu menu;
         aim::core::Flow flow(profile, rng, menu);
@@ -219,6 +237,7 @@ int main(int argc, char* argv[]) {
 
         FpsCounter fps;
         aim::app::Overlay overlay;
+        overlay.profile = files.profile_number();
         Nanoseconds toast_until = 0;
         std::vector<aim::core::Input> inputs;
         bool running = true;
@@ -271,12 +290,25 @@ int main(int argc, char* argv[]) {
             flow.update(now, {mx, my});
             for (const aim::core::FlowEvent& e : flow.take_events()) {
                 if (const auto* a = std::get_if<aim::core::AchievementUnlocked>(&e)) {
-                    overlay.toast = std::format("Achievement unlocked: {} of {}", a->id + 1,
-                                                aim::core::kAchievementCount);
+                    toasts.push_back(std::format("Achievement unlocked: {} of {}", a->id + 1,
+                                                 aim::core::kAchievementCount));
+                    // Как образец: достижение записывается сразу.
+                    save();
+                } else if (const auto* run = std::get_if<aim::core::RunFinished>(&e)) {
+                    std::string error;
+                    if (!files.log_run(run->summary, error))
+                        toasts.push_back("Game not added to history: " + error);
+                    save();
+                }
+            }
+            if (now >= toast_until) {
+                overlay.toast.clear();
+                if (!toasts.empty()) {
+                    overlay.toast = std::move(toasts.front());
+                    toasts.pop_front();
                     toast_until = now + kToastTime;
                 }
             }
-            if (now >= toast_until) overlay.toast.clear();
             overlay.fps = fps.fps();
 
             aim::app::render(renderer, flow, profile, now, overlay);

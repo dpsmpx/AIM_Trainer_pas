@@ -3,15 +3,15 @@
 // Профиль игрока в памяти: настройки, рекорды, таблица лидеров, достижения,
 // история реакций (archive/pascal/AIM_Trainer.pas: TStats, TSettings,
 // StepSetting, TryAddToLeaderboard, UnlockAchievement,
-// FinishGameAndSaveStats; docs/ARCHITECTURE.md, §8.1, §10). Чтение и запись
-// файлов — шаг «Файлы профиля». Отличия — нарочные:
+// FinishGameAndSaveStats; docs/ARCHITECTURE.md, §8.1, §10). Текст файла —
+// core/profile_file.h. Отличия — нарочные:
 //
 //   * рекорды точности, точности попадания и реакции — от 20 выстрелов (D-13);
-//   * история реакций — по порядку, последние 50 (AUD-14).
+//   * реакции забега дописываются в кольцо по порядку, и по порядку же его
+//     отдаёт in_order — для графика (AUD-14).
 
 #include <array>
 #include <cstdint>
-#include <deque>
 #include <string_view>
 #include <vector>
 
@@ -49,8 +49,9 @@ void step_setting(Settings& settings, SettingRow row, int delta);
 /// «Сбросить по умолчанию»: размер, время жизни, жизни и звук; тему и эффекты
 /// не трогает — как SetDefaultSettings образца (прогон 16 октября 2026).
 void reset_settings(Settings& settings);
-/// Вернуть значения в границы — для настроек, прочитанных из файла (AUD-07).
-void clamp_settings(Settings& settings);
+/// Значение вне границ — к умолчанию, как LoadStats образца; для настроек,
+/// прочитанных из файла.
+void reset_out_of_range(Settings& settings);
 /// Настройки забега из настроек профиля.
 GameSettings game_settings(const Settings& settings);
 
@@ -92,6 +93,19 @@ inline constexpr int kRecordMinShots = 20;
 
 // ---- Профиль ----
 
+/// Последние kReactionHistory реакций, мс — кольцо, как в файле профиля
+/// (ReactionCount, ReactionIndex, Reaction0…49): запись прочитанного файла его
+/// не меняет (D-11).
+struct ReactionRing {
+    std::array<int, kReactionHistory> values{};
+    int count = 0;  ///< 0…50
+    int next = 0;   ///< 0…49 — куда пойдёт следующая
+
+    void push(int value_ms);
+    /// Старые первыми.
+    [[nodiscard]] std::vector<int> in_order() const;
+};
+
 struct Profile {
     int best_score = 0;
     double best_accuracy = 0.0;      ///< %
@@ -100,7 +114,7 @@ struct Profile {
     int games_played = 0;
     bool tutorial_seen = false;
     Settings settings;
-    std::deque<int> reactions;  ///< последние 50 реакций, мс, старые первыми
+    ReactionRing reactions;
     std::array<bool, kAchievementCount> achievements{};
     Leaderboard leaderboard;
 };

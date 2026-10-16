@@ -6,7 +6,8 @@
 #   tools/gui.sh port build              собрать C++-версию, пресет linux-gcc
 #   tools/gui.sh TARGET start            запустить в своём Xvfb
 #   tools/gui.sh TARGET stop             закрыть программу и её Xvfb
-#   tools/gui.sh ref  clean              удалить файлы игрока у оригинала
+#   tools/gui.sh TARGET clean            удалить файлы игрока
+#   tools/gui.sh TARGET dir              папка файлов игрока
 #   tools/gui.sh TARGET shot F.png       снимок окна 800×600
 #   tools/gui.sh TARGET title            заголовок окна (_NET_WM_NAME; у port кириллица
 #                                        до него не доходит — docs/ARCHITECTURE.md, §12)
@@ -23,6 +24,8 @@
 # Оригинал пишет файлы профиля в текущий каталог (AUD-17), поэтому работает
 # в build/ref с копиями исходников из archive/pascal: файлы репозитория он
 # не трогает (D-04, D-09, D-28). Сборка начинает с чистого каталога — как «Подготовка» сценариев.
+# C++-версия пишет в build/gui/port/data (AIM_TRAINER_DATA_DIR, D-30), а не
+# в папку пользователя сессии; своя AIM_TRAINER_DATA_DIR — главнее.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -38,7 +41,7 @@ PLAYER_FILES=(profile*_stats.ini profile*_sessions.csv profile*_corrupt_backup.t
 
 die() { echo "gui.sh: $*" >&2; exit 1; }
 
-usage() { sed -n '2,17p' "$0"; exit 2; }
+usage() { sed -n '2,18p' "$0"; exit 2; }
 
 # --- цели -------------------------------------------------------------------
 
@@ -67,8 +70,9 @@ launch() {
             cd "$REF_DIR" && exec mono AIM_Trainer.exe ;;
         port)
             [ -x "$PORT_BIN" ] || build_port >/dev/null
+            mkdir -p "$PORT_DATA"
             # Программный кадровый буфер: Xvfb всё равно рисует без GPU.
-            SDL_FRAMEBUFFER_ACCELERATION=0 exec "$PORT_BIN" ;;
+            AIM_TRAINER_DATA_DIR="$PORT_DATA" SDL_FRAMEBUFFER_ACCELERATION=0 exec "$PORT_BIN" ;;
     esac
 }
 
@@ -127,9 +131,16 @@ cmd_stop() {
     done
 }
 
+player_dir() {
+    if [ "$TARGET" = ref ]; then echo "$REF_DIR"; else echo "$PORT_DATA"; fi
+}
+
 cmd_clean() {
-    [ "$TARGET" = ref ] || die "clean — только для ref"
-    (cd "$REF_DIR" && rm -f "${PLAYER_FILES[@]}")
+    local dir
+    dir="$(player_dir)"
+    [ -d "$dir" ] || return 0
+    # У C++-версии ещё aim_trainer.ini — номер последнего профиля (D-30).
+    (cd "$dir" && rm -f "${PLAYER_FILES[@]}" aim_trainer.ini)
 }
 
 cmd_shot() {
@@ -194,6 +205,7 @@ case "$TARGET" in
 esac
 STATE="$ROOT/build/gui/$TARGET"
 mkdir -p "$STATE"
+PORT_DATA="${AIM_TRAINER_DATA_DIR:-$ROOT/build/gui/port/data}"
 export DISPLAY="$TARGET_DISPLAY"
 
 cmd="${1:-}"
@@ -204,6 +216,7 @@ case "$cmd" in
     _launch) launch ;;
     stop) cmd_stop ;;
     clean) cmd_clean ;;
+    dir) player_dir ;;
     shot) cmd_shot "$@" ;;
     title) wid="$(window_id)" && xdotool getwindowname "$wid" ;;
     key) cmd_key "$@" ;;
