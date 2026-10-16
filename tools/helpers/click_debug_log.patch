@@ -1,0 +1,65 @@
+Журнал отладки времени клика (D-24, D-27): программа пишет в
+clicks_debug.log рядом с собой каждое сырое нажатие («raw время кнопка now»)
+и каждое нажатие SDL с итогом сопоставления («sdl метка кнопка now src
+time pending», src 0 — сырой ввод, 1 — событие SDL). Так 16 октября 2026
+найдена гонка: событие SDL разобрано раньше, чем поток поставил метку
+(docs/ARCHITECTURE.md, §12).
+
+Не для коммита в код — только для разбора:
+
+    git apply tools/helpers/click_debug_log.patch
+    tools/check_cpp.sh windows-cross        # или cmake --build --preset windows-cross
+    tools/helpers/wine_clicks.sh 300
+    git apply -R tools/helpers/click_debug_log.patch
+
+Журнал — в каталоге запуска (под Wine — текущий каталог скрипта).
+Снят с src/app/main.cpp шага «Время и ввод» (после 3a6441a); git apply пропускает этот текст.
+--- a/src/app/main.cpp
++++ b/src/app/main.cpp
+@@ -14,6 +14,7 @@
+ 
+ #include <algorithm>
+ #include <charconv>
++#include <cstdio>
+ #include <cstdint>
+ #include <format>
+ #include <optional>
+@@ -33,6 +34,9 @@
+ 
+ namespace {
+ 
++// Журнал отладки времени клика (tools/helpers/click_debug_log.patch).
++std::FILE* g_click_log = std::fopen("clicks_debug.log", "w");
++
+ using aim::core::ClickTime;
+ using aim::core::ClickTimer;
+ using aim::core::ClickTimeSource;
+@@ -198,8 +202,13 @@
+         std::vector<aim::core::RawPress> fresh;
+         const auto take_raw = [&] {
+             raw_mouse.drain(fresh);
+-            for (const auto& press : fresh)
++            for (const auto& press : fresh) {
++                std::fprintf(g_click_log, "raw %llu b%d now %llu\n",
++                             static_cast<unsigned long long>(press.time),
++                             static_cast<int>(press.button),
++                             static_cast<unsigned long long>(SDL_GetTicksNS()));
+                 clicks.add(press);
++            }
+             fresh.clear();
+         };
+         const auto click_time = [&](MouseButton button, Nanoseconds event_time) {
+@@ -247,6 +256,13 @@
+                         const ClickTime click =
+                             from_mouse ? click_time(*button, event.button.timestamp)
+                                        : ClickTime{event.button.timestamp, ClickTimeSource::Event};
++                        std::fprintf(g_click_log, "sdl %llu b%d now %llu src %d time %llu pending %zu\n",
++                                     static_cast<unsigned long long>(event.button.timestamp),
++                                     static_cast<int>(*button),
++                                     static_cast<unsigned long long>(SDL_GetTicksNS()),
++                                     static_cast<int>(click.source),
++                                     static_cast<unsigned long long>(click.time), clicks.pending());
++                        std::fflush(g_click_log);
+                         SDL_SetWindowTitle(window,
+                                            describe_click(*button, event.button.x, event.button.y,
+                                                           event.button.timestamp, click)

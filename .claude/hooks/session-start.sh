@@ -2,11 +2,14 @@
 # Хук начала веб-сессии Claude Code (по шаблону process-kit Galdhold,
 # tools/dpv/kit; без DP Verify — D-01).
 #
+#   * инструменты C++-версии — tools/setup_env.sh (D-25), пути — в окружение
+#     сессии;
 #   * проверка документов — tools/check_docs.py;
 #   * ветки с невлитой работой — с них продолжают, а не делают заново
 #     (CLAUDE.md, «Не терять работу между сессиями»).
 #
-# Только в веб-сессии; ничего не ставит и не меняет в рабочем дереве.
+# Только в веб-сессии; рабочее дерево не меняет. Сбой установки хук не
+# валит: о нём сообщается, а сессия остаётся с тем, что поставилось.
 set -euo pipefail
 
 if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
@@ -15,6 +18,19 @@ fi
 
 PROJ="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}"
 MAIN=main
+
+# ---- Инструменты C++-версии ----
+TOOLS_DIR="${AIM_TOOLS_DIR:-$HOME/.local/share/aim-trainer-tools}"
+mkdir -p "$TOOLS_DIR"
+if "$PROJ/tools/setup_env.sh" >"$TOOLS_DIR/setup_env.log" 2>&1; then
+    echo "session-start: инструменты C++ — на месте (tools/setup_env.sh)"
+    if [ -n "${CLAUDE_ENV_FILE:-}" ] && [ -f "$TOOLS_DIR/env.sh" ]; then
+        cat "$TOOLS_DIR/env.sh" >>"$CLAUDE_ENV_FILE"
+    fi
+else
+    echo "session-start: инструменты C++ не поставились — $TOOLS_DIR/setup_env.log:"
+    tail -15 "$TOOLS_DIR/setup_env.log" | sed 's/^/  /'
+fi
 
 # ---- Документы ----
 if command -v python3 >/dev/null 2>&1; then

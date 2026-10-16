@@ -1,0 +1,112 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}"
+    },
+    {
+      "name": "session",
+      "hidden": true,
+      "inherits": "base",
+      "description": "Сборки сессии: предупреждения — ошибки (D-19)",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
+      "cacheVariables": { "AIM_WERROR": "ON" }
+    },
+    {
+      "name": "linux-gcc",
+      "displayName": "Linux, GCC, отладка",
+      "inherits": "session",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    },
+    {
+      "name": "linux-clang",
+      "displayName": "Linux, Clang, отладка",
+      "inherits": "session",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
+      }
+    },
+    {
+      "name": "linux-asan",
+      "displayName": "Linux, GCC, ASan и UBSan",
+      "inherits": "linux-gcc",
+      "cacheVariables": { "AIM_SANITIZE": "ON" }
+    },
+    {
+      "name": "linux-tidy",
+      "displayName": "Linux, Clang, clang-tidy при сборке",
+      "inherits": "linux-clang",
+      "cacheVariables": { "AIM_CLANG_TIDY": "ON" }
+    },
+    {
+      "name": "windows-cross",
+      "displayName": "Windows из Linux: llvm-mingw (D-17), тесты под Wine",
+      "inherits": "session",
+      "toolchainFile": "${sourceDir}/tools/cmake/llvm-mingw.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "FETCHCONTENT_SOURCE_DIR_GOOGLETEST": "/usr/src/googletest"
+      }
+    },
+    {
+      "name": "windows",
+      "displayName": "Windows: llvm-mingw (D-17), программа без тестов",
+      "inherits": "base",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "x86_64-w64-mingw32-clang",
+        "CMAKE_CXX_COMPILER": "x86_64-w64-mingw32-clang++",
+        "CMAKE_RC_COMPILER": "x86_64-w64-mingw32-windres",
+        "BUILD_TESTING": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "linux-gcc", "configurePreset": "linux-gcc" },
+    { "name": "linux-clang", "configurePreset": "linux-clang" },
+    { "name": "linux-asan", "configurePreset": "linux-asan" },
+    { "name": "linux-tidy", "configurePreset": "linux-tidy" },
+    { "name": "windows-cross", "configurePreset": "windows-cross" },
+    { "name": "windows", "configurePreset": "windows" }
+  ],
+  "testPresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error" }
+    },
+    { "name": "linux-gcc", "inherits": "base", "configurePreset": "linux-gcc" },
+    { "name": "linux-clang", "inherits": "base", "configurePreset": "linux-clang" },
+    {
+      "name": "linux-asan",
+      "inherits": "base",
+      "configurePreset": "linux-asan",
+      "environment": {
+        "ASAN_OPTIONS": "detect_leaks=1:abort_on_error=1",
+        "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1"
+      }
+    },
+    {
+      "name": "windows-cross",
+      "inherits": "base",
+      "configurePreset": "windows-cross",
+      "environment": {
+        "WINEPREFIX": "${sourceDir}/build/wineprefix",
+        "WINEDEBUG": "-all",
+        "WINEDLLOVERRIDES": "mscoree,mshtml="
+      }
+    }
+  ]
+}
