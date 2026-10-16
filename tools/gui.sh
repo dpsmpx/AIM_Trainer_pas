@@ -8,7 +8,8 @@
 #   tools/gui.sh TARGET stop             закрыть программу и её Xvfb
 #   tools/gui.sh ref  clean              удалить файлы игрока у оригинала
 #   tools/gui.sh TARGET shot F.png       снимок окна 800×600
-#   tools/gui.sh TARGET title            заголовок окна
+#   tools/gui.sh TARGET title            заголовок окна (_NET_WM_NAME; у port кириллица
+#                                        до него не доходит — docs/ARCHITECTURE.md, §12)
 #   tools/gui.sh TARGET key KEY...       клавиши: Escape, space, p, Return
 #   tools/gui.sh TARGET move X Y         курсор в точку окна
 #   tools/gui.sh TARGET click X Y [BTN]  щелчок: 1 — ЛКМ, 3 — ПКМ
@@ -37,7 +38,7 @@ PLAYER_FILES=(profile*_stats.ini profile*_sessions.csv profile*_corrupt_backup.t
 
 die() { echo "gui.sh: $*" >&2; exit 1; }
 
-usage() { sed -n '2,16p' "$0"; exit 2; }
+usage() { sed -n '2,17p' "$0"; exit 2; }
 
 # --- цели -------------------------------------------------------------------
 

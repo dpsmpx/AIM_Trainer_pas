@@ -281,6 +281,7 @@ AIM_Trainer.pas  (программа)
 | события GraphABC | в потоке окна (`MainFormThread`), не в главном |
 | кодировка исходников | UTF-8 без BOM распознаётся компилятором по содержимому |
 | `Console.Beep` | синхронный: поток стоит всё время звука |
+| файлы `Text` (`Rewrite`, `Writeln`) | кодировка `DefaultEncoding` — Windows-1251, а где её нет — UTF-8 без BOM (`__InitModule`); перевод строки — `Environment.NewLine`: CRLF на Windows, LF под Mono на Linux. Файлы профиля — только ASCII. `real.ToString` — до 15 значащих цифр (`46.1538461538462`) |
 | `FillRoundRect`, `DrawRoundRect` | скругления — дуги `GraphicsPath.AddArc` размером `w`×`h` (`CreatePathForDrawRoundRect`, `GraphABCHelper.pas`); при `w` или `h` = 0 GDI+ отвечает `InvalidParameter` → `ArgumentException`: под Mono — прогоном, на Windows — по тесту `AddArc_ZeroWidthHeight_ThrowsArgumentException` (dotnet/winforms). Оригинал рисует так три экрана — сценарий 22 `docs/MANUAL_CHECKS.md` |
 
 ## 12. C++-версия — каркас
@@ -339,3 +340,4 @@ SDL — `msg.time`, раньше настоящего нажатия на 0…16
 | таймер Windows | `SDL_InitTicks` ставит `timeBeginPeriod(1)`: подсказка `SDL_HINT_TIMER_RESOLUTION`, по умолчанию 1 мс |
 | сырой ввод мыши у самого SDL | только в режиме relative (`WIN_SetRelativeMouseMode` → `WIN_SetRawMouseEnabled`) и в эмуляции переноса курсора: курсор скрыт и дважды перенесён в центр окна (`SDL_MaybeEnableWarpEmulation`); сырая клавиатура (`SDL_HINT_WINDOWS_RAW_KEYBOARD`) регистрирует только клавиатуру |
 | кнопки левши в сыром вводе | `WIN_SwapButtons`: переставляются только у события с устройством (`hDevice` не пуст); у сенсорной панели и `SendInput` — уже логические |
+| заголовок окна на X11 (Linux) | `SDL_X11_SetWindowTitle`: `_NET_WM_NAME` — через `Xutf8TextListToTextProperty`; в локали процесса «C» (программа её не меняет, SDL возвращает прежнюю после настройки ввода) кириллица не проходит, и `_NET_WM_NAME` остаётся прежним, а `WM_NAME` получает байты UTF-8. Проверено под Xvfb 16 октября 2026. У оригинала заголовок — латиницей, «Aim Trainer»; кириллица — только в отладочном заголовке каркаса |
