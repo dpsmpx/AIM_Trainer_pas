@@ -50,10 +50,12 @@ aim_own_code(aim_platform_tests)
 gtest_discover_tests(aim_platform_tests DISCOVERY_MODE PRE_TEST
                      DISCOVERY_TIMEOUT ${_aim_discovery_timeout})
 
-# Слой программы без окна: файлы игрока.
-add_executable(aim_app_tests app/player_files_test.cpp ../src/app/player_files.cpp)
-target_link_libraries(aim_app_tests PRIVATE aim_platform GTest::gtest_main)
+# Слой программы: файлы игрока и все экраны — обход на окне без экрана,
+# обоими шрифтами (AUD-49); шрифт — рядом с тестами, как у программы.
+add_executable(aim_app_tests app/player_files_test.cpp app/screens_test.cpp)
+target_link_libraries(aim_app_tests PRIVATE aim_app GTest::gtest_main)
 aim_own_code(aim_app_tests)
+aim_fonts_next_to(aim_app_tests)
 gtest_discover_tests(aim_app_tests DISCOVERY_MODE PRE_TEST
                      DISCOVERY_TIMEOUT ${_aim_discovery_timeout})
 

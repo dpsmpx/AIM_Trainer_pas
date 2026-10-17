@@ -130,7 +130,7 @@ Rect records_panel();
 Rect records_row(int i);
 
 // ---- История и профили ----
-inline constexpr int kHistoryW = 520;
+inline constexpr int kHistoryW = 620;  ///< строка замера Mono — до ~60 знаков (D-43)
 inline constexpr int kHistoryH = 460;
 Rect history_panel();
 Rect history_export();

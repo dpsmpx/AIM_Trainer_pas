@@ -89,26 +89,36 @@ target_sources(aim_platform PRIVATE
 target_link_libraries(aim_platform PUBLIC aim_core SDL3::SDL3)
 aim_own_code(aim_platform)
 
-# Программа: окно и главный цикл. WIN32 — без окна консоли; WinMain даёт
-# SDL_main.h.
-add_executable(AimTrainer WIN32
+# Экраны, холст, текст и файлы игрока — библиотека: её берут программа и
+# тесты экранов (tests/app/screens_test.cpp).
+add_library(aim_app STATIC
     src/app/canvas.cpp
     src/app/effects.cpp
     src/app/game_view.cpp
-    src/app/main.cpp
     src/app/menu_view.cpp
     src/app/player_files.cpp
     src/app/screens.cpp
     src/app/text.cpp
     src/app/toast.cpp)
-target_link_libraries(AimTrainer PRIVATE aim_platform SDL3_ttf::SDL3_ttf)
+target_link_libraries(aim_app PUBLIC aim_platform SDL3_ttf::SDL3_ttf)
+aim_own_code(aim_app)
+
+# Шрифт — рядом с программой, в fonts/ (D-22, D-31); тесты экранов кладут его
+# рядом с собой тем же способом.
+function(aim_fonts_next_to target)
+    add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:${target}>/fonts"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different ${AIM_FONT_FILES}
+                "$<TARGET_FILE_DIR:${target}>/fonts"
+        VERBATIM)
+endfunction()
+
+# Программа: окно и главный цикл. WIN32 — без окна консоли; WinMain даёт
+# SDL_main.h.
+add_executable(AimTrainer WIN32 src/app/main.cpp)
+target_link_libraries(AimTrainer PRIVATE aim_app)
 aim_own_code(AimTrainer)
-# Шрифт — рядом с программой, в fonts/ (D-22, D-31).
-add_custom_command(TARGET AimTrainer POST_BUILD
-    COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:AimTrainer>/fonts"
-    COMMAND "${CMAKE_COMMAND}" -E copy_if_different ${AIM_FONT_FILES}
-            "$<TARGET_FILE_DIR:AimTrainer>/fonts"
-    VERBATIM)
+aim_fonts_next_to(AimTrainer)
 
 if(BUILD_TESTING)
     add_subdirectory(tests)
