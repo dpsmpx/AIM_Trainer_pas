@@ -3,11 +3,15 @@
 // Экраны и переходы между ними (docs/ARCHITECTURE.md, §12):
 //
 //   меню ──старт──► отсчёт 3 с ──► замер ──жизни, время, бомба, Esc──► итог
-//    ▲  ◄──── M ─────┘   ▲          │ R (без записи)                  │ R
+//    ▲  ◄──── M ─────┘   ▲          │ R (без записи)     R, «Ещё раз» │
 //    │                   └──────────┘──────────────────────────────────┘
-//    └──── M (с записью) из замера; Space или M из итога
+//    └──── M (с записью) из замера; Space, M, «В меню» из итога
 //
 //   меню ──реплей набора──► реплей ──Esc, Space, M──► меню
+//   итог ──«Реплей» нового рекорда──► реплей ──Esc, Space, M──► итог (D-46)
+//
+// Кнопки итога срабатывают через kResultButtonsDelay после его появления:
+// щелчок, начатый в замере, их не нажимает (AUD-02).
 //
 // Паузы нет: замер идёт непрерывно (D-40). У каждого замера — свой
 // генератор случайных чисел с записанным началом, а вход замера пишется:
@@ -28,6 +32,7 @@
 #include <vector>
 
 #include "core/game.h"
+#include "core/layout.h"
 #include "core/measure.h"
 #include "core/mouse.h"
 #include "core/profile.h"
@@ -117,6 +122,14 @@ public:
     /// Из меню — реплей с момента now (D-39); не в меню — ничего.
     void start_replay(std::shared_ptr<const Replay> replay, Nanoseconds now);
 
+    /// На итоге — кнопка «Реплей»: замер — новый рекорд набора, и его вход
+    /// записан (D-46).
+    [[nodiscard]] bool replay_offered() const;
+    /// Когда показан итог: кнопки срабатывают через kResultButtonsDelay.
+    [[nodiscard]] Nanoseconds result_shown_at() const { return result_shown_; }
+    /// Куда выходит реплей: в меню или на итог (D-46).
+    [[nodiscard]] Screen replay_back() const { return replay_back_; }
+
     [[nodiscard]] Screen screen() const { return screen_; }
     [[nodiscard]] const MeasureOptions& options() const { return options_; }
     /// Замер — в игре, на итоге (итоги и тепловая карта) и в реплее; иначе
@@ -136,6 +149,12 @@ private:
     void go(Screen to);
     void start_countdown(Nanoseconds now);
     void finish_run();
+    /// Замер записан, итог показан с момента разбираемого кадра.
+    void show_result();
+    /// Реплей с момента now; по выходу — экран back.
+    void play(std::shared_ptr<const Replay> replay, Nanoseconds now, Screen back);
+    /// Щелчок на итоге: кнопки (D-46); false — экран сменился.
+    bool click_result(const ClickInput& click);
     void pass_game_events();
     /// Событие экрану; false — экран сменился, остальной ввод кадра — в сторону.
     bool handle(const Input& event);
@@ -150,6 +169,8 @@ private:
     Screen screen_ = Screen::Menu;
     MeasureOptions options_;
     Nanoseconds countdown_started_ = 0;
+    Nanoseconds result_shown_ = 0;
+    Screen replay_back_ = Screen::Menu;  // куда выходит реплей
     std::uint64_t seed_ = 0;
     std::unique_ptr<Random> run_random_;  // раньше game_: замер держит ссылку
     std::optional<Game> game_;

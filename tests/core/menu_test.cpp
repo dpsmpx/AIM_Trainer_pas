@@ -104,9 +104,10 @@ TEST_F(MenuTest, EmptySpaceTogglesEffectsRightClickDoesNothing) {
     const bool before = profile_.settings.menu_effects;
     EXPECT_EQ(menu_.click(click_at({400, 20}, kLater, MouseButton::Right)), std::nullopt);
     EXPECT_EQ(profile_.settings.menu_effects, before);
+    EXPECT_TRUE(menu_.take_requests().empty());
     EXPECT_EQ(menu_.click(click_at({400, 20})), std::nullopt);
     EXPECT_NE(profile_.settings.menu_effects, before);
-    EXPECT_TRUE(menu_.take_requests().empty()) << "записывается с другим сохранением";
+    EXPECT_EQ(count<SaveProfile>(menu_.take_requests()), 1) << "пишется сразу (D-47)";
 }
 
 TEST_F(MenuTest, InformationPanelsCloseOnAnyClick) {
@@ -294,7 +295,11 @@ TEST_F(MenuTest, SettingsStepToggleResetAndClose) {
     EXPECT_FALSE(profile_.settings.hud);
     menu_.click(click_at(center(settings_toggle(kSettingsReplaysRow))));
     EXPECT_FALSE(profile_.settings.replays);
-    EXPECT_EQ(count<SaveProfile>(menu_.take_requests()), 4);
+    // Эффекты меню — та же настройка, что щелчок по пустому месту (D-47).
+    menu_.click(click_at(center(settings_toggle(kSettingsMenuEffectsRow))));
+    EXPECT_FALSE(profile_.settings.menu_effects);
+    EXPECT_EQ(menu_.panel(), Panel::Settings);
+    EXPECT_EQ(count<SaveProfile>(menu_.take_requests()), 5);
     menu_.click(click_at(center(settings_reset())));
     EXPECT_EQ(profile_.settings.preset.target_size, 40);
     EXPECT_EQ(profile_.settings.preset.ending, Ending::Lives);
@@ -302,6 +307,7 @@ TEST_F(MenuTest, SettingsStepToggleResetAndClose) {
     EXPECT_TRUE(profile_.settings.sound);
     EXPECT_TRUE(profile_.settings.hud);
     EXPECT_TRUE(profile_.settings.replays);
+    EXPECT_FALSE(profile_.settings.menu_effects) << "сброс эффекты не трогает";
     // Щелчок внутри панели мимо кнопок — панель открыта; снаружи — закрыта.
     menu_.click(click_at({static_cast<double>(settings_panel().x1 + 5),
                           static_cast<double>(settings_panel().y1 + 5)}));

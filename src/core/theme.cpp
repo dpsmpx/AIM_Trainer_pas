@@ -10,7 +10,7 @@
 
 namespace aim::core {
 
-const std::array<ThemeKey, 38> kThemeKeys{{
+const std::array<ThemeKey, 37> kThemeKeys{{
     {"background", &Theme::background, -1, "фон окна"},
     {"accent", &Theme::accent, -1, "акцент: разделы справки, полоса прокрутки, график, рамки"},
     {"text", &Theme::text, -1, "основной текст"},
@@ -28,8 +28,7 @@ const std::array<ThemeKey, 38> kThemeKeys{{
     {"overlay", &Theme::overlay, -1, "плашки поверх замера"},
     {"trail", &Theme::trail, -1, "след курсора"},
     {"wave", &Theme::wave, -1, "волна попадания"},
-    {"flash_hit", &Theme::flash_hit, -1, "вспышка точного попадания"},
-    {"flash_bomb", &Theme::flash_bomb, -1, "вспышка подрыва"},
+    {"target_mark", &Theme::target_mark, -1, "метка стороны на цели «по цвету»"},
     {"dim", &Theme::dim, -1, "затемнение под панелью"},
     {"panel", &Theme::panel, -1, "панель"},
     {"panel_border", &Theme::panel_border, -1, "рамка панели"},

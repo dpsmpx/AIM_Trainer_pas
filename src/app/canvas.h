@@ -80,6 +80,9 @@ public:
     void fill_polygon(std::span<const IntPoint> points);
     /// DrawCircle: контур пером.
     void draw_circle(int x, int y, int r);
+    /// Дуга окружности радиуса r пером: от угла from на sweep радиан (углы
+    /// окна: 0 — вправо, π/2 — вниз).
+    void draw_arc(int x, int y, double r, double from, double sweep);
     /// Circle: заливка кистью и контур пером.
     void circle(int x, int y, int r);
     /// Line: отрезок пером.

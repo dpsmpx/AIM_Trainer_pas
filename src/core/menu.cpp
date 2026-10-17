@@ -82,6 +82,9 @@ void Menu::click_settings(Vec2 p) {
     } else if (settings_toggle(kSettingsFontRow).contains(p)) {
         s.font = (s.font + 1) % kFontCount;
         requests_.emplace_back(SaveProfile{});
+    } else if (settings_toggle(kSettingsMenuEffectsRow).contains(p)) {
+        s.menu_effects = !s.menu_effects;
+        requests_.emplace_back(SaveProfile{});
     } else if (settings_toggle(kSettingsHudRow).contains(p)) {
         s.hud = !s.hud;
         requests_.emplace_back(SaveProfile{});
@@ -163,9 +166,10 @@ std::optional<MeasureOptions> Menu::click(const ClickInput& click) {
         }
     }
     if (kPlate.contains(p)) return start_selected();
-    // Щелчок по пустому месту — эффекты меню вкл./выкл.; записываются со
-    // следующим сохранением.
+    // Щелчок по пустому месту — эффекты меню вкл./выкл., как строка
+    // настроек (D-47).
     profile_.settings.menu_effects = !profile_.settings.menu_effects;
+    requests_.emplace_back(SaveProfile{});
     return std::nullopt;
 }
 

@@ -24,7 +24,7 @@ struct ThemeKey {
 };
 
 /// Все ключи по порядку Theme.
-extern const std::array<ThemeKey, 38> kThemeKeys;
+extern const std::array<ThemeKey, 37> kThemeKeys;
 
 /// Встроенная тема по слову id; нет — пусто.
 const BuiltinTheme* builtin_theme(std::string_view id);

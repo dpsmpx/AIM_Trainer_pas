@@ -23,6 +23,15 @@ Rect mini_button(MiniButton b) {
     return {x, kH - 35, x + 90, kH - 10};
 }
 
+Rect result_button(ResultButton b, bool with_replay) {
+    constexpr int kColumnCenter = (kResultMeasuresX1 + kResultMeasuresX2) / 2;
+    const int count = with_replay ? 3 : 2;
+    const int total = count * kResultButtonW + (count - 1) * kResultButtonGap;
+    const int x =
+        kColumnCenter - total / 2 + static_cast<int>(b) * (kResultButtonW + kResultButtonGap);
+    return {x, kResultButtonsY, x + kResultButtonW, kResultButtonsY + kResultButtonH};
+}
+
 Rect settings_panel() {
     const int x = (kW - kSettingsW) / 2;
     const int y = (kH - kSettingsH) / 2;
@@ -30,7 +39,7 @@ Rect settings_panel() {
 }
 
 int settings_row_y(int row) {
-    return settings_panel().y1 + 60 + row * kSettingsRowH;
+    return settings_panel().y1 + 58 + row * kSettingsRowH;
 }
 
 Rect settings_minus(int row) {

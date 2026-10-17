@@ -136,6 +136,85 @@ TEST(Flow, GameOverClickDoesNotReachMenu) {
     EXPECT_EQ(f.menu.clicks.size(), menu_clicks) << "сценарий 7: щелчок Game Over гаснет там же";
 }
 
+Vec2 center_of(ResultButton b, bool with_replay) {
+    const Rect r = result_button(b, with_replay);
+    return {(r.x1 + r.x2) / 2.0, (r.y1 + r.y2) / 2.0};
+}
+
+TEST(Flow, ResultButtonsWorkAfterDelay) {
+    Fixture f;
+    const Nanoseconds start = f.start_game(kT0);
+    const Nanoseconds shown = start + ms(100);
+    f.send({key(Key::Escape, shown)}, shown);
+    ASSERT_EQ(f.flow.screen(), Screen::GameOver);
+    EXPECT_EQ(f.flow.result_shown_at(), shown);
+    const bool replay = f.flow.replay_offered();
+    const Vec2 again = center_of(ResultButton::Again, replay);
+    // Щелчок, начатый в замере, кнопку не нажимает (AUD-02, D-46).
+    const Nanoseconds early = shown + kResultButtonsDelay - 1;
+    f.send({click_at(again.x, again.y, early)}, early);
+    EXPECT_EQ(f.flow.screen(), Screen::GameOver);
+    // ПКМ и щелчок мимо кнопок — ничего.
+    const Nanoseconds later = shown + kResultButtonsDelay;
+    f.send({click_at(again.x, again.y, later, MouseButton::Right), click_at(5, 5, later)}, later);
+    EXPECT_EQ(f.flow.screen(), Screen::GameOver);
+    f.send({click_at(again.x, again.y, later), key(Key::M, later)}, later);
+    EXPECT_EQ(f.flow.screen(), Screen::Countdown) << "«Ещё раз» — тот же набор";
+    EXPECT_EQ(f.flow.options(), preset_options(1, f.profile.settings.preset));
+    EXPECT_EQ(f.profile.runs.size(), 1U);
+}
+
+TEST(Flow, ResultMenuButtonGoesToMenu) {
+    Fixture f;
+    const Nanoseconds start = f.start_game(kT0);
+    f.send({key(Key::Escape, start)}, start);
+    const Vec2 menu = center_of(ResultButton::Menu, f.flow.replay_offered());
+    const Nanoseconds t = start + kResultButtonsDelay + ms(1);
+    f.send({click_at(menu.x, menu.y, t)}, t);
+    EXPECT_EQ(f.flow.screen(), Screen::Menu);
+    EXPECT_EQ(f.menu.clicks.size(), 1U) << "щелчок итога в меню не уходит";
+}
+
+TEST(Flow, ReplayFromResultReturnsToResult) {
+    Fixture f;
+    const Nanoseconds start = f.start_game(kT0);
+    f.flow.update(start + ms(15), {});
+    f.flow.frame_presented(start + ms(15), start + ms(16));
+    const Vec2 c = f.flow.game()->target().center();
+    f.send({click_at(c.x, c.y, start + ms(100))}, start + ms(105));
+    f.send({key(Key::Escape, start + ms(200))}, start + ms(200));
+    ASSERT_EQ(f.flow.screen(), Screen::GameOver);
+    ASSERT_TRUE(f.flow.replay_offered()) << "первый замер набора — рекорд, вход записан";
+    const GameSummary result = f.flow.game()->summary();
+    f.flow.take_events();
+
+    const Vec2 replay = center_of(ResultButton::Replay, true);
+    const Nanoseconds t = start + ms(200) + kResultButtonsDelay;
+    f.send({click_at(replay.x, replay.y, t)}, t);
+    ASSERT_EQ(f.flow.screen(), Screen::Replay);
+    ASSERT_NE(f.flow.replay(), nullptr);
+    f.flow.update(t + ms(500), {});
+    EXPECT_EQ(f.flow.game()->summary().hits, result.hits) << "реплей — этот же замер";
+    f.send({key(Key::Escape, t + ms(600))}, t + ms(600));
+    EXPECT_EQ(f.flow.screen(), Screen::GameOver) << "реплей с итога — назад на итог";
+    EXPECT_EQ(f.flow.game()->summary().duration_ms, result.duration_ms);
+    EXPECT_EQ(f.profile.runs.size(), 1U) << "реплей в историю не идёт";
+    EXPECT_EQ(count_of<RunFinished>(f.flow.take_events()), 0);
+}
+
+TEST(Flow, NoReplayButtonWithoutRecording) {
+    Fixture f;
+    f.profile.settings.replays = false;  // запись реплеев выключена (D-45)
+    const Nanoseconds start = f.start_game(kT0);
+    f.send({key(Key::Escape, start)}, start);
+    ASSERT_EQ(f.flow.screen(), Screen::GameOver);
+    EXPECT_FALSE(f.flow.replay_offered());
+    const Vec2 replay = center_of(ResultButton::Replay, true);
+    const Nanoseconds t = start + kResultButtonsDelay;
+    f.send({click_at(replay.x, replay.y, t)}, t);
+    EXPECT_EQ(f.flow.screen(), Screen::GameOver) << "кнопки «Реплей» нет";
+}
+
 TEST(Flow, EscEndsAttemptAndRecordsIt) {
     Fixture f;
     const Nanoseconds start = f.start_game(kT0);

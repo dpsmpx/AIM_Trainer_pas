@@ -63,6 +63,46 @@ void Flow::finish_run() {
     events_.emplace_back(*last_run_);
 }
 
+void Flow::show_result() {
+    finish_run();
+    result_shown_ = now_;
+    go(Screen::GameOver);
+}
+
+void Flow::play(std::shared_ptr<const Replay> replay, Nanoseconds now, Screen back) {
+    options_ = replay->run.summary.options;
+    player_.emplace(std::move(replay), make_random_, now);
+    replay_back_ = back;
+    go(Screen::Replay);
+}
+
+bool Flow::replay_offered() const {
+    return last_run_ && last_run_->new_best && last_run_->replay != nullptr;
+}
+
+bool Flow::click_result(const ClickInput& click) {
+    // Как меню, итог читает только ЛКМ; щелчок из замера — мимо (AUD-02).
+    if (click.button != MouseButton::Left || click.time < result_shown_ + kResultButtonsDelay)
+        return true;
+    // Реплей нового рекорда с записанным входом — третья кнопка (D-46).
+    std::shared_ptr<const Replay> offered;
+    if (last_run_ && last_run_->new_best) offered = last_run_->replay;
+    const bool with_replay = offered != nullptr;
+    if (result_button(ResultButton::Again, with_replay).contains(click.position)) {
+        start_countdown(now_);
+        return false;
+    }
+    if (result_button(ResultButton::Menu, with_replay).contains(click.position)) {
+        go(Screen::Menu);
+        return false;
+    }
+    if (offered && result_button(ResultButton::Replay, true).contains(click.position)) {
+        play(std::move(offered), now_, Screen::GameOver);
+        return false;
+    }
+    return true;
+}
+
 bool Flow::handle(const Input& event) {
     switch (screen_) {
         case Screen::Menu:
@@ -99,8 +139,7 @@ bool Flow::handle(const Input& event) {
                 game.click(c->button, c->position, c->time);
                 pass_game_events();
                 if (!game.over()) return true;
-                finish_run();
-                go(Screen::GameOver);
+                show_result();
                 return false;
             }
             const auto* key = std::get_if<KeyInput>(&event);
@@ -119,8 +158,7 @@ bool Flow::handle(const Input& event) {
                 case Key::Escape:  // конец попытки (D-40)
                     if (recorder_) recorder_->finish(EndReason::GaveUp, k.time, now_);
                     game.finish(EndReason::GaveUp, k.time);
-                    finish_run();
-                    go(Screen::GameOver);
+                    show_result();
                     return false;
                 case Key::Space:
                 case Key::Up:
@@ -131,8 +169,9 @@ bool Flow::handle(const Input& event) {
             return true;
         }
         case Screen::GameOver: {
+            if (const auto* c = std::get_if<ClickInput>(&event)) return click_result(*c);
             const auto* k = std::get_if<KeyInput>(&event);
-            if (k == nullptr) return true;  // щелчки Game Over гасит (AUD-02)
+            if (k == nullptr) return true;
             if (k->key == Key::Space || k->key == Key::M) {
                 go(Screen::Menu);
                 return false;
@@ -149,7 +188,7 @@ bool Flow::handle(const Input& event) {
             if (k == nullptr) return true;
             if (k->key == Key::Escape || k->key == Key::Space || k->key == Key::M) {
                 player_.reset();
-                go(Screen::Menu);
+                go(replay_back_);
                 return false;
             }
             return true;
@@ -190,10 +229,7 @@ void Flow::update(Nanoseconds now, Vec2 cursor) {
             if (recorder_) recorder_->update(now, cursor);
             game.update(now, cursor);
             pass_game_events();
-            if (game.over()) {
-                finish_run();
-                go(Screen::GameOver);
-            }
+            if (game.over()) show_result();
             break;
         }
         case Screen::Replay:
@@ -217,9 +253,7 @@ void Flow::frame_presented(Nanoseconds frame_time, Nanoseconds presented_at) {
 
 void Flow::start_replay(std::shared_ptr<const Replay> replay, Nanoseconds now) {
     if (screen_ != Screen::Menu || !replay) return;
-    options_ = replay->run.summary.options;
-    player_.emplace(std::move(replay), make_random_, now);
-    go(Screen::Replay);
+    play(std::move(replay), now, Screen::Menu);
 }
 
 const Game* Flow::game() const {

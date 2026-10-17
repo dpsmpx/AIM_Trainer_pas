@@ -52,11 +52,29 @@ inline constexpr std::array<MiniButton, 6> kMiniButtons{
     MiniButton::Achievements, MiniButton::History,  MiniButton::Profile};
 Rect mini_button(MiniButton b);
 
+// ---- Итог замера (D-46) ----
+/// Кнопки итога: «Ещё раз», «В меню» и «Реплей» у нового рекорда набора.
+enum class ResultButton : unsigned char { Again, Menu, Replay };
+/// Столбцы итога: параметры замера слева, меры справа.
+inline constexpr int kResultParamsX1 = 40;
+inline constexpr int kResultParamsX2 = 380;
+inline constexpr int kResultMeasuresX1 = 420;
+inline constexpr int kResultMeasuresX2 = 760;
+inline constexpr int kResultButtonW = 106;
+inline constexpr int kResultButtonH = 32;
+inline constexpr int kResultButtonGap = 10;
+inline constexpr int kResultButtonsY = 516;
+/// Кнопки — по центру столбца мер; with_replay — есть ли третья.
+Rect result_button(ResultButton b, bool with_replay);
+/// Щелчок, начатый в замере, кнопки итога не нажимает (AUD-02): они
+/// срабатывают через это время после появления итога.
+inline constexpr Nanoseconds kResultButtonsDelay = ms(500);
+
 // ---- Настройки ----
 inline constexpr int kSettingsW = 480;
 inline constexpr int kSettingsH = 560;
-inline constexpr int kSettingsRowH = 34;
-inline constexpr int kSettingsButton = 30;
+inline constexpr int kSettingsRowH = 32;
+inline constexpr int kSettingsButton = 28;
 // Ряды настроек по порядку.
 inline constexpr int kSettingsSizeRow = 0;      ///< размер цели, «−»/«+»
 inline constexpr int kSettingsLifetimeRow = 1;  ///< жизнь цели, «−»/«+»
@@ -65,12 +83,13 @@ inline constexpr int kSettingsEndingRow = 3;   ///< окончание: жизн
 inline constexpr int kSettingsAverageRow = 4;  ///< среднее за N, «−»/«+» (D-38)
 inline constexpr int kSettingsSoundRow = 5;
 inline constexpr int kSettingsThemeRow = 6;
-inline constexpr int kSettingsFontRow = 7;     ///< шрифт (D-43)
-inline constexpr int kSettingsHudRow = 8;      ///< интерфейс замера (D-45)
-inline constexpr int kSettingsReplaysRow = 9;  ///< запись реплеев (D-45)
-inline constexpr int kSettingsOpenFolderRow = 10;  ///< открыть папку сохранений (D-33)
-inline constexpr int kSettingsChooseFolderRow = 11;  ///< выбрать её (D-33)
-inline constexpr int kSettingsResetRow = 12;
+inline constexpr int kSettingsFontRow = 7;         ///< шрифт (D-43)
+inline constexpr int kSettingsMenuEffectsRow = 8;  ///< эффекты меню (D-47)
+inline constexpr int kSettingsHudRow = 9;          ///< интерфейс замера (D-45)
+inline constexpr int kSettingsReplaysRow = 10;     ///< запись реплеев (D-45)
+inline constexpr int kSettingsOpenFolderRow = 11;  ///< открыть папку сохранений (D-33)
+inline constexpr int kSettingsChooseFolderRow = 12;  ///< выбрать её (D-33)
+inline constexpr int kSettingsResetRow = 13;
 Rect settings_panel();
 int settings_row_y(int row);
 Rect settings_minus(int row);

@@ -129,7 +129,8 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
                         // Новый замер: эффекты и след — заново.
                         effects_.clear();
                         trail_.clear();
-                    } else if (s.to == core::Screen::GameOver) {
+                    } else if (s.to == core::Screen::GameOver && s.from == core::Screen::Game) {
+                        // Конец замера; возврат из реплея на итог — молча.
                         play(core::kGameOverBeep);
                     }
                 },
@@ -149,7 +150,6 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
                                 break;
                             }
                             effects_.hit(x, y, color, th.text, g.points, rng_, now);
-                            if (g.accuracy >= core::kPreciseHit) effects_.precise_flash(now);
                             break;
                         case core::GameEventKind::FalseStart:
                             play(core::kMissBeep);
@@ -160,8 +160,9 @@ void Screens::after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds
                             effects_.hit(x, y, color, th.text, g.points, rng_, now);
                             play(core::kHitBeep);
                             break;
-                        case core::GameEventKind::Bomb: effects_.bomb_flash(now); break;
                         case core::GameEventKind::Miss: play(core::kMissBeep); break;
+                        // Подрыв — итогом «ПОДРЫВ!» и звуком конца (D-48).
+                        case core::GameEventKind::Bomb:
                         case core::GameEventKind::Expired: break;
                     }
                 },
@@ -263,13 +264,13 @@ void Screens::render(const core::Flow& flow, core::Vec2 mouse, int fps, core::Na
             break;
         case core::Screen::GameOver:
             if (const core::Game* g = flow.game()) {
-                render_game_over(canvas_, th, *g, flow.last_run(), profile_);
+                render_game_over(canvas_, th, *g, flow, profile_, mouse, now);
                 toasts_.render(canvas_, th, now);
             }
             break;
         case core::Screen::Replay:
             if (const core::ReplayPlayer* r = flow.replay()) {
-                render_replay(canvas_, th, *r, effects_, trail_, fps, now);
+                render_replay(canvas_, th, *r, flow.replay_back(), effects_, trail_, fps, now);
                 toasts_.render(canvas_, th, now);
             }
             break;

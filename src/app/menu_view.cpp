@@ -186,6 +186,8 @@ void render_settings(Canvas& c, const core::Theme& th, const core::Settings& s,
     toggle(core::kSettingsThemeRow, "Тема: " + core::theme_title(s.theme));
     toggle(core::kSettingsFontRow,
            std::string("Шрифт: ") + (s.font == 1 ? "DejaVu Sans Mono" : "DejaVu Sans Condensed"));
+    toggle(core::kSettingsMenuEffectsRow,
+           std::string("Эффекты меню: ") + (s.menu_effects ? "ON" : "OFF"));
     toggle(core::kSettingsHudRow, std::string("Интерфейс замера: ") + (s.hud ? "ON" : "OFF"));
     toggle(core::kSettingsReplaysRow, std::string("Запись реплеев: ") + (s.replays ? "ON" : "OFF"));
     toggle(core::kSettingsOpenFolderRow, "Открыть папку сохранений");
@@ -480,17 +482,15 @@ void MenuView::update(core::Nanoseconds now) {
 
 void MenuView::render_particles(Canvas& c, const core::Theme& theme, const core::Profile& profile,
                                 core::Vec2 mouse) const {
+    // Эффекты меню выключены — ни частиц, ни связей, ни линий к курсору (D-47).
+    if (!profile.settings.menu_effects) return;
     const auto& items = particles_.items();
-    // Линии к курсору — только с эффектами меню; линии между частицами и
-    // точки — всегда, как у образца.
-    if (profile.settings.menu_effects) {
-        for (const core::Particle& p : items) {
-            const double dist = std::hypot(p.x - mouse.x, p.y - mouse.y);
-            if (const auto alpha = core::link_alpha(dist, core::kCursorLink)) {
-                c.pen = with_alpha(theme.particles, *alpha);
-                c.pen_width = 1;
-                c.line(round_int(p.x), round_int(p.y), round_int(mouse.x), round_int(mouse.y));
-            }
+    for (const core::Particle& p : items) {
+        const double dist = std::hypot(p.x - mouse.x, p.y - mouse.y);
+        if (const auto alpha = core::link_alpha(dist, core::kCursorLink)) {
+            c.pen = with_alpha(theme.particles, *alpha);
+            c.pen_width = 1;
+            c.line(round_int(p.x), round_int(p.y), round_int(mouse.x), round_int(mouse.y));
         }
     }
     for (std::size_t i = 0; i + 1 < items.size(); ++i) {

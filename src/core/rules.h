@@ -29,7 +29,7 @@ inline constexpr int kComboTier2 = 10;
 inline constexpr double kComboMult1 = 1.5;
 inline constexpr double kComboMult2 = 2.0;
 
-/// Точность попадания, с которой оно «в яблочко»: вспышка и достижение 1.
+/// Точность попадания, с которой оно «в яблочко»: достижение 1.
 inline constexpr double kPreciseHit = 0.95;
 
 /// Наведение (D-21): наводка до засчитывания; движение: скорость цели, px/с.

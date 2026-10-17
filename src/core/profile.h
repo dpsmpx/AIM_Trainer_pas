@@ -32,7 +32,7 @@ struct Settings {
     PresetSettings preset;
     int average_runs = kDefaultAverageRuns;  ///< N у «среднего за N» (D-38)
     bool sound = true;
-    bool menu_effects = true;  ///< частицы меню, «Effects: ON/OFF»
+    bool menu_effects = true;  ///< частицы фона меню, связи и линии к курсору (D-47)
     /// Тема (D-44): слово встроенной (dark, neon, minimal) или имя файла
     /// themes/ИМЯ.ini игрока.
     std::string theme = "dark";

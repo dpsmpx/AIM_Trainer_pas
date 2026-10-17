@@ -6,7 +6,6 @@
 #include <utility>
 
 #include "core/rounding.h"
-#include "core/screen.h"
 
 namespace aim::app {
 
@@ -58,14 +57,6 @@ void Effects::label(int x, int y, std::string text, core::Rgba color, core::Nano
     effects_[(next_ + kSlots - 1) % kSlots].size = size;
 }
 
-void Effects::precise_flash(core::Nanoseconds now) {
-    spawn(Kind::WhiteScreen, 0, 0, 0, 0, 200, {}, {}, now);
-}
-
-void Effects::bomb_flash(core::Nanoseconds now) {
-    spawn(Kind::RedScreen, 0, 0, 0, 0, 350, {}, {}, now);
-}
-
 void Effects::clear() {
     for (Effect& e : effects_)
         e.active = false;
@@ -104,14 +95,6 @@ void Effects::render(Canvas& c, const core::Theme& theme, core::Nanoseconds now)
                 c.text_out(round_int(e.x) - tw / 2, round_int(e.y + e.vy * t) - e.size / 2, e.text);
                 break;
             }
-            case Kind::WhiteScreen:
-                c.brush = with_alpha(theme.flash_hit, round_int(70 * (1 - t)));
-                c.fill_rect(0, 0, core::kWindowWidth, core::kWindowHeight);
-                break;
-            case Kind::RedScreen:
-                c.brush = with_alpha(theme.flash_bomb, round_int(140 * (1 - t)));
-                c.fill_rect(0, 0, core::kWindowWidth, core::kWindowHeight);
-                break;
         }
     }
 }

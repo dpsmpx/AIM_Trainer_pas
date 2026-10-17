@@ -43,8 +43,7 @@ struct Theme {
     Rgba overlay;  ///< плашки поверх замера: серия, подсказка кнопок, реплей
     Rgba trail;    ///< след курсора
     Rgba wave;     ///< волна попадания
-    Rgba flash_hit;   ///< вспышка экрана — точное попадание
-    Rgba flash_bomb;  ///< вспышка экрана — подрыв
+    Rgba target_mark;  ///< метка стороны на цели «по цвету» (D-48)
     // Панели и кнопки.
     Rgba dim;           ///< затемнение под панелью
     Rgba panel;         ///< панель
@@ -88,8 +87,7 @@ constexpr Theme dark_theme() {
     t.overlay = {40, 40, 45, 180};
     t.trail = {200, 220, 255};
     t.wave = {255, 255, 255};
-    t.flash_hit = {255, 255, 255};
-    t.flash_bomb = {200, 30, 20};
+    t.target_mark = {20, 20, 24, 210};
     t.dim = {15, 15, 18, 215};
     t.panel = {45, 45, 50, 238};
     t.panel_border = {90, 90, 95};

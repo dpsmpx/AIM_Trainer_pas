@@ -1,7 +1,8 @@
 #!/bin/bash
 # Обход экранов C++-версии (D-27, D-43): с чистой папки игрока — туториал,
 # каждый пункт меню, каждая панель, справка до конца, конструктор, каждый
-# набор (отсчёт, замер, итог), реплей рекорда — снимок каждого в КАТАЛОГ.
+# набор (отсчёт, замер, итог), реплей с итога и из «Рекордов наборов», меню
+# без эффектов — снимок каждого в КАТАЛОГ.
 # Программа идёт с --text-check: надписи, которые не поместились в свой
 # прямоугольник, — в конце, из журнала программы.
 #
@@ -36,7 +37,7 @@ if [ "$FONT" = mono ]; then
     # «Настройки» → строка «Шрифт» (core/layout.h: панель 560 px, ряд 7).
     gui click 155 577
     sleep 0.3
-    gui click 400 333
+    gui click 400 316
     gui key Escape
     sleep 0.3
 fi
@@ -93,8 +94,18 @@ for i in 0 1 2 3 4; do
     fi
     shot "05_preset_${i}_game"
     gui key Escape
-    sleep 0.5
+    sleep 0.7
     shot "05_preset_${i}_over"
+    if [ "$i" = 1 ]; then
+        # Первый замер набора — рекорд: «▶ Реплей» — третья кнопка итога
+        # (core/layout.h, result_button), назад — на итог (D-46).
+        gui click 706 532
+        sleep 1.5
+        shot "05_preset_${i}_replay"
+        gui key Escape
+        sleep 0.3
+        shot "05_preset_${i}_over_back"
+    fi
     gui key space
     sleep 0.4
 done
@@ -108,6 +119,17 @@ sleep 2
 shot 06_replay
 gui key Escape
 sleep 0.3
+
+# Эффекты меню выключены (D-47): «Настройки» → ряд 8.
+gui key Escape
+gui click 155 577
+sleep 0.3
+gui click 400 348
+sleep 0.2
+shot 07_settings_effects_off
+gui key Escape
+sleep 0.3
+shot 07_menu_effects_off
 
 gui stop >/dev/null 2>&1 || true
 LOG="$ROOT/build/gui/port/run.log"

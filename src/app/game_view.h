@@ -4,8 +4,6 @@
 // смена цвета окна, D-37), итог с параметрами, рекордом и средним за N
 // (D-38) и тепловой картой промахов, реплей (D-39).
 
-#include <optional>
-
 #include "app/canvas.h"
 #include "app/effects.h"
 #include "core/flow.h"
@@ -27,13 +25,16 @@ void render_game(Canvas& canvas, const core::Theme& theme, const core::Game& gam
                  const CursorTrail& trail, int fps, core::Nanoseconds now, bool hud = true);
 
 /// Итог замера: причина конца, параметры, меры, рекорд и среднее за N
-/// набора, тепловая карта промахов; без уведомления.
+/// набора, тепловая карта промахов, кнопки «Ещё раз», «В меню» и «Реплей»
+/// (D-46); без уведомления. mouse — подсветка кнопки под курсором.
 void render_game_over(Canvas& canvas, const core::Theme& theme, const core::Game& game,
-                      const std::optional<core::RunFinished>& run, const core::Profile& profile);
+                      const core::Flow& flow, const core::Profile& profile, core::Vec2 mouse,
+                      core::Nanoseconds now);
 
 /// Реплей: кадр замера из записи, курсор игрока, плашка «Реплей» с
-/// набором и датой; в конце — как выйти.
+/// набором и датой; в конце — как выйти: в меню или на итог (back, D-46).
 void render_replay(Canvas& canvas, const core::Theme& theme, const core::ReplayPlayer& replay,
-                   Effects& effects, const CursorTrail& trail, int fps, core::Nanoseconds now);
+                   core::Screen back, Effects& effects, const CursorTrail& trail, int fps,
+                   core::Nanoseconds now);
 
 }  // namespace aim::app

@@ -204,6 +204,38 @@ void stroke_segment(Mesh& mesh, Pt a, Pt b, float width, core::Rgba color) {
         mesh.quad(va[k], vb[k], vb[k + 1], va[k + 1]);
 }
 
+// Дуга окружности (центр c, радиус radius) пером ширины width: от угла from
+// на sweep радиан (углы окна: π/2 — вниз); края сглажены, торцы — по радиусу.
+void stroke_arc(SDL_Renderer* r, Pt c, float radius, double from, double sweep, float width,
+                core::Rgba color) {
+    if (color.a == 0 || width <= 0 || radius <= 0) return;
+    const float coverage = std::min(width, 1.0F);
+    const float half_core = std::max(width / 2.0F - kFeather, 0.0F);
+    const float half_all = std::max(width, 1.0F) / 2.0F + kFeather;
+    const SDL_FColor solid = to_fcolor(color, coverage);
+    const SDL_FColor clear = to_fcolor(color, 0);
+    const int n = std::clamp(static_cast<int>(radius * std::abs(sweep)), 8, 128);
+    Mesh mesh;
+    std::array<int, 4> prev{};
+    for (int i = 0; i <= n; ++i) {
+        const double a = from + sweep * i / n;
+        const auto dx = static_cast<float>(std::cos(a));
+        const auto dy = static_cast<float>(std::sin(a));
+        const auto at = [&](float d) {
+            return Pt{c.x + (radius + d) * dx, c.y + (radius + d) * dy};
+        };
+        const std::array<int, 4> cur{
+            mesh.vertex(at(-half_all), clear), mesh.vertex(at(-half_core), solid),
+            mesh.vertex(at(half_core), solid), mesh.vertex(at(half_all), clear)};
+        if (i > 0) {
+            for (std::size_t k = 0; k < 3; ++k)
+                mesh.quad(prev[k], cur[k], cur[k + 1], prev[k + 1]);
+        }
+        prev = cur;
+    }
+    mesh.draw(r);
+}
+
 Pt gdi(int x, int y) {
     return {static_cast<float>(x) + kPixelCenter, static_cast<float>(y) + kPixelCenter};
 }
@@ -256,6 +288,11 @@ void Canvas::draw_circle(int x, int y, int r) {
     const Pt c = gdi(x, y);
     stroke_closed(renderer_, ellipse_points(c.x, c.y, static_cast<float>(r), static_cast<float>(r)),
                   static_cast<float>(pen_width), pen);
+}
+
+void Canvas::draw_arc(int x, int y, double r, double from, double sweep) {
+    stroke_arc(renderer_, gdi(x, y), static_cast<float>(r), from, sweep,
+               static_cast<float>(pen_width), pen);
 }
 
 void Canvas::circle(int x, int y, int r) {
