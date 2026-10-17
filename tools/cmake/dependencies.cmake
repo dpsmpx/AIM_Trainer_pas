@@ -3,8 +3,8 @@
 #   SDL 3.4.18 (D-18) — архив выпуска со сверкой SHA-256, статически.
 #   SDL3_ttf 3.2.2 и FreeType 2.15.0 (D-31) — так же; FreeType — внутри
 #   SDL3_ttf, его же сборкой.
-#   DejaVu Sans Mono 2.37 (D-22, D-31) — архив выпуска со сверкой SHA-256;
-#   файлы шрифта кладёт рядом с программой CMakeLists.txt.
+#   DejaVu 2.37 (D-31, D-43): Sans Condensed и Sans Mono — архив выпуска со
+#   сверкой SHA-256; файлы шрифтов кладёт рядом с программой CMakeLists.txt.
 #   GoogleTest 1.14.0 (D-19) — на Linux пакет Ubuntu; без пакета — исходники
 #   тега v1.14.0 по коммиту (в пресете windows-cross — исходники из пакета).
 #
@@ -90,6 +90,8 @@ FetchContent_Declare(dejavu
     SOURCE_SUBDIR aim-unpack-only)
 FetchContent_MakeAvailable(dejavu)
 set(AIM_FONT_FILES
+    "${dejavu_SOURCE_DIR}/ttf/DejaVuSansCondensed.ttf"
+    "${dejavu_SOURCE_DIR}/ttf/DejaVuSansCondensed-Bold.ttf"
     "${dejavu_SOURCE_DIR}/ttf/DejaVuSansMono.ttf"
     "${dejavu_SOURCE_DIR}/ttf/DejaVuSansMono-Bold.ttf"
     "${dejavu_SOURCE_DIR}/LICENSE")

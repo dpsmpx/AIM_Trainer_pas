@@ -1,14 +1,23 @@
 #include "core/menu.h"
 
+#include <algorithm>
 #include <array>
+#include <cmath>
+#include <cstddef>
 #include <utility>
+#include <vector>
 
+#include "core/help.h"
 #include "core/profile_file.h"
+#include "core/records.h"
 
 namespace aim::core {
 
 Menu::Menu(Profile& profile, int profile_number, bool show_tutorial)
-    : profile_(profile), profile_number_(profile_number), tutorial_(show_tutorial) {}
+    : profile_(profile),
+      profile_number_(profile_number),
+      tutorial_(show_tutorial),
+      selected_(std::clamp(profile.preset, 0, kMenuItems - 1)) {}
 
 void Menu::enter(Nanoseconds now) {
     entered_at_ = now;
@@ -16,8 +25,8 @@ void Menu::enter(Nanoseconds now) {
 
 void Menu::hover(Vec2 cursor, Nanoseconds now) {
     if (tutorial_ || panel_ != Panel::None) return;
-    for (int i = 0; i < kModeCount; ++i) {
-        if (mode_button(i, since_entered(now)).contains(cursor)) {
+    for (int i = 0; i < kMenuItems; ++i) {
+        if (preset_button(i, since_entered(now)).contains(cursor)) {
             selected_ = i;
             return;
         }
@@ -34,29 +43,58 @@ void Menu::close_tutorial() {
     requests_.emplace_back(SaveProfile{});
 }
 
-std::optional<GameMode> Menu::start_selected() const {
-    return kAllModes.at(static_cast<std::size_t>(selected_));
+MeasureOptions Menu::start_selected() {
+    if (profile_.preset != selected_) {
+        profile_.preset = selected_;
+        requests_.emplace_back(SaveProfile{});
+    }
+    return selected_options(profile_);
 }
 
 void Menu::click_settings(Vec2 p) {
-    constexpr std::array<SettingRow, 3> kRows{SettingRow::CircleSize, SettingRow::Lifetime,
-                                              SettingRow::Lives};
-    for (int row = 0; row < 3; ++row) {
-        const SettingRow r = kRows.at(static_cast<std::size_t>(row));
+    constexpr std::array<std::pair<int, SettingRow>, 4> kSteppers{{
+        {kSettingsSizeRow, SettingRow::TargetSize},
+        {kSettingsLifetimeRow, SettingRow::Lifetime},
+        {kSettingsLivesRow, SettingRow::Lives},
+        {kSettingsAverageRow, SettingRow::AverageRuns},
+    }};
+    for (const auto& [row, setting] : kSteppers) {
         if (settings_minus(row).contains(p)) {
-            step_setting(profile_.settings, r, -1);
+            step_setting(profile_.settings, setting, -1);
             requests_.emplace_back(SaveProfile{});
-        } else if (settings_plus(row).contains(p)) {
-            step_setting(profile_.settings, r, 1);
+            return;
+        }
+        if (settings_plus(row).contains(p)) {
+            step_setting(profile_.settings, setting, 1);
             requests_.emplace_back(SaveProfile{});
+            return;
         }
     }
-    if (settings_toggle(3).contains(p)) {
-        profile_.settings.sound = !profile_.settings.sound;
+    Settings& s = profile_.settings;
+    if (settings_toggle(kSettingsEndingRow).contains(p)) {
+        s.preset.ending = s.preset.ending == Ending::Lives ? Ending::Time : Ending::Lives;
         requests_.emplace_back(SaveProfile{});
-    } else if (settings_toggle(4).contains(p)) {
-        profile_.settings.theme = (profile_.settings.theme + 1) % kThemeCount;
+    } else if (settings_toggle(kSettingsSoundRow).contains(p)) {
+        s.sound = !s.sound;
         requests_.emplace_back(SaveProfile{});
+    } else if (settings_toggle(kSettingsThemeRow).contains(p)) {
+        requests_.emplace_back(NextTheme{});
+    } else if (settings_toggle(kSettingsFontRow).contains(p)) {
+        s.font = (s.font + 1) % kFontCount;
+        requests_.emplace_back(SaveProfile{});
+    } else if (settings_toggle(kSettingsMenuEffectsRow).contains(p)) {
+        s.menu_effects = !s.menu_effects;
+        requests_.emplace_back(SaveProfile{});
+    } else if (settings_toggle(kSettingsHudRow).contains(p)) {
+        s.hud = !s.hud;
+        requests_.emplace_back(SaveProfile{});
+    } else if (settings_toggle(kSettingsReplaysRow).contains(p)) {
+        s.replays = !s.replays;
+        requests_.emplace_back(SaveProfile{});
+    } else if (settings_toggle(kSettingsOpenFolderRow).contains(p)) {
+        requests_.emplace_back(OpenDataFolder{});
+    } else if (settings_toggle(kSettingsChooseFolderRow).contains(p)) {
+        requests_.emplace_back(ChooseDataFolder{});
     } else if (settings_reset().contains(p)) {
         reset_settings(profile_.settings);
         requests_.emplace_back(SaveProfile{});
@@ -65,7 +103,7 @@ void Menu::click_settings(Vec2 p) {
     }
 }
 
-std::optional<GameMode> Menu::click(const ClickInput& click) {
+std::optional<MeasureOptions> Menu::click(const ClickInput& click) {
     // Меню читает только ЛКМ, как образец.
     if (click.button != MouseButton::Left) return std::nullopt;
     const Vec2 p = click.position;
@@ -75,16 +113,18 @@ std::optional<GameMode> Menu::click(const ClickInput& click) {
         return std::nullopt;
     }
     switch (panel_) {
-        case Panel::Help:
-        case Panel::Records:
+        case Panel::Help: click_help(p); return std::nullopt;
+        case Panel::Records: click_records(p); return std::nullopt;
         case Panel::Achievements:
-            // Любой щелчок закрывает и дальше не идёт: режим под панелью не
+            // Любой щелчок закрывает и дальше не идёт: набор под панелью не
             // выбирается.
             panel_ = Panel::None;
             return std::nullopt;
         case Panel::History:
-            // «Экспорт в CSV» — после ответа автора (TODO.md).
-            if (!history_panel().contains(p)) panel_ = Panel::None;
+            if (history_export().contains(p))
+                requests_.emplace_back(ExportHistory{});
+            else if (!history_panel().contains(p))
+                panel_ = Panel::None;
             return std::nullopt;
         case Panel::Profiles:
             for (int n = 1; n <= kProfileCount; ++n) {
@@ -96,6 +136,7 @@ std::optional<GameMode> Menu::click(const ClickInput& click) {
             if (!profiles_panel().contains(p)) panel_ = Panel::None;
             return std::nullopt;
         case Panel::Settings: click_settings(p); return std::nullopt;
+        case Panel::Constructor: return click_constructor(p);
         case Panel::None: break;
     }
     constexpr std::array<std::pair<MiniButton, Panel>, 6> kOpens{{
@@ -109,24 +150,129 @@ std::optional<GameMode> Menu::click(const ClickInput& click) {
     for (const auto& [button, panel] : kOpens) {
         if (mini_button(button).contains(p)) {
             panel_ = panel;
-            if (panel == Panel::History) requests_.emplace_back(LoadHistory{});
+            if (panel == Panel::Help) help_scroll_ = 0;
             return std::nullopt;
         }
     }
-    for (int i = 0; i < kModeCount; ++i) {
-        if (mode_button(i, since_entered(click.time)).contains(p)) {
+    for (int i = 0; i < kMenuItems; ++i) {
+        if (preset_button(i, since_entered(click.time)).contains(p)) {
             selected_ = i;
+            // «Свой набор» сперва открывает конструктор; набор — сразу замер.
+            if (i == kCustomItem) {
+                panel_ = Panel::Constructor;
+                return std::nullopt;
+            }
             return start_selected();
         }
     }
     if (kPlate.contains(p)) return start_selected();
-    // Щелчок по пустому месту — эффекты меню вкл./выкл.; записываются со
-    // следующим сохранением, как у образца.
+    // Щелчок по пустому месту — эффекты меню вкл./выкл., как строка
+    // настроек (D-47).
     profile_.settings.menu_effects = !profile_.settings.menu_effects;
+    requests_.emplace_back(SaveProfile{});
     return std::nullopt;
 }
 
+void Menu::scroll_help(int lines) {
+    help_scroll_ = std::clamp(help_scroll_ + lines, 0, kHelpMaxScroll);
+}
+
+std::optional<MeasureOptions> Menu::click_constructor(Vec2 p) {
+    MeasureOptions& o = profile_.custom;
+    // Заготовка — набор с общими настройками: только заполняет опции.
+    for (int i = 0; i < kPresetCount; ++i) {
+        if (constructor_preset(i).contains(p)) {
+            o = preset_options(i, profile_.settings.preset);
+            requests_.emplace_back(SaveProfile{});
+            return std::nullopt;
+        }
+    }
+    for (int r = 0; r < kOptionRows; ++r) {
+        const auto row = static_cast<OptionRow>(r);
+        // Опция, которая к замеру не относится, не правится.
+        if (!constructor_row(r).contains(p) || !option_applies(o, row)) continue;
+        if (option_toggles(row)) {
+            toggle_option(o, row);
+        } else if (constructor_minus(r).contains(p)) {
+            step_option(o, row, -1);
+        } else if (constructor_plus(r).contains(p)) {
+            step_option(o, row, 1);
+        } else {
+            return std::nullopt;
+        }
+        requests_.emplace_back(SaveProfile{});
+        return std::nullopt;
+    }
+    if (constructor_start().contains(p)) {
+        panel_ = Panel::None;
+        selected_ = kCustomItem;
+        return start_selected();
+    }
+    if (!constructor_panel().contains(p)) panel_ = Panel::None;
+    return std::nullopt;
+}
+
+void Menu::click_records(Vec2 p) {
+    // Строки — как на панели: наборы истории, свежие сверху (core/records.h).
+    const std::vector<ComboStats> all =
+        all_combo_stats(profile_.runs, profile_.settings.average_runs);
+    const int rows = std::min(kRecordsRows, static_cast<int>(all.size()));
+    for (int i = 0; i < rows; ++i) {
+        if (records_row(i).contains(p)) {
+            requests_.emplace_back(PlayReplay{all.at(static_cast<std::size_t>(i)).options});
+            return;
+        }
+    }
+    // Мимо строк — закрыть; набор под панелью не выбирается.
+    panel_ = Panel::None;
+}
+
+void Menu::scroll_help_to(double y) {
+    const Rect track = help_track();
+    const double share = (y - track.y1) / (track.y2 - track.y1);
+    help_scroll_ =
+        std::clamp(static_cast<int>(std::lround(share * kHelpMaxScroll)), 0, kHelpMaxScroll);
+}
+
+void Menu::click_help(Vec2 p) {
+    if (help_track().contains(p)) {
+        // Полоса прокрутки: место щелчка — место в справке; дальше ползунок
+        // тянется за курсором, пока ЛКМ зажата.
+        scroll_help_to(p.y);
+        dragging_help_ = true;
+    } else if (!help_panel().contains(p)) {
+        panel_ = Panel::None;
+    }
+}
+
+void Menu::drag(Vec2 cursor, bool left_held) {
+    if (!left_held || panel_ != Panel::Help) {
+        dragging_help_ = false;
+        return;
+    }
+    if (dragging_help_) scroll_help_to(cursor.y);
+}
+
+void Menu::wheel(const WheelInput& wheel) {
+    if (panel_ != Panel::Help || tutorial_) return;
+    // Щелчок колёсика — три строки; от себя — вверх.
+    constexpr int kLinesPerNotch = 3;
+    scroll_help(-static_cast<int>(std::lround(wheel.y * kLinesPerNotch)));
+}
+
 void Menu::key(const KeyInput& key) {
+    if (panel_ == Panel::Help && !tutorial_) {
+        switch (key.key) {
+            case Key::Up: scroll_help(-1); return;
+            case Key::Down: scroll_help(1); return;
+            case Key::PageUp: scroll_help(-kHelpVisibleLines); return;
+            case Key::PageDown: scroll_help(kHelpVisibleLines); return;
+            case Key::Escape:
+            case Key::Space:
+            case Key::R:
+            case Key::M: break;
+        }
+    }
     if (key.key != Key::Escape) return;
     panel_ = Panel::None;
     // Туториал по Esc пропускается и помечается просмотренным.

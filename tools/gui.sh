@@ -4,13 +4,14 @@
 #
 #   tools/gui.sh ref  build              собрать оригинал (archive/pascal) под Mono в build/ref
 #   tools/gui.sh port build              собрать C++-версию, пресет linux-gcc
-#   tools/gui.sh TARGET start            запустить в своём Xvfb
+#   tools/gui.sh TARGET start            запустить в своём Xvfb (ключи port —
+#                                        в AIM_PORT_ARGS, например --text-check)
 #   tools/gui.sh TARGET stop             закрыть программу и её Xvfb
 #   tools/gui.sh TARGET clean            удалить файлы игрока
 #   tools/gui.sh TARGET dir              папка файлов игрока
 #   tools/gui.sh TARGET shot F.png       снимок окна 800×600
 #   tools/gui.sh TARGET title            заголовок окна (_NET_WM_NAME; у port кириллица
-#                                        до него не доходит — docs/ARCHITECTURE.md, §12)
+#                                        до него не доходит — docs/ARCHITECTURE.md, §10)
 #   tools/gui.sh TARGET key KEY...       клавиши: Escape, space, p, Return
 #   tools/gui.sh TARGET move X Y         курсор в точку окна
 #   tools/gui.sh TARGET click X Y [BTN]  щелчок: 1 — ЛКМ, 3 — ПКМ
@@ -35,15 +36,16 @@ TOOLS_DIR="${AIM_TOOLS_DIR:-$HOME/.local/share/aim-trainer-tools}"
 PABCNET_DIR="${PABCNET_DIR:-$TOOLS_DIR/pascalabcnet}"
 REF_DIR="$ROOT/build/ref"
 PORT_BIN="$ROOT/build/linux-gcc/AimTrainer"
-TITLE="Aim Trainer"
 # Шаблоны файлов игрока — для find -name: раскрывать их здесь, в текущем
 # каталоге, нельзя.
-PLAYER_FILES=('profile*_stats.ini' 'profile*_sessions.csv' 'profile*_corrupt_backup.txt'
-              'export_profile*.csv' 'aim_trainer.ini')
+# Обе программы: Pascal-версия — profileN_stats.ini и _sessions.csv,
+# C++-версия — profileN.ini и profileN_runs.csv (D-38).
+PLAYER_FILES=('profile*.ini' 'profile*_sessions.csv' 'profile*_runs.csv'
+              'profile*_corrupt_backup.txt' 'export_profile*.csv' 'aim_trainer.ini')
 
 die() { echo "gui.sh: $*" >&2; exit 1; }
 
-usage() { sed -n '2,18p' "$0"; exit 2; }
+usage() { sed -n '2,19p' "$0"; exit 2; }
 
 # --- цели -------------------------------------------------------------------
 
@@ -76,8 +78,10 @@ launch() {
             # Программный кадровый буфер: Xvfb всё равно рисует без GPU.
             # Звуковой карты в сессии нет: звук — в драйвер dummy, без шума
             # ALSA в журнале.
+            # AIM_PORT_ARGS — ключи программы, например --text-check (D-43).
+            # shellcheck disable=SC2086 # ключи — словами
             AIM_TRAINER_DATA_DIR="$PORT_DATA" SDL_FRAMEBUFFER_ACCELERATION=0 \
-                SDL_AUDIO_DRIVER="${SDL_AUDIO_DRIVER:-dummy}" exec "$PORT_BIN" ;;
+                SDL_AUDIO_DRIVER="${SDL_AUDIO_DRIVER:-dummy}" exec "$PORT_BIN" ${AIM_PORT_ARGS:-} ;;
     esac
 }
 
@@ -148,6 +152,8 @@ cmd_clean() {
     local args=() p
     for p in "${PLAYER_FILES[@]}"; do args+=(-o -name "$p"); done
     find "$dir" -maxdepth 1 -type f \( "${args[@]:1}" \) -delete
+    # Реплеи и темы C++-версии — в своих подпапках (D-39, D-44).
+    rm -rf -- "${dir:?}/replays" "${dir:?}/themes"
 }
 
 cmd_shot() {
@@ -206,8 +212,8 @@ fi
 TARGET="$1"
 shift || true
 case "$TARGET" in
-    ref) TARGET_DISPLAY="${AIM_REF_DISPLAY:-:97}" ;;
-    port) TARGET_DISPLAY="${AIM_PORT_DISPLAY:-:96}" ;;
+    ref) TARGET_DISPLAY="${AIM_REF_DISPLAY:-:97}"; TITLE="Aim Trainer" ;;
+    port) TARGET_DISPLAY="${AIM_PORT_DISPLAY:-:96}"; TITLE="DP AIM Trainer" ;;
     *) usage ;;
 esac
 STATE="$ROOT/build/gui/$TARGET"

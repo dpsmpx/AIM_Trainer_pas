@@ -1,5 +1,6 @@
-// Забег — перенос TGameState, ProcessClick и UpdateGame (docs/ARCHITECTURE.md,
-// §7) с отличиями D-12, D-14 и AUD-03.
+// Замер по опциям (D-37): цель, наведение, смена цвета окна; окончание по
+// жизням и по времени; реакция от показанного кадра (D-12), серия (D-14),
+// щелчок по своему времени (AUD-03).
 
 #include "core/game.h"
 
@@ -16,7 +17,17 @@ namespace {
 using testing::ScriptedRandom;
 
 constexpr Nanoseconds kT0 = ms(5'000);
-constexpr GameSettings kDefaults{.circle_size = 40, .lifetime_ms = 1000, .lives = 15};
+constexpr PresetSettings kDefaults{
+    .target_size = 40, .lifetime_ms = 1000, .lives = 15, .ending = Ending::Lives};
+// Наборы kPresets.
+constexpr int kScreen = 0;
+constexpr int kClassic = 1;
+constexpr int kTwoButtons = 2;
+constexpr int kTracking = 3;
+
+MeasureOptions preset(int index, PresetSettings settings = kDefaults) {
+    return preset_options(index, settings);
+}
 
 // Места целей по очереди: (200, 200) и (600, 400) — далеко друг от друга, так
 // что каждая цель встаёт с первой попытки. unit() не задан — 0,5: масштаб 1
@@ -39,7 +50,7 @@ void show(Game& g, Nanoseconds frame) {
 TEST(Game, HitScoresAndMeasuresReactionFromShownFrame) {
     ScriptedRandom rng;
     alternate_spots(rng, 4);
-    Game g(GameMode::Classic, kDefaults, rng, kT0);
+    Game g(preset(kClassic), rng, kT0);
     show(g, kT0 + ms(15));  // показан в kT0 + 16 мс
     g.click(MouseButton::Left, center_of(g), kT0 + ms(316));
     EXPECT_EQ(g.score(), 13);
@@ -63,7 +74,7 @@ TEST(Game, HitScoresAndMeasuresReactionFromShownFrame) {
 TEST(Game, MissCostsLifeAndRecordsHeatmap) {
     ScriptedRandom rng;
     alternate_spots(rng, 2);
-    Game g(GameMode::Classic, kDefaults, rng, kT0);
+    Game g(preset(kClassic), rng, kT0);
     show(g, kT0 + ms(15));
     g.click(MouseButton::Left, {790, 10}, kT0 + ms(300));
     EXPECT_EQ(g.misses(), 1);
@@ -78,7 +89,7 @@ TEST(Game, MissCostsLifeAndRecordsHeatmap) {
 TEST(Game, ClickBeforeTargetShownIsMiss) {
     ScriptedRandom rng;
     alternate_spots(rng, 2);
-    Game g(GameMode::Classic, kDefaults, rng, kT0);
+    Game g(preset(kClassic), rng, kT0);
     g.click(MouseButton::Left, center_of(g), kT0 + ms(300));
     EXPECT_EQ(g.misses(), 1);
     EXPECT_EQ(g.hits(), 0);
@@ -87,7 +98,7 @@ TEST(Game, ClickBeforeTargetShownIsMiss) {
 TEST(Game, RightButtonInClassicIsMiss) {
     ScriptedRandom rng;
     alternate_spots(rng, 2);
-    Game g(GameMode::Classic, kDefaults, rng, kT0);
+    Game g(preset(kClassic), rng, kT0);
     show(g, kT0 + ms(15));
     g.click(MouseButton::Right, center_of(g), kT0 + ms(300));
     EXPECT_EQ(g.misses(), 1);
@@ -96,7 +107,7 @@ TEST(Game, RightButtonInClassicIsMiss) {
 TEST(Game, OtherButtonsAreNotShots) {
     ScriptedRandom rng;
     alternate_spots(rng, 2);
-    Game g(GameMode::Classic, kDefaults, rng, kT0);
+    Game g(preset(kClassic), rng, kT0);
     show(g, kT0 + ms(15));
     g.click(MouseButton::Middle, center_of(g), kT0 + ms(300));
     g.click(MouseButton::X1, center_of(g), kT0 + ms(310));
@@ -107,7 +118,7 @@ TEST(Game, OtherButtonsAreNotShots) {
 TEST(Game, ClickBeforeExpiryCountsEvenIfProcessedLate) {
     ScriptedRandom rng;
     alternate_spots(rng, 3);
-    Game g(GameMode::Classic, kDefaults, rng, kT0);
+    Game g(preset(kClassic), rng, kT0);
     show(g, kT0 + ms(15));
     // Щелчок за 10 мс до конца жизни разобран в кадре уже после неё (AUD-03):
     // цель ещё не сменена — щелчки идут до update, по своему времени.
@@ -118,7 +129,7 @@ TEST(Game, ClickBeforeExpiryCountsEvenIfProcessedLate) {
     // Тот же щелчок по краю: к 990 мс радиус 0,8 px — мимо.
     ScriptedRandom rng2;
     alternate_spots(rng2, 3);
-    Game h(GameMode::Classic, kDefaults, rng2, kT0);
+    Game h(preset(kClassic), rng2, kT0);
     show(h, kT0 + ms(15));
     h.click(MouseButton::Left, {center_of(h).x + 5, center_of(h).y}, kT0 + ms(990));
     EXPECT_EQ(h.misses(), 1);
@@ -127,7 +138,7 @@ TEST(Game, ClickBeforeExpiryCountsEvenIfProcessedLate) {
 TEST(Game, ExpiredTargetCostsLifeAndBreaksCombo) {
     ScriptedRandom rng;
     alternate_spots(rng, 8);
-    Game g(GameMode::Classic, kDefaults, rng, kT0);
+    Game g(preset(kClassic), rng, kT0);
     Nanoseconds t = kT0;
     for (int i = 0; i < 3; ++i) {
         show(g, t + ms(15));
@@ -152,7 +163,7 @@ TEST(Game, FirstTargetIsNeverBombAndBombsExpireFreely) {
     ScriptedRandom rng;
     alternate_spots(rng, 3);
     rng.units({0.5});  // масштаб первой цели; бомбу для неё не спрашивают
-    Game g(GameMode::Classic, kDefaults, rng, kT0);
+    Game g(preset(kClassic), rng, kT0);
     EXPECT_FALSE(g.target().is_bomb());
     show(g, kT0 + ms(15));
     rng.units({0.5, 0.0});  // следующая цель: масштаб 1, бомба
@@ -170,14 +181,14 @@ TEST(Game, BombClickEndsRun) {
     // Dual: место и цвет; вторая цель — красная бомба.
     rng.ints({200, 200, 0, 600, 400, 1});
     rng.units({0.5, 0.5, 0.0});
-    Game g(GameMode::Dual, kDefaults, rng, kT0);
+    Game g(preset(kTwoButtons), rng, kT0);
     show(g, kT0 + ms(15));
     g.click(MouseButton::Left, center_of(g), kT0 + ms(300));
     ASSERT_TRUE(g.target().is_bomb());
     show(g, kT0 + ms(320));
     g.click(MouseButton::Right, center_of(g), kT0 + ms(600));
     EXPECT_TRUE(g.over());
-    EXPECT_TRUE(g.died_to_bomb());
+    EXPECT_EQ(g.end_reason(), EndReason::Bomb);
     EXPECT_EQ(g.shots(), 2);
     EXPECT_EQ(g.lives_left(), 15);
     const std::vector<GameEvent> events = g.take_events();
@@ -189,7 +200,7 @@ TEST(Game, BombClickEndsRun) {
 TEST(Game, ComboMultiplierFromFiveAndTen) {
     ScriptedRandom rng;
     alternate_spots(rng, 13);
-    Game g(GameMode::Classic, kDefaults, rng, kT0);
+    Game g(preset(kClassic), rng, kT0);
     Nanoseconds t = kT0;
     std::vector<int> points;
     for (int i = 0; i < 11; ++i) {
@@ -210,20 +221,22 @@ TEST(Game, ComboMultiplierFromFiveAndTen) {
 TEST(Game, RunEndsWhenLivesAreGone) {
     ScriptedRandom rng;
     alternate_spots(rng, 2);
-    Game g(GameMode::Classic, {.circle_size = 40, .lifetime_ms = 1000, .lives = 5}, rng, kT0);
+    Game g(preset(kClassic,
+                  {.target_size = 40, .lifetime_ms = 1000, .lives = 5, .ending = Ending::Lives}),
+           rng, kT0);
     for (int i = 0; i < 4; ++i)
         g.click(MouseButton::Left, {5, 5}, kT0 + ms(100) + ms(static_cast<Nanoseconds>(i)));
     EXPECT_FALSE(g.over());
     g.click(MouseButton::Left, {5, 5}, kT0 + ms(200));
     EXPECT_TRUE(g.over());
-    EXPECT_FALSE(g.died_to_bomb());
+    EXPECT_EQ(g.end_reason(), EndReason::Lives);
     EXPECT_EQ(g.lives_left(), 0);
 }
 
 TEST(Game, DualNeedsMatchingButton) {
     ScriptedRandom rng;
     rng.ints({200, 200, 1});  // красная
-    Game g(GameMode::Dual, kDefaults, rng, kT0);
+    Game g(preset(kTwoButtons), rng, kT0);
     show(g, kT0 + ms(15));
     g.click(MouseButton::Left, center_of(g), kT0 + ms(300));
     EXPECT_EQ(g.misses(), 1);
@@ -231,33 +244,13 @@ TEST(Game, DualNeedsMatchingButton) {
     EXPECT_EQ(g.hits(), 1);
 }
 
-TEST(Game, PauseFreezesTimeAndIgnoresInput) {
-    ScriptedRandom rng;
-    alternate_spots(rng, 3);
-    Game g(GameMode::Classic, kDefaults, rng, kT0);
-    show(g, kT0 + ms(15));
-    g.pause(kT0 + ms(500));
-    g.update(kT0 + ms(2000), {});
-    g.click(MouseButton::Left, center_of(g), kT0 + ms(2100));
-    g.frame_presented(kT0 + ms(2200), kT0 + ms(2201));
-    EXPECT_EQ(g.lives_left(), 15);
-    EXPECT_EQ(g.shots(), 0);
-    g.resume(kT0 + ms(3500));  // пауза — 3 с
-    EXPECT_EQ(g.target().expires_at(), kT0 + ms(4000));
-    EXPECT_EQ(g.target().shown_at().value_or(0), kT0 + ms(3016));
-    g.update(kT0 + ms(3600), {});
-    EXPECT_EQ(g.lives_left(), 15) << "время паузы в жизнь цели не идёт";
-    g.click(MouseButton::Left, center_of(g), kT0 + ms(3700));
-    EXPECT_DOUBLE_EQ(g.avg_reaction_ms(), 684) << "реакция без паузы: 700 − 16";
-}
-
 TEST(Game, TrackingScoresByHoverWithoutShots) {
     ScriptedRandom rng;
     rng.ints({400, 300, 60});  // место и скорость 60 px/с; unit() 0,5 — масштаб 1, влево
     rng.units({0.5, 0.5});
-    Game g(GameMode::Tracking, kDefaults, rng, kT0);
+    Game g(preset(kTracking), rng, kT0);
     g.click(MouseButton::Left, center_of(g), kT0 + ms(10));
-    EXPECT_EQ(g.shots(), 0) << "в Tracking щелчки не читаются";
+    EXPECT_EQ(g.shots(), 0) << "при наведении щелчки не читаются";
     Nanoseconds t = kT0;
     for (int i = 0; i < 89; ++i) {
         t += ms(10);
@@ -274,48 +267,49 @@ TEST(Game, TrackingScoresByHoverWithoutShots) {
     ASSERT_EQ(events.size(), 1U);
     EXPECT_EQ(events[0].kind, GameEventKind::Tracked);
     EXPECT_EQ(g.target().spawned_at(), t);
+    EXPECT_EQ(g.summary().tracked, 1);
 }
 
 TEST(Game, TrackingTargetLivesTwoAndHalfSeconds) {
     ScriptedRandom rng;
     rng.ints({400, 300, 60, 200, 200, 60});
-    Game g(GameMode::Tracking, kDefaults, rng, kT0);
+    Game g(preset(kTracking), rng, kT0);
     g.update(kT0 + ms(2499), {0, 0});
     EXPECT_EQ(g.lives_left(), 15);
     g.update(kT0 + ms(2500), {0, 0});
     EXPECT_EQ(g.lives_left(), 14);
 }
 
-TEST(Game, ReactionHistoryKeepsLastFiftyInOrder) {
+TEST(Game, AllReactionsAreKeptInOrder) {
     ScriptedRandom rng;
     alternate_spots(rng, 62);
-    Game g(GameMode::Classic, kDefaults, rng, kT0);
+    Game g(preset(kClassic), rng, kT0);
     Nanoseconds t = kT0;
     for (int i = 0; i < 60; ++i) {
         show(g, t + ms(15));
         g.click(MouseButton::Left, center_of(g), t + ms(16) + ms(static_cast<Nanoseconds>(i)));
         t += ms(500);
     }
-    ASSERT_EQ(g.reactions().size(), static_cast<std::size_t>(kReactionHistory));
-    EXPECT_EQ(g.reactions().front(), ms(10));
+    ASSERT_EQ(g.reactions().size(), 60U);
+    EXPECT_EQ(g.reactions().front(), ms(0));
     EXPECT_EQ(g.reactions().back(), ms(59));
     const GameSummary s = g.summary();
-    EXPECT_EQ(s.reactions_ms.size(), 50U);
-    EXPECT_DOUBLE_EQ(s.reactions_ms.back(), 59);
+    EXPECT_EQ(s.reactions_ms.size(), 60U);
+    EXPECT_DOUBLE_EQ(s.median_reaction_ms, 29.5);
 }
 
 TEST(Game, SummaryAndGiveUp) {
     ScriptedRandom rng;
     alternate_spots(rng, 3);
-    Game g(GameMode::Classic, kDefaults, rng, kT0);
+    Game g(preset(kClassic), rng, kT0);
     show(g, kT0 + ms(15));
     // На 500 мс радиус — пик, 40 px: 20 px от центра — точность 50 %.
     g.click(MouseButton::Left, {center_of(g).x + 20, center_of(g).y}, kT0 + ms(500));
     g.click(MouseButton::Left, {5, 5}, kT0 + ms(600));
-    g.give_up();
+    g.finish(EndReason::GaveUp, kT0 + ms(700));
     EXPECT_TRUE(g.over());
     const GameSummary s = g.summary();
-    EXPECT_EQ(s.mode, GameMode::Classic);
+    EXPECT_EQ(s.options, preset(kClassic));
     EXPECT_EQ(s.score, 13);
     EXPECT_EQ(s.hits, 1);
     EXPECT_EQ(s.shots, 2);
@@ -324,7 +318,84 @@ TEST(Game, SummaryAndGiveUp) {
     EXPECT_DOUBLE_EQ(s.accuracy, 50);
     EXPECT_DOUBLE_EQ(s.avg_reaction_ms, 484);
     EXPECT_DOUBLE_EQ(s.precision, 50);
-    EXPECT_FALSE(s.died_to_bomb);
+    EXPECT_DOUBLE_EQ(s.median_reaction_ms, 484);
+    EXPECT_EQ(s.end, EndReason::GaveUp);
+    EXPECT_EQ(s.duration_ms, 700);
+}
+
+TEST(Game, TimeEndingIgnoresLivesAndStopsAtDuration) {
+    ScriptedRandom rng;
+    alternate_spots(rng, 4);
+    PresetSettings timed = kDefaults;
+    timed.ending = Ending::Time;
+    Game g(preset(kClassic, timed), rng, kT0);
+    for (int i = 0; i < 20; ++i)
+        g.click(MouseButton::Left, {5, 5}, kT0 + ms(100) + ms(static_cast<Nanoseconds>(i)));
+    EXPECT_FALSE(g.over()) << "по времени промахи жизней не снимают";
+    EXPECT_EQ(g.misses(), 20);
+    EXPECT_EQ(g.time_left(kT0 + ms(10'000)), ms(50'000));
+    g.update(kT0 + ms(59'999), {});
+    EXPECT_FALSE(g.over());
+    g.click(MouseButton::Left, {5, 5}, kT0 + ms(60'000));
+    EXPECT_TRUE(g.over()) << "щелчок после конца времени в замер не идёт";
+    EXPECT_EQ(g.misses(), 20);
+    EXPECT_EQ(g.end_reason(), EndReason::Time);
+    EXPECT_EQ(g.summary().duration_ms, 60'000);
+}
+
+TEST(Game, ScreenReactionFromShownSignal) {
+    ScriptedRandom rng;
+    rng.ints({1500, 2000});  // паузы до смены цвета
+    Game g(preset(kScreen), rng, kT0);
+    EXPECT_TRUE(g.screen_stimulus());
+    EXPECT_FALSE(g.signal_lit(kT0 + ms(1499)));
+    EXPECT_TRUE(g.signal_lit(kT0 + ms(1500)));
+    g.frame_presented(kT0 + ms(1490), kT0 + ms(1491));  // ещё тёмное окно
+    g.frame_presented(kT0 + ms(1504), kT0 + ms(1506));  // первый кадр с сигналом
+    g.frame_presented(kT0 + ms(1520), kT0 + ms(1521));
+    g.click(MouseButton::Middle, {10, 10}, kT0 + ms(1756));
+    EXPECT_EQ(g.hits(), 1);
+    EXPECT_EQ(g.reactions().back(), ms(250)) << "от показа, а не от смены в логике (D-12)";
+    EXPECT_EQ(g.score(), 0);
+    const std::vector<GameEvent> events = g.take_events();
+    ASSERT_EQ(events.size(), 1U);
+    EXPECT_EQ(events[0].kind, GameEventKind::Hit);
+    EXPECT_FALSE(g.signal_lit(kT0 + ms(1757))) << "после реакции — новая пауза";
+    EXPECT_TRUE(g.signal_lit(kT0 + ms(3756)));
+}
+
+TEST(Game, ScreenClickBeforeShownIsFalseStart) {
+    ScriptedRandom rng;
+    rng.ints({1500, 1200});
+    MeasureOptions o = preset(kScreen);
+    o.ending = Ending::Lives;
+    o.lives = 2;
+    Game g(o, rng, kT0);
+    // Смена в логике уже была, но кадр с ней ещё не показан — тоже фальстарт.
+    g.click(MouseButton::Left, {10, 10}, kT0 + ms(1600));
+    EXPECT_EQ(g.misses(), 1);
+    EXPECT_EQ(g.hits(), 0);
+    EXPECT_EQ(g.lives_left(), 1);
+    EXPECT_EQ(g.take_events().at(0).kind, GameEventKind::FalseStart);
+    EXPECT_FALSE(g.signal_lit(kT0 + ms(2799))) << "фальстарт начинает паузу заново";
+    g.click(MouseButton::Left, {10, 10}, kT0 + ms(2000));
+    EXPECT_TRUE(g.over());
+    EXPECT_EQ(g.end_reason(), EndReason::Lives);
+}
+
+TEST(Game, HoverRunHasNoBombs) {
+    MeasureOptions o = preset(kTracking);
+    o.bombs = true;
+    EXPECT_FALSE(target_rules(o).bombs) << "наведение без бомб: щёлкать их нечем";
+}
+
+TEST(Median, OddEvenAndEmpty) {
+    EXPECT_DOUBLE_EQ(median({}), 0);
+    EXPECT_DOUBLE_EQ(median({300, 100, 200}), 200);
+    EXPECT_DOUBLE_EQ(median({400, 100, 300, 200}), 250);
+    std::vector<double> mostly_300(19, 300.0);
+    mostly_300.push_back(2000);
+    EXPECT_DOUBLE_EQ(median(mostly_300), 300) << "одна долгая реакция медиану не сдвигает";
 }
 
 }  // namespace

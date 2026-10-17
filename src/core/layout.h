@@ -1,10 +1,7 @@
 #pragma once
 
-// Геометрия меню и панелей — константы и раскладка образца (PLATE_*, BTNS_*,
-// DESC_*, SET_*, DrawMiniButton, HistoryPanelX, ProfilesPanelX и др. в
-// archive/pascal/AIM_Trainer.pas). Одна на отрисовку и попадания (AUD-24):
-// у образца кнопки внизу проверялись по другим прямоугольникам, а кнопки
-// режимов — без сдвига анимации появления.
+// Геометрия меню и панелей в логических 800×600 — одна на отрисовку и
+// попадания (AUD-24).
 
 #include <array>
 
@@ -32,19 +29,20 @@ inline constexpr int kW = kWindowWidth;
 inline constexpr int kH = kWindowHeight;
 
 // ---- Меню ----
-inline constexpr Rect kPlate{50, 40, 50 + 330, 40 + 240};  ///< плашка-превью режима
+inline constexpr Rect kPlate{50, 40, 50 + 330, 40 + 240};  ///< плашка-превью набора
 inline constexpr int kButtonsX = 420;
 inline constexpr int kButtonsY = 40;
 inline constexpr int kButtonW = 330;
-inline constexpr int kButtonH = 34;
-inline constexpr int kButtonGap = 8;
-inline constexpr Rect kDescription{420, 214, 420 + 330, 214 + 76};
+inline constexpr int kButtonH = 26;
+inline constexpr int kButtonGap = 5;
+inline constexpr Rect kDescription{420, 226, 420 + 330, 226 + 90};
 
-/// Кнопка режима i через since_enter после входа в меню: появляется
+/// Кнопка пункта i (наборы, затем «Свой набор») через since_enter после
+/// входа в меню: появляется
 /// каскадом — через i·80 мс, за 400 мс, снизу на 20 px.
-Rect mode_button(int i, Nanoseconds since_enter);
+Rect preset_button(int i, Nanoseconds since_enter);
 /// Доля появления кнопки i, 0…1.
-double mode_button_entry(int i, Nanoseconds since_enter);
+double preset_button_entry(int i, Nanoseconds since_enter);
 
 /// Кнопки внизу меню: Справка, Настройки, Рекорды, Награды, История,
 /// Профиль.
@@ -54,29 +52,100 @@ inline constexpr std::array<MiniButton, 6> kMiniButtons{
     MiniButton::Achievements, MiniButton::History,  MiniButton::Profile};
 Rect mini_button(MiniButton b);
 
+// ---- Итог замера (D-46) ----
+/// Кнопки итога: «Ещё раз», «В меню» и «Реплей» у нового рекорда набора.
+enum class ResultButton : unsigned char { Again, Menu, Replay };
+/// Столбцы итога: параметры замера слева, меры справа.
+inline constexpr int kResultParamsX1 = 40;
+inline constexpr int kResultParamsX2 = 380;
+inline constexpr int kResultMeasuresX1 = 420;
+inline constexpr int kResultMeasuresX2 = 760;
+inline constexpr int kResultButtonW = 106;
+inline constexpr int kResultButtonH = 32;
+inline constexpr int kResultButtonGap = 10;
+inline constexpr int kResultButtonsY = 516;
+/// Кнопки — по центру столбца мер; with_replay — есть ли третья.
+Rect result_button(ResultButton b, bool with_replay);
+/// Щелчок, начатый в замере, кнопки итога не нажимает (AUD-02): они
+/// срабатывают через это время после появления итога.
+inline constexpr Nanoseconds kResultButtonsDelay = ms(500);
+
 // ---- Настройки ----
-inline constexpr int kSettingsW = 420;
-inline constexpr int kSettingsH = 390;
-inline constexpr int kSettingsRowH = 40;
-inline constexpr int kSettingsButton = 34;
+inline constexpr int kSettingsW = 480;
+inline constexpr int kSettingsH = 560;
+inline constexpr int kSettingsRowH = 32;
+inline constexpr int kSettingsButton = 28;
+// Ряды настроек по порядку.
+inline constexpr int kSettingsSizeRow = 0;      ///< размер цели, «−»/«+»
+inline constexpr int kSettingsLifetimeRow = 1;  ///< жизнь цели, «−»/«+»
+inline constexpr int kSettingsLivesRow = 2;     ///< жизни, «−»/«+»
+inline constexpr int kSettingsEndingRow = 3;   ///< окончание: жизни или время
+inline constexpr int kSettingsAverageRow = 4;  ///< среднее за N, «−»/«+» (D-38)
+inline constexpr int kSettingsSoundRow = 5;
+inline constexpr int kSettingsThemeRow = 6;
+inline constexpr int kSettingsFontRow = 7;         ///< шрифт (D-43)
+inline constexpr int kSettingsMenuEffectsRow = 8;  ///< эффекты меню (D-47)
+inline constexpr int kSettingsHudRow = 9;          ///< интерфейс замера (D-45)
+inline constexpr int kSettingsReplaysRow = 10;     ///< запись реплеев (D-45)
+inline constexpr int kSettingsOpenFolderRow = 11;  ///< открыть папку сохранений (D-33)
+inline constexpr int kSettingsChooseFolderRow = 12;  ///< выбрать её (D-33)
+inline constexpr int kSettingsResetRow = 13;
 Rect settings_panel();
-/// Верх строки настроек: 0 — размер, 1 — время жизни, 2 — жизни, 3 — звук,
-/// 4 — тема, 5 — сброс.
 int settings_row_y(int row);
 Rect settings_minus(int row);
 Rect settings_plus(int row);
-Rect settings_toggle(int row);  ///< строка-кнопка: 3 — звук, 4 — тема
+/// Строка-кнопка во всю ширину панели.
+Rect settings_toggle(int row);
 Rect settings_reset();
 
+// ---- Справка ----
+inline constexpr int kHelpW = 620;
+inline constexpr int kHelpH = 400;
+inline constexpr int kHelpTop = 56;  ///< от верха панели до первой строки
+inline constexpr int kHelpLineH = 22;  ///< строка справки
+Rect help_panel();
+/// Полоса прокрутки справки: щелчок по ней — прокрутка к месту.
+Rect help_track();
+
+// ---- Конструктор «Своего набора» (D-37) ----
+inline constexpr int kConstructorW = 680;
+inline constexpr int kConstructorH = 520;
+inline constexpr int kConstructorRowH = 32;  ///< шаг строк опций
+Rect constructor_panel();
+/// Заготовка — набор i (два ряда: три и два): щелчок заполняет опции.
+Rect constructor_preset(int i);
+/// Строка опции row (OptionRow) целиком: щелчок переключает.
+Rect constructor_row(int row);
+Rect constructor_minus(int row);
+Rect constructor_plus(int row);
+Rect constructor_start();
+
+// ---- Рекорды наборов ----
+inline constexpr int kRecordsW = 760;
+inline constexpr int kRecordsH = 540;
+inline constexpr int kRecordsRows = 10;  ///< строк наборов на панели
+Rect records_panel();
+/// Строка набора i (0…kRecordsRows − 1), свежие сверху: щелчок — реплей
+/// лучшего замера набора (D-39).
+Rect records_row(int i);
+
 // ---- История и профили ----
-inline constexpr int kHistoryW = 520;
+inline constexpr int kHistoryW = 620;  ///< строка замера Mono — до ~60 знаков (D-43)
 inline constexpr int kHistoryH = 460;
 Rect history_panel();
 Rect history_export();
+inline constexpr int kAchievementsW = 560;
+inline constexpr int kAchievementsH = 470;
+Rect achievements_panel();
 inline constexpr int kProfilesW = 360;
 inline constexpr int kProfilesH = 320;
 Rect profiles_panel();
 /// Строка профиля number (1…4).
 Rect profile_row(int number);
+
+// ---- Туториал первого запуска ----
+inline constexpr int kTutorialW = 480;
+inline constexpr int kTutorialH = 220;
+Rect tutorial_panel();
 
 }  // namespace aim::core

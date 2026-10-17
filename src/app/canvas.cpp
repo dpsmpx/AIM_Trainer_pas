@@ -204,6 +204,38 @@ void stroke_segment(Mesh& mesh, Pt a, Pt b, float width, core::Rgba color) {
         mesh.quad(va[k], vb[k], vb[k + 1], va[k + 1]);
 }
 
+// Дуга окружности (центр c, радиус radius) пером ширины width: от угла from
+// на sweep радиан (углы окна: π/2 — вниз); края сглажены, торцы — по радиусу.
+void stroke_arc(SDL_Renderer* r, Pt c, float radius, double from, double sweep, float width,
+                core::Rgba color) {
+    if (color.a == 0 || width <= 0 || radius <= 0) return;
+    const float coverage = std::min(width, 1.0F);
+    const float half_core = std::max(width / 2.0F - kFeather, 0.0F);
+    const float half_all = std::max(width, 1.0F) / 2.0F + kFeather;
+    const SDL_FColor solid = to_fcolor(color, coverage);
+    const SDL_FColor clear = to_fcolor(color, 0);
+    const int n = std::clamp(static_cast<int>(radius * std::abs(sweep)), 8, 128);
+    Mesh mesh;
+    std::array<int, 4> prev{};
+    for (int i = 0; i <= n; ++i) {
+        const double a = from + sweep * i / n;
+        const auto dx = static_cast<float>(std::cos(a));
+        const auto dy = static_cast<float>(std::sin(a));
+        const auto at = [&](float d) {
+            return Pt{c.x + (radius + d) * dx, c.y + (radius + d) * dy};
+        };
+        const std::array<int, 4> cur{
+            mesh.vertex(at(-half_all), clear), mesh.vertex(at(-half_core), solid),
+            mesh.vertex(at(half_core), solid), mesh.vertex(at(half_all), clear)};
+        if (i > 0) {
+            for (std::size_t k = 0; k < 3; ++k)
+                mesh.quad(prev[k], cur[k], cur[k + 1], prev[k + 1]);
+        }
+        prev = cur;
+    }
+    mesh.draw(r);
+}
+
 Pt gdi(int x, int y) {
     return {static_cast<float>(x) + kPixelCenter, static_cast<float>(y) + kPixelCenter};
 }
@@ -212,99 +244,136 @@ Pt gdi(int x, int y) {
 
 Canvas::Canvas(SDL_Renderer* renderer, Text& text) : renderer_(renderer), text_(text) {}
 
-void Canvas::clear_window(core::Rgba c) {
+void Canvas::clear(core::Rgba c) {
     SDL_SetRenderDrawColor(renderer_, c.r, c.g, c.b, c.a);
     SDL_RenderClear(renderer_);
 }
 
-void Canvas::fill_rect(int x1, int y1, int x2, int y2) {
+void Canvas::fill_rect(int x1, int y1, int x2, int y2, core::Rgba color) {
     if (x1 > x2) std::swap(x1, x2);
     if (y1 > y2) std::swap(y1, y2);
-    if (brush.a == 0) return;
-    SDL_SetRenderDrawColor(renderer_, brush.r, brush.g, brush.b, brush.a);
+    if (color.a == 0) return;
+    SDL_SetRenderDrawColor(renderer_, color.r, color.g, color.b, color.a);
     const SDL_FRect rect{static_cast<float>(x1), static_cast<float>(y1),
                          static_cast<float>(x2 - x1), static_cast<float>(y2 - y1)};
     SDL_RenderFillRect(renderer_, &rect);
 }
 
-void Canvas::fill_round_rect(int x1, int y1, int x2, int y2, int w, int h) {
-    fill_convex(renderer_, round_rect_points(x1, y1, x2, y2, w, h), brush);
+void Canvas::fill_round_rect(int x1, int y1, int x2, int y2, int w, int h, core::Rgba color) {
+    fill_convex(renderer_, round_rect_points(x1, y1, x2, y2, w, h), color);
 }
 
-void Canvas::draw_round_rect(int x1, int y1, int x2, int y2, int w, int h) {
-    stroke_closed(renderer_, round_rect_points(x1, y1, x2, y2, w, h), static_cast<float>(pen_width),
-                  pen);
+void Canvas::stroke_round_rect(int x1, int y1, int x2, int y2, int w, int h, Pen pen) {
+    stroke_closed(renderer_, round_rect_points(x1, y1, x2, y2, w, h), static_cast<float>(pen.width),
+                  pen.color);
 }
 
-void Canvas::fill_circle(int x, int y, int r) {
+void Canvas::fill_circle(int x, int y, int r, core::Rgba color) {
     if (r <= 0) return;
     const Pt c = gdi(x, y);
     fill_convex(renderer_, ellipse_points(c.x, c.y, static_cast<float>(r), static_cast<float>(r)),
-                brush);
+                color);
 }
 
-void Canvas::draw_circle(int x, int y, int r) {
+void Canvas::fill_polygon(std::span<const IntPoint> points, core::Rgba color) {
+    std::vector<Pt> pts;
+    pts.reserve(points.size());
+    for (const IntPoint& p : points)
+        pts.push_back(gdi(p.x, p.y));
+    fill_convex(renderer_, pts, color);
+}
+
+void Canvas::stroke_circle(int x, int y, int r, Pen pen) {
     if (r <= 0) return;
     const Pt c = gdi(x, y);
     stroke_closed(renderer_, ellipse_points(c.x, c.y, static_cast<float>(r), static_cast<float>(r)),
-                  static_cast<float>(pen_width), pen);
+                  static_cast<float>(pen.width), pen.color);
 }
 
-void Canvas::circle(int x, int y, int r) {
-    fill_circle(x, y, r);
-    draw_circle(x, y, r);
+void Canvas::arc(int x, int y, double r, double from, double sweep, Pen pen) {
+    stroke_arc(renderer_, gdi(x, y), static_cast<float>(r), from, sweep,
+               static_cast<float>(pen.width), pen.color);
 }
 
-void Canvas::line(int x1, int y1, int x2, int y2) {
-    if (pen.a == 0) return;
+void Canvas::line(int x1, int y1, int x2, int y2, Pen pen) {
+    if (pen.color.a == 0) return;
     Mesh mesh;
-    stroke_segment(mesh, gdi(x1, y1), gdi(x2, y2), static_cast<float>(pen_width), pen);
+    stroke_segment(mesh, gdi(x1, y1), gdi(x2, y2), static_cast<float>(pen.width), pen.color);
     mesh.draw(renderer_);
 }
 
-void Canvas::polyline(std::span<const IntPoint> points) {
-    if (points.size() < 2 || pen.a == 0) return;
+void Canvas::polyline(std::span<const IntPoint> points, Pen pen) {
+    if (points.size() < 2 || pen.color.a == 0) return;
     Mesh mesh;
     for (std::size_t i = 0; i + 1 < points.size(); ++i)
         stroke_segment(mesh, gdi(points[i].x, points[i].y), gdi(points[i + 1].x, points[i + 1].y),
-                       static_cast<float>(pen_width), pen);
+                       static_cast<float>(pen.width), pen.color);
     mesh.draw(renderer_);
 }
 
-void Canvas::text_out(int x, int y, std::string_view s) {
-    // GraphABCHelper.TextOut: кисть не пустая — сперва прямоугольник под
-    // строкой (ширина — как MeasureString, высота — строка и ещё 1).
-    const int w = text_.measure(s, font);
-    const int h = text_.height(font);
-    fill_rect(x, y, x + w, y + h + 1);
-    text_.out(static_cast<float>(x), static_cast<float>(y), s, font, font_color);
+void Canvas::text(int x, int y, std::string_view s, Font font, core::Rgba color) {
+    text_.out(static_cast<float>(x), static_cast<float>(y), s, font, color);
 }
 
-void Canvas::draw_text_centered(int x, int y, int x1, int y1, std::string_view s) {
-    const SDL_Rect box{x, y, x1 - x, y1 - y};
+void Canvas::text_centered(int x1, int y1, int x2, int y2, std::string_view s, Font font,
+                           core::Rgba color) {
+    text_box(x1, y1, x2, y2, s, font, color, true);
+}
+
+void Canvas::text_left(int x1, int y1, int x2, int y2, std::string_view s, Font font,
+                       core::Rgba color) {
+    text_box(x1, y1, x2, y2, s, font, color, false);
+}
+
+void Canvas::text_box(int x1, int y1, int x2, int y2, std::string_view s, Font font,
+                      core::Rgba color, bool centered) {
+    const SDL_Rect box{x1, y1, x2 - x1, y2 - y1};
     if (box.w <= 0 || box.h <= 0) return;
-    // Перенос — по ширине прямоугольника, как у эталона (libgdiplus).
+    // Перенос — по ширине прямоугольника, как DrawString GDI+.
     const std::vector<std::string> lines = text_.wrap(s, font, box.w);
     const int line_h = text_.height(font);
     const int block = line_h * static_cast<int>(lines.size());
-    const float top = static_cast<float>(box.y) + static_cast<float>(box.h - block) / 2.0F;
+    const float top = centered
+                          ? static_cast<float>(box.y) + static_cast<float>(box.h - block) / 2.0F
+                          : static_cast<float>(box.y);
     // Обрезка — только если текст выходит за прямоугольник: смена области
     // обрезки рвёт пакет отрисовки SDL.
     int widest = 0;
     for (const std::string& line : lines)
         widest = std::max(widest, text_.measure(line, font));
     const bool clip = block > box.h || widest > box.w;
+    if (clip && check_text_ && clipped_.emplace(s).second)
+        SDL_Log("надпись не помещается в %d×%d (строк %zu): %.*s", box.w, box.h, lines.size(),
+                static_cast<int>(s.size()), s.data());
     if (clip) SDL_SetRenderClipRect(renderer_, &box);
     for (std::size_t i = 0; i < lines.size(); ++i) {
         const int w = text_.measure(lines[i], font);
-        text_.out(static_cast<float>(box.x) + static_cast<float>(box.w - w) / 2.0F,
-                  top + static_cast<float>(line_h) * static_cast<float>(i), lines[i], font,
-                  font_color);
+        text_.out(
+            static_cast<float>(box.x) + (centered ? static_cast<float>(box.w - w) / 2.0F : 0.0F),
+            top + static_cast<float>(line_h) * static_cast<float>(i), lines[i], font, color);
     }
     if (clip) SDL_SetRenderClipRect(renderer_, nullptr);
 }
 
-int Canvas::text_width(std::string_view s) {
+void Canvas::pair_centered(int x1, int y1, int x2, int y2, std::string_view s, Font font,
+                           core::Rgba label, core::Rgba value) {
+    const std::size_t sep = s.find(": ");
+    const std::string_view head = sep == std::string_view::npos ? "" : s.substr(0, sep + 2);
+    const std::string_view tail = sep == std::string_view::npos ? s : s.substr(sep + 2);
+    const int head_w = text_.measure(head, font);
+    const int total = head_w + text_.measure(tail, font);
+    const int line_h = text_.height(font);
+    if (total > x2 - x1 || line_h > y2 - y1) {
+        text_centered(x1, y1, x2, y2, s, font, value);
+        return;
+    }
+    const float left = static_cast<float>(x1) + static_cast<float>(x2 - x1 - total) / 2.0F;
+    const float top = static_cast<float>(y1) + static_cast<float>(y2 - y1 - line_h) / 2.0F;
+    text_.out(left, top, head, font, label);
+    text_.out(left + static_cast<float>(head_w), top, tail, font, value);
+}
+
+int Canvas::text_width(std::string_view s, Font font) {
     return text_.width(s, font);
 }
 

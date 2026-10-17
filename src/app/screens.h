@@ -1,13 +1,14 @@
 #pragma once
 
 // Экраны программы: что показать и что сделать по событиям переходов
-// (core/flow.h) и меню (core/menu.h) — эффекты попадания, след курсора,
-// звук, уведомления, запись профиля и истории (app/player_files.h), смена
-// профиля, «История». Рисуют app/menu_view.h и app/game_view.h на холсте
-// app/canvas.h.
+// (core/flow.h) и меню (core/menu.h) — эффекты, след курсора, звук,
+// уведомления, запись профиля и истории замеров (app/player_files.h), смена
+// профиля и папки сохранений. Рисуют app/menu_view.h и app/game_view.h на
+// холсте app/canvas.h.
 
 #include <SDL3/SDL.h>
 
+#include <cstddef>
 #include <string>
 
 #include "app/canvas.h"
@@ -21,35 +22,59 @@
 #include "core/profile.h"
 #include "core/random.h"
 #include "core/tone.h"
+#include "platform/folders.h"
 #include "platform/sound.h"
 
 namespace aim::app {
 
 class Screens {
 public:
-    Screens(SDL_Renderer* renderer, Text& text, core::Profile& profile, PlayerFiles& files,
-            core::Random& rng, core::Menu& menu, platform::Sound& sound);
+    Screens(SDL_Window* window, SDL_Renderer* renderer, Text& text, core::Profile& profile,
+            PlayerFiles& files, core::Random& rng, core::Menu& menu, platform::Sound& sound);
 
     /// Программа запущена в момент now: меню появляется.
     void start(core::Nanoseconds now);
     /// Уведомление вверху окна.
     void message(std::string text) { toasts_.push(std::move(text)); }
 
-    /// До ввода кадра: в меню режим под курсором — выбранный.
-    void before_input(const core::Flow& flow, core::Vec2 mouse, core::Nanoseconds now);
+    /// До ввода кадра: в меню набор под курсором — выбранный, ползунок
+    /// справки — за курсором, пока ЛКМ зажата (left_held).
+    void before_input(const core::Flow& flow, core::Vec2 mouse, bool left_held,
+                      core::Nanoseconds now);
     /// После Flow::update: события переходов и меню — эффекты, файлы,
     /// уведомления; след курсора и частицы.
     void after_update(core::Flow& flow, core::Vec2 mouse, core::Nanoseconds now);
     /// Нарисовать текущий экран на момент now.
     void render(const core::Flow& flow, core::Vec2 mouse, int fps, core::Nanoseconds now);
+    /// Программа закрывается: отложенная запись профиля — сейчас.
+    void shutdown();
+    /// Проверка текста (--text-check, D-43): не поместившиеся надписи — в
+    /// журнал.
+    void check_text(bool on) { canvas_.check_text(on); }
+    [[nodiscard]] std::size_t clipped_texts() const { return canvas_.clipped_texts(); }
 
 private:
+    /// Записать профиль; посреди замера — по его концу (AUD-40): запись в
+    /// кадре замера отнимала бы время у кадра.
     void save();
+    /// Смена экрана: меню заново, эффекты замера с нуля, звук конца.
+    void screen_changed(const core::ScreenChanged& s, core::Nanoseconds now);
+    /// Событие замера: эффекты и звук.
+    void game_event(const core::GameEvent& g, bool screen_stimulus, const core::Theme& th,
+                    core::Nanoseconds now);
+    /// Замер записан в профиль: строка истории, реплей рекорда, профиль.
+    void run_finished(const core::RunFinished& run);
+    /// Запрос меню: файлы, папка, тема, реплей.
+    void menu_request(const core::MenuRequest& r, core::Flow& flow, core::Nanoseconds now);
+    /// Ответ диалога выбора папки сохранений (D-33): перейти на неё.
+    void take_folder_choice();
     /// Звук, если он включён в настройках.
     void play(core::Beep beep);
-    void open_history();
-    [[nodiscard]] const core::Theme& theme() const;
+    /// Тема из настроек (D-44): встроенная или файл игрока; перечитывается,
+    /// когда меняется имя темы или папка сохранений.
+    const core::Theme& theme();
 
+    SDL_Window* window_;
     Canvas canvas_;
     core::Profile& profile_;
     PlayerFiles& files_;
@@ -60,7 +85,11 @@ private:
     Effects effects_;
     CursorTrail trail_;
     Toasts toasts_;
-    HistoryView history_;
+    platform::FolderPicker folder_picker_;
+    bool in_run_ = false;        ///< идёт замер: профиль не пишется
+    bool save_pending_ = false;  ///< профиль ждёт конца замера
+    core::Theme theme_ = core::kThemes.front().theme;
+    std::string theme_for_;  ///< папка и имя темы, по которым прочитана theme_
 };
 
 }  // namespace aim::app

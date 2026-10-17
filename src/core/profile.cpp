@@ -2,91 +2,108 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdlib>
 
-#include "core/rounding.h"
 #include "core/rules.h"
 
 namespace aim::core {
 
 const std::array<AchievementInfo, kAchievementCount> kAchievements{{
-    {"Первая игра", "Сыграй свою первую игру"},
-    {"В яблочко", "Попади почти точно в центр цели"},
-    {"Молниеносно", "Попади с реакцией меньше 150мс"},
-    {"Комбо x100", "Набери 100 попаданий подряд без промаха"},
-    {"Тысяча", "Набери 1000 очков за одну игру"},
-    {"Снайпер", "Закончи игру (от 20 выстрелов) с точностью 90%+"},
-    {"Ветеран", "Сыграй 1000 игр"},
-    {"Мастер Dual", "Набери 500+ очков в Dual Mode за одну игру"},
+    {"first_run", "Первый замер", "Закончи свой первый замер"},
+    {"bullseye", "В яблочко", "Попади почти точно в центр цели"},
+    {"lightning", "Молниеносно", "Отреагируй быстрее 150 мс"},
+    {"combo100", "Серия x100", "100 попаданий подряд без промаха"},
+    {"thousand", "Тысяча", "Набери 1000 очков за один замер"},
+    {"sniper", "Снайпер", "Закончи замер (от 20 выстрелов) с точностью 90%+"},
+    {"veteran", "Ветеран", "Сделай 1000 замеров"},
+    {"two_hands", "Обе руки", "Набери 500+ очков с кнопками по цвету цели"},
 }};
 
 namespace {
 
-// Номера достижений — как в kAchievements и в файле профиля (Achv0…Achv7).
-constexpr int kFirstGame = 0;
+// Номера достижений — как в kAchievements.
+constexpr int kFirstRun = 0;
 constexpr int kBullseye = 1;
 constexpr int kLightning = 2;
 constexpr int kCombo100 = 3;
 constexpr int kThousand = 4;
 constexpr int kSniper = 5;
 constexpr int kVeteran = 6;
-constexpr int kDualMaster = 7;
+constexpr int kTwoHands = 7;
 
-constexpr int kVeteranGames = 1000;
-constexpr int kDualMasterScore = 500;
+constexpr int kVeteranRuns = 1000;
+constexpr int kTwoHandsScore = 500;
 constexpr double kSniperAccuracy = 90.0;
+
+int step_average(int value, int delta) {
+    // Ближайшая ступень к value, затем delta ступеней.
+    const auto& steps = kAverageRunSteps;
+    std::size_t nearest = 0;
+    for (std::size_t i = 1; i < steps.size(); ++i)
+        if (std::abs(steps.at(i) - value) < std::abs(steps.at(nearest) - value)) nearest = i;
+    const int index =
+        std::clamp(static_cast<int>(nearest) + delta, 0, static_cast<int>(steps.size()) - 1);
+    return steps.at(static_cast<std::size_t>(index));
+}
 
 }  // namespace
 
 void step_setting(Settings& settings, SettingRow row, int delta) {
+    PresetSettings& p = settings.preset;
     switch (row) {
-        case SettingRow::CircleSize:
-            settings.circle_size = std::clamp(settings.circle_size + delta * kCircleSizeStep,
-                                              kMinCircleSize, kMaxCircleSize);
+        case SettingRow::TargetSize:
+            p.target_size =
+                std::clamp(p.target_size + delta * kTargetSizeStep, kMinTargetSize, kMaxTargetSize);
             break;
         case SettingRow::Lifetime:
-            settings.lifetime_ms = std::clamp(settings.lifetime_ms + delta * kLifetimeStepMs,
-                                              kMinLifetimeMs, kMaxLifetimeMs);
+            p.lifetime_ms = std::clamp(p.lifetime_ms + delta * kLifetimeStepMs, kMinBaseLifetimeMs,
+                                       kMaxBaseLifetimeMs);
             break;
-        case SettingRow::Lives:
-            settings.lives = std::clamp(settings.lives + delta, kMinLives, kMaxLives);
+        case SettingRow::Lives: p.lives = std::clamp(p.lives + delta, kMinLives, kMaxLives); break;
+        case SettingRow::AverageRuns:
+            settings.average_runs = step_average(settings.average_runs, delta);
             break;
     }
 }
 
 void reset_settings(Settings& settings) {
     const Settings defaults;
-    settings.circle_size = defaults.circle_size;
-    settings.lifetime_ms = defaults.lifetime_ms;
-    settings.lives = defaults.lives;
+    settings.preset = defaults.preset;
+    settings.average_runs = defaults.average_runs;
     settings.sound = defaults.sound;
+    settings.hud = defaults.hud;
+    settings.replays = defaults.replays;
 }
 
-void reset_out_of_range(Settings& settings) {
+int reset_out_of_range(Settings& settings) {
     const Settings defaults;
-    const auto check = [](int& value, int low, int high, int fallback) {
-        if (value < low || value > high) value = fallback;
+    int reset = 0;
+    const auto check = [&](int& value, int low, int high, int fallback) {
+        if (value < low || value > high) {
+            value = fallback;
+            ++reset;
+        }
     };
-    check(settings.circle_size, kMinCircleSize, kMaxCircleSize, defaults.circle_size);
-    check(settings.lifetime_ms, kMinLifetimeMs, kMaxLifetimeMs, defaults.lifetime_ms);
-    check(settings.lives, kMinLives, kMaxLives, defaults.lives);
-    check(settings.theme, 0, kThemeCount - 1, defaults.theme);
+    PresetSettings& p = settings.preset;
+    check(p.target_size, kMinTargetSize, kMaxTargetSize, defaults.preset.target_size);
+    check(p.lifetime_ms, kMinBaseLifetimeMs, kMaxBaseLifetimeMs, defaults.preset.lifetime_ms);
+    check(p.lives, kMinLives, kMaxLives, defaults.preset.lives);
+    check(settings.average_runs, kMinAverageRuns, kMaxAverageRuns, defaults.average_runs);
+    if (settings.theme.empty()) {
+        settings.theme = defaults.theme;
+        ++reset;
+    }
+    check(settings.font, 0, kFontCount - 1, defaults.font);
+    return reset;
 }
 
-GameSettings game_settings(const Settings& settings) {
-    return {.circle_size = settings.circle_size,
-            .lifetime_ms = settings.lifetime_ms,
-            .lives = settings.lives};
+MeasureOptions item_options(const Profile& profile, int item) {
+    if (item == kCustomItem) return normalized(profile.custom);
+    return preset_options(item, profile.settings.preset);
 }
 
-int add_to_leaderboard(Leaderboard& board, GameMode mode, int score, double accuracy) {
-    auto& rows = board[static_cast<std::size_t>(mode_index(mode))];
-    const auto at = std::find_if(rows.begin(), rows.end(),
-                                 [&](const LeaderboardEntry& e) { return score > e.score; });
-    const auto place = static_cast<int>(at - rows.begin());
-    if (place >= kLeaderboardSize) return -1;
-    rows.insert(at, LeaderboardEntry{.score = score, .accuracy = accuracy});
-    if (rows.size() > static_cast<std::size_t>(kLeaderboardSize)) rows.pop_back();
-    return place;
+MeasureOptions selected_options(const Profile& profile) {
+    return item_options(profile, profile.preset);
 }
 
 bool unlock(Profile& profile, int achievement) {
@@ -110,51 +127,27 @@ std::vector<int> achievements_on_event(Profile& profile, const GameEvent& event)
     return opened;
 }
 
-FinishResult finish_game(Profile& profile, const GameSummary& summary) {
+FinishResult finish_game(Profile& profile, const RunRecord& run) {
     FinishResult result;
-    profile.best_score = std::max(profile.best_score, summary.score);
-    // D-13: точность и реакция — только по играм от 20 выстрелов.
-    if (summary.shots >= kRecordMinShots) {
-        profile.best_accuracy = std::max(profile.best_accuracy, summary.accuracy);
-        if (summary.hits > 0) {
-            profile.best_precision = std::max(profile.best_precision, summary.precision);
-            if (profile.best_avg_reaction == 0.0 ||
-                summary.avg_reaction_ms < profile.best_avg_reaction)
-                profile.best_avg_reaction = summary.avg_reaction_ms;
-        }
-    }
-    ++profile.games_played;
-
-    result.leaderboard_place =
-        add_to_leaderboard(profile.leaderboard, summary.mode, summary.score, summary.accuracy);
+    const GameSummary& summary = run.summary;
+    const ComboStats before =
+        combo_stats(profile.runs, summary.options, profile.settings.average_runs);
+    result.new_best = counts_for_record(summary) &&
+                      (!before.best || better(summary, profile.runs[*before.best].summary));
+    profile.runs.push_back(run);
+    profile.runs.back().summary.reactions_ms.clear();
 
     const auto try_unlock = [&](int id, bool condition) {
         if (condition && unlock(profile, id)) result.unlocked.push_back(id);
     };
-    try_unlock(kFirstGame, profile.games_played == 1);
+    const auto runs = static_cast<int>(profile.runs.size());
+    try_unlock(kFirstRun, runs >= 1);
     try_unlock(kSniper, summary.shots >= kRecordMinShots && summary.accuracy >= kSniperAccuracy);
-    try_unlock(kVeteran, profile.games_played >= kVeteranGames);
-    try_unlock(kDualMaster, summary.mode == GameMode::Dual && summary.score >= kDualMasterScore);
-
-    for (const double r : summary.reactions_ms)
-        profile.reactions.push(round_half_even(r));
+    try_unlock(kVeteran, runs >= kVeteranRuns);
+    try_unlock(kTwoHands,
+               summary.options.color_buttons && summary.options.action == Action::Click &&
+                   summary.options.stimulus == Stimulus::Target && summary.score >= kTwoHandsScore);
     return result;
-}
-
-void ReactionRing::push(int value_ms) {
-    values[static_cast<std::size_t>(next)] = value_ms;
-    next = (next + 1) % kReactionHistory;
-    count = std::min(count + 1, kReactionHistory);
-}
-
-std::vector<int> ReactionRing::in_order() const {
-    std::vector<int> out;
-    out.reserve(static_cast<std::size_t>(count));
-    // Неполное кольцо — с нуля; полное — со следующей записи, она старейшая.
-    const int first = count < kReactionHistory ? 0 : next;
-    for (int i = 0; i < count; ++i)
-        out.push_back(values[static_cast<std::size_t>((first + i) % kReactionHistory)]);
-    return out;
 }
 
 }  // namespace aim::core

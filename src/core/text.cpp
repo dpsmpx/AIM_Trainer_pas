@@ -10,6 +10,8 @@ namespace {
 
 constexpr std::string_view kBom = "\xEF\xBB\xBF";
 
+}  // namespace
+
 std::string_view trim(std::string_view s) {
     const auto space = [](char c) {
         return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\v' || c == '\f';
@@ -20,8 +22,6 @@ std::string_view trim(std::string_view s) {
         s.remove_suffix(1);
     return s;
 }
-
-}  // namespace
 
 std::vector<std::string_view> split_lines(std::string_view text) {
     if (text.starts_with(kBom)) text.remove_prefix(kBom.size());

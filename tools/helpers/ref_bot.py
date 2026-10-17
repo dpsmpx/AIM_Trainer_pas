@@ -84,7 +84,8 @@ def find(path):
 
 def play(display, policy, seconds, max_actions, shots_dir):
     env = dict(os.environ, DISPLAY=display)
-    wid = subprocess.run(["xdotool", "search", "--name", "^Aim Trainer"], env=env,
+    # Заголовок оригинала — «Aim Trainer», C++-версии — «DP AIM Trainer» (D-42).
+    wid = subprocess.run(["xdotool", "search", "--name", "^(DP AIM|Aim) Trainer"], env=env,
                          capture_output=True, text=True, check=True).stdout.split()[0]
     shot = os.path.join(tempfile.mkdtemp(prefix="aim_bot_"), "shot.png")
 

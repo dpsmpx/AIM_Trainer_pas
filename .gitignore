@@ -13,7 +13,11 @@ __pycache__/
 *.pcu
 *.mdb
 
-# Файлы игрока и журналы замеров
+# Файлы игрока и журналы замеров: Pascal-версии и C++-версии (D-38, D-39)
+profile*.ini
+profile*_runs.csv
+aim_trainer.ini
+replays/
 profile*_stats.ini
 profile*_sessions.csv
 profile*_corrupt_backup.txt

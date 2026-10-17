@@ -33,11 +33,17 @@ public:
     RawMouse(RawMouse&&) = delete;
     RawMouse& operator=(RawMouse&&) = delete;
 
-    /// Поток работает и мышь зарегистрирована.
+    /// Поток работает и мышь зарегистрирована; поток остановился — false, и
+    /// время клика — из события SDL (AUD-51).
     [[nodiscard]] bool active() const;
 
-    /// Почему потока нет — для журнала и заголовка окна; при работе — пусто.
-    [[nodiscard]] const std::string& problem() const;
+    /// Почему потока нет или почему он остановился — для журнала и заголовка
+    /// окна; при работе — пусто.
+    [[nodiscard]] std::string problem() const;
+
+    /// Остановить поток: дальше active() — false. Деструктор делает то же;
+    /// второй вызов ничего не делает.
+    void stop();
 
     /// Дописать в out нажатия, пришедшие с прошлого вызова, по порядку времени.
     void drain(std::vector<core::RawPress>& out);

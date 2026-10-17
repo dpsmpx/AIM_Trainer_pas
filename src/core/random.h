@@ -4,10 +4,12 @@
 // стандартной библиотеки, тесты — заданную последовательность.
 //
 // Семантика — как у PascalABC.NET, на которой написан образец
-// (docs/ARCHITECTURE.md, §11): Random — вещественное в [0, 1), Random(a, b) —
+// (archive/pascal/ARCHITECTURE.md, §11): Random — вещественное в [0, 1), Random(a, b) —
 // целое в [a, b] включительно, при a > b границы меняются местами.
 
 #include <cstdint>
+#include <functional>
+#include <memory>
 #include <random>
 
 namespace aim::core {
@@ -29,7 +31,8 @@ public:
     virtual int between(int lo, int hi) = 0;
 };
 
-/// Генератор стандартной библиотеки (mt19937_64).
+/// mt19937_64 и свои отображения в числа: по одному началу — одни и те же
+/// числа на всех системах (D-39).
 class EngineRandom final : public Random {
 public:
     explicit EngineRandom(std::uint64_t seed);
@@ -40,5 +43,10 @@ public:
 private:
     std::mt19937_64 engine_;
 };
+
+/// Генератор случайных чисел замера по его началу.
+using RandomFactory = std::function<std::unique_ptr<Random>(std::uint64_t seed)>;
+/// EngineRandom(seed).
+std::unique_ptr<Random> engine_random(std::uint64_t seed);
 
 }  // namespace aim::core

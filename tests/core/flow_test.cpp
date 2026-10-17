@@ -1,10 +1,11 @@
-// Экраны и переходы (docs/ARCHITECTURE.md, §2): нажатия не переходят между
+// Экраны и переходы (docs/ARCHITECTURE.md, §5): нажатия не переходят между
 // экранами (AUD-02, сценарии 5–7), клавиши не теряются (AUD-16).
 
 #include "core/flow.h"
 
 #include <gtest/gtest.h>
 
+#include <memory>
 #include <optional>
 #include <variant>
 #include <vector>
@@ -18,18 +19,25 @@ using testing::ScriptedRandom;
 
 constexpr Nanoseconds kT0 = ms(1'000);
 
-// Меню для тестов: щелчок правее x = 400 запускает Classic.
+// Меню для тестов: щелчок правее x = 400 запускает «Классику» с общими
+// настройками профиля.
 class FakeMenu final : public MenuInput {
 public:
-    std::optional<GameMode> click(const ClickInput& c) override {
+    explicit FakeMenu(const Profile& p) : profile(p) {}
+
+    std::optional<MeasureOptions> click(const ClickInput& c) override {
         clicks.push_back(c);
-        if (c.position.x > 400 && c.button == MouseButton::Left) return GameMode::Classic;
+        if (c.position.x > 400 && c.button == MouseButton::Left)
+            return preset_options(1, profile.settings.preset);
         return std::nullopt;
     }
     void key(const KeyInput& k) override { keys.push_back(k); }
+    void wheel(const WheelInput& w) override { wheels.push_back(w); }
 
+    const Profile& profile;
     std::vector<ClickInput> clicks;
     std::vector<KeyInput> keys;
+    std::vector<WheelInput> wheels;
 };
 
 ClickInput click_at(double x, double y, Nanoseconds t, MouseButton b = MouseButton::Left) {
@@ -40,13 +48,16 @@ KeyInput key(Key k, Nanoseconds t) {
     return {.key = k, .time = t};
 }
 
-struct Fixture {
-    Fixture() {
-        for (int i = 0; i < 40; ++i)
-            rng.ints(i % 2 == 0 ? std::initializer_list<int>{200, 200}
-                                : std::initializer_list<int>{600, 400});
-    }
+// Генератор замера: места целей по очереди (200, 200) и (600, 400).
+std::unique_ptr<Random> scripted_spots(std::uint64_t /*seed*/) {
+    auto rng = std::make_unique<ScriptedRandom>();
+    for (int i = 0; i < 40; ++i)
+        rng->ints(i % 2 == 0 ? std::initializer_list<int>{200, 200}
+                             : std::initializer_list<int>{600, 400});
+    return rng;
+}
 
+struct Fixture {
     // Меню → отсчёт щелчком в t, отсчёт до конца; возвращает начало забега.
     Nanoseconds start_game(Nanoseconds t) {
         const std::vector<Input> in{click_at(500, 50, t)};
@@ -58,9 +69,9 @@ struct Fixture {
     void send(std::vector<Input> in, Nanoseconds now) { flow.input(in, now); }
 
     Profile profile;
-    ScriptedRandom rng;
-    FakeMenu menu;
-    Flow flow{profile, rng, menu};
+    ScriptedRandom seeds;
+    FakeMenu menu{profile};
+    Flow flow{profile, seeds, menu, scripted_spots, [] { return LocalTime{.year = 2026}; }};
 };
 
 template <class T>
@@ -89,7 +100,7 @@ TEST(Flow, ClickStartingModeDoesNotReachGame) {
     ASSERT_NE(g, nullptr);
     EXPECT_EQ(g->shots(), 0) << "сценарий 5: до первого щелчка выстрелов нет";
     EXPECT_EQ(g->lives_left(), 15);
-    EXPECT_EQ(g->target().spawned_at(), kT0 + ms(10) + kCountdown) << "забег — с конца отсчёта";
+    EXPECT_EQ(g->target().spawned_at(), kT0 + ms(10) + kCountdown) << "замер — с конца отсчёта";
 }
 
 TEST(Flow, RightClickInMenuAndClicksInCountdownDoNotReachGame) {
@@ -125,18 +136,97 @@ TEST(Flow, GameOverClickDoesNotReachMenu) {
     EXPECT_EQ(f.menu.clicks.size(), menu_clicks) << "сценарий 7: щелчок Game Over гаснет там же";
 }
 
-TEST(Flow, PauseKeysInOneFrameAreAllHandled) {
+Vec2 center_of(ResultButton b, bool with_replay) {
+    const Rect r = result_button(b, with_replay);
+    return {(r.x1 + r.x2) / 2.0, (r.y1 + r.y2) / 2.0};
+}
+
+TEST(Flow, ResultButtonsWorkAfterDelay) {
     Fixture f;
     const Nanoseconds start = f.start_game(kT0);
-    f.send({key(Key::P, start + ms(100))}, start + ms(105));
-    ASSERT_TRUE(f.flow.game()->paused());
-    // Две P в одном кадре — пауза и снятие: ни одна не теряется (AUD-16).
-    f.send({key(Key::P, start + ms(2100)), key(Key::P, start + ms(2150))}, start + ms(2160));
-    EXPECT_TRUE(f.flow.game()->paused());
-    f.send({key(Key::P, start + ms(3100))}, start + ms(3105));
-    ASSERT_FALSE(f.flow.game()->paused());
-    // Пауза длилась 100 → 2100 и 2150 → 3100: жизнь цели сдвинута на 2950 мс.
-    EXPECT_EQ(f.flow.game()->target().expires_at(), start + ms(1000) + ms(2950));
+    const Nanoseconds shown = start + ms(100);
+    f.send({key(Key::Escape, shown)}, shown);
+    ASSERT_EQ(f.flow.screen(), Screen::GameOver);
+    EXPECT_EQ(f.flow.result_shown_at(), shown);
+    const bool replay = f.flow.replay_offered();
+    const Vec2 again = center_of(ResultButton::Again, replay);
+    // Щелчок, начатый в замере, кнопку не нажимает (AUD-02, D-46).
+    const Nanoseconds early = shown + kResultButtonsDelay - 1;
+    f.send({click_at(again.x, again.y, early)}, early);
+    EXPECT_EQ(f.flow.screen(), Screen::GameOver);
+    // ПКМ и щелчок мимо кнопок — ничего.
+    const Nanoseconds later = shown + kResultButtonsDelay;
+    f.send({click_at(again.x, again.y, later, MouseButton::Right), click_at(5, 5, later)}, later);
+    EXPECT_EQ(f.flow.screen(), Screen::GameOver);
+    f.send({click_at(again.x, again.y, later), key(Key::M, later)}, later);
+    EXPECT_EQ(f.flow.screen(), Screen::Countdown) << "«Ещё раз» — тот же набор";
+    EXPECT_EQ(f.flow.options(), preset_options(1, f.profile.settings.preset));
+    EXPECT_EQ(f.profile.runs.size(), 1U);
+}
+
+TEST(Flow, ResultMenuButtonGoesToMenu) {
+    Fixture f;
+    const Nanoseconds start = f.start_game(kT0);
+    f.send({key(Key::Escape, start)}, start);
+    const Vec2 menu = center_of(ResultButton::Menu, f.flow.replay_offered());
+    const Nanoseconds t = start + kResultButtonsDelay + ms(1);
+    f.send({click_at(menu.x, menu.y, t)}, t);
+    EXPECT_EQ(f.flow.screen(), Screen::Menu);
+    EXPECT_EQ(f.menu.clicks.size(), 1U) << "щелчок итога в меню не уходит";
+}
+
+TEST(Flow, ReplayFromResultReturnsToResult) {
+    Fixture f;
+    const Nanoseconds start = f.start_game(kT0);
+    f.flow.update(start + ms(15), {});
+    f.flow.frame_presented(start + ms(15), start + ms(16));
+    const Vec2 c = f.flow.game()->target().center();
+    f.send({click_at(c.x, c.y, start + ms(100))}, start + ms(105));
+    f.send({key(Key::Escape, start + ms(200))}, start + ms(200));
+    ASSERT_EQ(f.flow.screen(), Screen::GameOver);
+    ASSERT_TRUE(f.flow.replay_offered()) << "первый замер набора — рекорд, вход записан";
+    const GameSummary result = f.flow.game()->summary();
+    f.flow.take_events();
+
+    const Vec2 replay = center_of(ResultButton::Replay, true);
+    const Nanoseconds t = start + ms(200) + kResultButtonsDelay;
+    f.send({click_at(replay.x, replay.y, t)}, t);
+    ASSERT_EQ(f.flow.screen(), Screen::Replay);
+    ASSERT_NE(f.flow.replay(), nullptr);
+    f.flow.update(t + ms(500), {});
+    EXPECT_EQ(f.flow.game()->summary().hits, result.hits) << "реплей — этот же замер";
+    f.send({key(Key::Escape, t + ms(600))}, t + ms(600));
+    EXPECT_EQ(f.flow.screen(), Screen::GameOver) << "реплей с итога — назад на итог";
+    EXPECT_EQ(f.flow.game()->summary().duration_ms, result.duration_ms);
+    EXPECT_EQ(f.profile.runs.size(), 1U) << "реплей в историю не идёт";
+    EXPECT_EQ(count_of<RunFinished>(f.flow.take_events()), 0);
+}
+
+TEST(Flow, NoReplayButtonWithoutRecording) {
+    Fixture f;
+    f.profile.settings.replays = false;  // запись реплеев выключена (D-45)
+    const Nanoseconds start = f.start_game(kT0);
+    f.send({key(Key::Escape, start)}, start);
+    ASSERT_EQ(f.flow.screen(), Screen::GameOver);
+    EXPECT_FALSE(f.flow.replay_offered());
+    const Vec2 replay = center_of(ResultButton::Replay, true);
+    const Nanoseconds t = start + kResultButtonsDelay;
+    f.send({click_at(replay.x, replay.y, t)}, t);
+    EXPECT_EQ(f.flow.screen(), Screen::GameOver) << "кнопки «Реплей» нет";
+}
+
+TEST(Flow, EscEndsAttemptAndRecordsIt) {
+    Fixture f;
+    const Nanoseconds start = f.start_game(kT0);
+    f.send({key(Key::Escape, start + ms(1500))}, start + ms(1505));
+    ASSERT_EQ(f.flow.screen(), Screen::GameOver);
+    ASSERT_EQ(f.profile.runs.size(), 1U);
+    const GameSummary& s = f.profile.runs.back().summary;
+    EXPECT_EQ(s.end, EndReason::GaveUp);
+    EXPECT_EQ(s.duration_ms, 1500);
+    EXPECT_EQ(s.options, preset_options(1, f.profile.settings.preset));
+    ASSERT_TRUE(f.flow.last_run().has_value());
+    EXPECT_EQ(f.flow.last_run().value_or(RunFinished{}).record.when.year, 2026);
 }
 
 TEST(Flow, RestartDoesNotRecordRun) {
@@ -145,11 +235,11 @@ TEST(Flow, RestartDoesNotRecordRun) {
     f.send({click_at(5, 5, start + ms(100))}, start + ms(100));
     f.send({key(Key::R, start + ms(200))}, start + ms(200));
     EXPECT_EQ(f.flow.screen(), Screen::Countdown);
-    EXPECT_EQ(f.profile.games_played, 0);
+    EXPECT_TRUE(f.profile.runs.empty());
     EXPECT_EQ(count_of<RunFinished>(f.flow.take_events()), 0);
     f.flow.update(start + ms(200) + kCountdown, {});
     ASSERT_EQ(f.flow.screen(), Screen::Game);
-    EXPECT_EQ(f.flow.game()->shots(), 0) << "новый забег — с нуля";
+    EXPECT_EQ(f.flow.game()->shots(), 0) << "новый замер — с нуля";
 }
 
 TEST(Flow, MenuKeyRecordsRunOnce) {
@@ -157,7 +247,7 @@ TEST(Flow, MenuKeyRecordsRunOnce) {
     const Nanoseconds start = f.start_game(kT0);
     f.send({key(Key::M, start + ms(100)), key(Key::M, start + ms(101))}, start + ms(105));
     EXPECT_EQ(f.flow.screen(), Screen::Menu);
-    EXPECT_EQ(f.profile.games_played, 1);
+    EXPECT_EQ(f.profile.runs.size(), 1U);
     EXPECT_EQ(f.menu.keys.size(), 0U) << "вторая M — уже после смены экрана";
     const std::vector<FlowEvent> events = f.flow.take_events();
     EXPECT_EQ(count_of<RunFinished>(events), 1);
@@ -165,7 +255,7 @@ TEST(Flow, MenuKeyRecordsRunOnce) {
 
 TEST(Flow, LivesRunOutGoesToGameOverAndRecords) {
     Fixture f;
-    f.profile.settings.lives = 5;
+    f.profile.settings.preset.lives = 5;
     const Nanoseconds start = f.start_game(kT0);
     std::vector<Input> misses;
     misses.reserve(6);
@@ -174,9 +264,9 @@ TEST(Flow, LivesRunOutGoesToGameOverAndRecords) {
     f.send(misses, start + ms(110));
     EXPECT_EQ(f.flow.screen(), Screen::GameOver);
     EXPECT_EQ(f.flow.game()->shots(), 5) << "шестой щелчок — уже не игре";
-    EXPECT_EQ(f.profile.games_played, 1);
+    EXPECT_EQ(f.profile.runs.size(), 1U);
     f.flow.update(start + ms(200), {});
-    EXPECT_EQ(f.profile.games_played, 1) << "запись — один раз";
+    EXPECT_EQ(f.profile.runs.size(), 1U) << "запись — один раз";
     f.send({key(Key::R, start + ms(300))}, start + ms(300));
     EXPECT_EQ(f.flow.screen(), Screen::Countdown);
 }
@@ -199,18 +289,32 @@ TEST(Flow, HitEventsAndAchievements) {
     EXPECT_EQ(std::get<AchievementUnlocked>(events[2]).id, 2);
     f.send({key(Key::Escape, start + ms(200))}, start + ms(200));
     events = f.flow.take_events();
-    // Первая игра — достижение по итогу, затем запись забега и смена экрана.
+    // Первый замер — достижение по итогу, затем запись замера и смена экрана.
     ASSERT_EQ(events.size(), 3U);
     EXPECT_EQ(std::get<AchievementUnlocked>(events[0]).id, 0);
-    EXPECT_EQ(std::get<RunFinished>(events[1]).summary.hits, 1);
+    EXPECT_EQ(std::get<RunFinished>(events[1]).record.summary.hits, 1);
+    EXPECT_TRUE(std::get<RunFinished>(events[1]).new_best) << "первый замер набора — рекорд";
     EXPECT_EQ(std::get<ScreenChanged>(events[2]).to, Screen::GameOver);
 }
 
-TEST(Flow, MenuGetsKeys) {
+TEST(Flow, MenuGetsKeysAndWheel) {
     Fixture f;
-    f.send({key(Key::Escape, kT0)}, kT0);
+    f.send({key(Key::Escape, kT0), WheelInput{.y = -1, .time = kT0}}, kT0);
     ASSERT_EQ(f.menu.keys.size(), 1U);
     EXPECT_EQ(f.menu.keys[0].key, Key::Escape);
+    ASSERT_EQ(f.menu.wheels.size(), 1U);
+    EXPECT_FLOAT_EQ(f.menu.wheels[0].y, -1);
+}
+
+TEST(Flow, WheelAndArrowsDoNotTouchRun) {
+    Fixture f;
+    const Nanoseconds start = f.start_game(kT0);
+    f.send({WheelInput{.y = 1, .time = start + ms(10)}, key(Key::Up, start + ms(11)),
+            key(Key::PageDown, start + ms(12))},
+           start + ms(20));
+    EXPECT_EQ(f.flow.screen(), Screen::Game);
+    EXPECT_EQ(f.flow.game()->shots(), 0);
+    EXPECT_TRUE(f.menu.wheels.empty());
 }
 
 }  // namespace

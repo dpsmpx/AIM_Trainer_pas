@@ -1,5 +1,5 @@
-// Профиль: настройки, таблица лидеров, рекорды (D-13), достижения, история
-// реакций (docs/ARCHITECTURE.md, §8.1, §10).
+// Профиль: настройки, выбранный набор, итог замера — история, рекорд набора
+// и достижения (D-13, D-37, D-38).
 
 #include "core/profile.h"
 
@@ -10,182 +10,129 @@
 namespace aim::core {
 namespace {
 
-TEST(Settings, StepsAndBoundsLikeSettingsPanel) {
+RunRecord run_of(const MeasureOptions& options, int score, int shots = 30, int hits = 25,
+                 double median_ms = 300) {
+    RunRecord r;
+    r.summary.options = normalized(options);
+    r.summary.score = score;
+    r.summary.shots = shots;
+    r.summary.hits = hits;
+    r.summary.accuracy = shots > 0 ? 100.0 * hits / shots : 0;
+    r.summary.median_reaction_ms = median_ms;
+    r.summary.avg_reaction_ms = median_ms;
+    return r;
+}
+
+TEST(Settings, StepsAndBounds) {
     Settings s;
-    for (int i = 0; i < 15; ++i)
-        step_setting(s, SettingRow::CircleSize, -1);
-    EXPECT_EQ(s.circle_size, kMinCircleSize);
     for (int i = 0; i < 25; ++i)
-        step_setting(s, SettingRow::CircleSize, 1);
-    EXPECT_EQ(s.circle_size, kMaxCircleSize);
+        step_setting(s, SettingRow::TargetSize, -1);
+    EXPECT_EQ(s.preset.target_size, kMinTargetSize);
+    for (int i = 0; i < 25; ++i)
+        step_setting(s, SettingRow::TargetSize, 1);
+    EXPECT_EQ(s.preset.target_size, kMaxTargetSize);
     step_setting(s, SettingRow::Lifetime, -12);
-    EXPECT_EQ(s.lifetime_ms, kMinLifetimeMs);
+    EXPECT_EQ(s.preset.lifetime_ms, kMinBaseLifetimeMs);
     step_setting(s, SettingRow::Lifetime, 3);
-    EXPECT_EQ(s.lifetime_ms, 800);
+    EXPECT_EQ(s.preset.lifetime_ms, 800);
     step_setting(s, SettingRow::Lives, 100);
-    EXPECT_EQ(s.lives, kMaxLives);
+    EXPECT_EQ(s.preset.lives, kMaxLives);
     step_setting(s, SettingRow::Lives, -100);
-    EXPECT_EQ(s.lives, kMinLives);
+    EXPECT_EQ(s.preset.lives, kMinLives);
+}
+
+TEST(Settings, AverageRunsStepsThroughList) {
+    Settings s;
+    EXPECT_EQ(s.average_runs, 50);
+    step_setting(s, SettingRow::AverageRuns, 1);
+    EXPECT_EQ(s.average_runs, 100);
+    step_setting(s, SettingRow::AverageRuns, -3);
+    EXPECT_EQ(s.average_runs, 20);
+    step_setting(s, SettingRow::AverageRuns, -10);
+    EXPECT_EQ(s.average_runs, 5);
+    s.average_runs = 47;  // не ступень — от ближайшей
+    step_setting(s, SettingRow::AverageRuns, 1);
+    EXPECT_EQ(s.average_runs, 100);
 }
 
 TEST(Settings, ResetKeepsThemeAndEffects) {
-    Settings s{.circle_size = 60,
-               .lifetime_ms = 2000,
-               .lives = 30,
-               .sound = false,
-               .menu_effects = false,
-               .theme = 1};
+    Settings s;
+    s.preset = {.target_size = 60, .lifetime_ms = 2000, .lives = 30, .ending = Ending::Time};
+    s.average_runs = 200;
+    s.sound = false;
+    s.menu_effects = false;
+    s.theme = "neon";
+    s.hud = false;
+    s.replays = false;
+    s.font = 1;
     reset_settings(s);
-    EXPECT_EQ(s.circle_size, 40);
-    EXPECT_EQ(s.lifetime_ms, 1000);
-    EXPECT_EQ(s.lives, 15);
+    EXPECT_EQ(s.preset.target_size, 40);
+    EXPECT_EQ(s.preset.lifetime_ms, 1000);
+    EXPECT_EQ(s.preset.lives, 15);
+    EXPECT_EQ(s.preset.ending, Ending::Lives);
+    EXPECT_EQ(s.average_runs, 50);
     EXPECT_TRUE(s.sound);
+    EXPECT_TRUE(s.hud) << "интерфейс замера — снова включён (D-45)";
+    EXPECT_TRUE(s.replays);
     EXPECT_FALSE(s.menu_effects);
-    EXPECT_EQ(s.theme, 1);
+    EXPECT_EQ(s.theme, "neon");
+    EXPECT_EQ(s.font, 1) << "шрифт сброс не трогает, как тему";
 }
 
 TEST(Settings, OutOfRangeFromFileGoesToDefault) {
-    // Как LoadStats образца: не к границе, а к умолчанию; внутри границ — как есть.
-    Settings s{.circle_size = 7, .lifetime_ms = 99999, .lives = -3, .theme = 5};
-    reset_out_of_range(s);
-    EXPECT_EQ(s.circle_size, 40);
-    EXPECT_EQ(s.lifetime_ms, 1000);
-    EXPECT_EQ(s.lives, 15);
-    EXPECT_EQ(s.theme, 0);
-    Settings edge{
-        .circle_size = kMaxCircleSize, .lifetime_ms = kMinLifetimeMs, .lives = 29, .theme = 2};
-    reset_out_of_range(edge);
-    EXPECT_EQ(edge.circle_size, kMaxCircleSize);
-    EXPECT_EQ(edge.lifetime_ms, kMinLifetimeMs);
-    EXPECT_EQ(edge.lives, 29);
-    EXPECT_EQ(edge.theme, 2);
-    const GameSettings g = game_settings(Settings{});
-    EXPECT_EQ(g.circle_size, 40);
-    EXPECT_EQ(g.lifetime_ms, 1000);
-    EXPECT_EQ(g.lives, 15);
+    Settings s;
+    s.preset.target_size = 7;
+    s.preset.lifetime_ms = 9000;
+    s.average_runs = 0;
+    s.theme.clear();
+    EXPECT_EQ(reset_out_of_range(s), 4);
+    EXPECT_EQ(s.preset.target_size, 40);
+    EXPECT_EQ(s.preset.lifetime_ms, 1000);
+    EXPECT_EQ(s.average_runs, 50);
+    EXPECT_EQ(s.theme, "dark");
+    EXPECT_EQ(reset_out_of_range(s), 0);
 }
 
-TEST(Leaderboard, SortedTopTenEqualScoresAfterOld) {
-    Leaderboard board;
-    EXPECT_EQ(add_to_leaderboard(board, GameMode::Dual, 100, 50), 0);
-    EXPECT_EQ(add_to_leaderboard(board, GameMode::Dual, 300, 60), 0);
-    EXPECT_EQ(add_to_leaderboard(board, GameMode::Dual, 100, 70), 2) << "равные — после прежних";
-    const auto& dual = board[static_cast<std::size_t>(mode_index(GameMode::Dual))];
-    ASSERT_EQ(dual.size(), 3U);
-    EXPECT_EQ(dual[0].score, 300);
-    EXPECT_DOUBLE_EQ(dual[1].accuracy, 50);
-    EXPECT_DOUBLE_EQ(dual[2].accuracy, 70);
-    EXPECT_TRUE(board[0].empty()) << "другие режимы не тронуты";
-    for (int i = 0; i < 7; ++i)
-        add_to_leaderboard(board, GameMode::Dual, 200, 0);
-    EXPECT_EQ(dual.size(), 10U);
-    EXPECT_EQ(add_to_leaderboard(board, GameMode::Dual, 100, 0), -1) << "11-е место не пишется";
-    EXPECT_EQ(add_to_leaderboard(board, GameMode::Dual, 250, 0), 1);
-    EXPECT_EQ(dual.size(), 10U);
-    EXPECT_EQ(dual.back().score, 100);
-}
-
-TEST(Leaderboard, AllFourModesKept) {
-    Leaderboard board;
-    for (const GameMode m : kAllModes)
-        add_to_leaderboard(board, m, 10 + mode_index(m), 0);
-    for (const GameMode m : kAllModes)
-        EXPECT_EQ(board[static_cast<std::size_t>(mode_index(m))].at(0).score, 10 + mode_index(m));
-}
-
-GameSummary summary_of(GameMode mode, int score, int hits, int shots, double avg_ms,
-                       double precision) {
-    GameSummary s;
-    s.mode = mode;
-    s.score = score;
-    s.hits = hits;
-    s.shots = shots;
-    s.misses = shots - hits;
-    s.accuracy = shots > 0 ? 100.0 * hits / shots : 0.0;
-    s.avg_reaction_ms = avg_ms;
-    s.precision = precision;
-    return s;
-}
-
-TEST(FinishGame, RecordsNeedTwentyShotsByD13) {
+TEST(Profile, SelectedOptionsArePresetWithSettings) {
     Profile p;
-    finish_game(p, summary_of(GameMode::Classic, 13, 1, 1, 300, 90));
-    EXPECT_EQ(p.best_score, 13) << "счёт — по любой игре";
-    EXPECT_EQ(p.games_played, 1);
-    EXPECT_DOUBLE_EQ(p.best_accuracy, 0) << "1 выстрел — не рекорд (D-13)";
-    EXPECT_DOUBLE_EQ(p.best_precision, 0);
-    EXPECT_DOUBLE_EQ(p.best_avg_reaction, 0);
-
-    finish_game(p, summary_of(GameMode::Classic, 200, 18, 20, 420, 61));
-    EXPECT_DOUBLE_EQ(p.best_accuracy, 90);
-    EXPECT_DOUBLE_EQ(p.best_precision, 61);
-    EXPECT_DOUBLE_EQ(p.best_avg_reaction, 420);
-
-    finish_game(p, summary_of(GameMode::Classic, 100, 10, 25, 380, 50));
-    EXPECT_DOUBLE_EQ(p.best_accuracy, 90) << "хуже — не меняет";
-    EXPECT_DOUBLE_EQ(p.best_precision, 61);
-    EXPECT_DOUBLE_EQ(p.best_avg_reaction, 380) << "реакция — чем меньше, тем лучше";
-    EXPECT_EQ(p.best_score, 200);
-    EXPECT_EQ(p.games_played, 3);
+    p.preset = 4;  // «Флик»
+    p.settings.preset.lifetime_ms = 2000;
+    p.settings.preset.target_size = 30;
+    const MeasureOptions o = selected_options(p);
+    EXPECT_EQ(o.lifetime_ms, 1400) << "жизнь цели Флика — ×0,7 (D-21)";
+    EXPECT_EQ(o.target_size, 30);
+    EXPECT_FALSE(o.grows);
 }
 
-TEST(FinishGame, TrackingDoesNotTouchAccuracyRecords) {
+TEST(FinishGame, AppendsRunAndFindsNewBestPerCombo) {
     Profile p;
-    finish_game(p, summary_of(GameMode::Tracking, 500, 0, 0, 0, 0));
-    EXPECT_EQ(p.best_score, 500);
-    EXPECT_DOUBLE_EQ(p.best_accuracy, 0);
-    EXPECT_EQ(p.leaderboard[static_cast<std::size_t>(mode_index(GameMode::Tracking))].size(), 1U);
+    const MeasureOptions classic = preset_options(1, {});
+    const MeasureOptions flick = preset_options(4, {});
+    EXPECT_TRUE(finish_game(p, run_of(classic, 100)).new_best);
+    EXPECT_FALSE(finish_game(p, run_of(classic, 90)).new_best);
+    EXPECT_FALSE(finish_game(p, run_of(classic, 100)).new_best) << "равный — не новый";
+    EXPECT_TRUE(finish_game(p, run_of(flick, 10)).new_best) << "у другого набора — свой рекорд";
+    EXPECT_TRUE(finish_game(p, run_of(classic, 101)).new_best);
+    EXPECT_EQ(p.runs.size(), 5U);
+}
+
+TEST(FinishGame, ReactionRecordNeedsTwentyShotsByD13) {
+    Profile p;
+    const MeasureOptions screen = preset_options(0, {});
+    EXPECT_FALSE(finish_game(p, run_of(screen, 0, 5, 5, 150)).new_best)
+        << "5 реакций — в рекорд не идут";
+    EXPECT_TRUE(finish_game(p, run_of(screen, 0, 20, 19, 300)).new_best);
+    EXPECT_TRUE(finish_game(p, run_of(screen, 0, 25, 25, 250)).new_best) << "меньше — лучше";
+    EXPECT_FALSE(finish_game(p, run_of(screen, 0, 25, 25, 260)).new_best);
 }
 
 TEST(FinishGame, AchievementsOnFinish) {
     Profile p;
-    FinishResult r = finish_game(p, summary_of(GameMode::Classic, 10, 18, 20, 400, 50));
-    EXPECT_EQ(r.unlocked, (std::vector<int>{0, 5}))
-        << "первая игра и снайпер (90 % от 20 выстрелов)";
-    EXPECT_EQ(r.leaderboard_place, 0);
-    r = finish_game(p, summary_of(GameMode::Classic, 10, 19, 19, 400, 50));
-    EXPECT_TRUE(r.unlocked.empty()) << "повторно не открываются";
-
-    Profile q;
-    r = finish_game(q, summary_of(GameMode::Classic, 10, 18, 19, 400, 50));
-    EXPECT_EQ(r.unlocked, (std::vector<int>{0})) << "снайпер — только от 20 выстрелов";
-    r = finish_game(q, summary_of(GameMode::Dual, 499, 10, 10, 400, 50));
-    EXPECT_TRUE(r.unlocked.empty());
-    r = finish_game(q, summary_of(GameMode::Dual, 500, 10, 10, 400, 50));
-    EXPECT_EQ(r.unlocked, (std::vector<int>{7}));
-
-    Profile v;
-    v.games_played = 998;
-    EXPECT_TRUE(finish_game(v, summary_of(GameMode::Flick, 1, 0, 0, 0, 0)).unlocked.empty());
-    EXPECT_EQ(finish_game(v, summary_of(GameMode::Flick, 1, 0, 0, 0, 0)).unlocked,
-              (std::vector<int>{6}));
-}
-
-TEST(FinishGame, ReactionHistoryKeepsLastFiftyInOrder) {
-    Profile p;
-    for (int i = 0; i < 40; ++i)
-        p.reactions.push(1000 + i);
-    GameSummary s = summary_of(GameMode::Classic, 0, 0, 0, 0, 0);
-    for (int i = 0; i < 20; ++i)
-        s.reactions_ms.push_back(200.0 + i + 0.5);
-    finish_game(p, s);
-    EXPECT_EQ(p.reactions.count, 50);
-    EXPECT_EQ(p.reactions.next, 10) << "кольцо: 60 записей, следующая — на место 10";
-    const std::vector<int> order = p.reactions.in_order();
-    ASSERT_EQ(order.size(), 50U);
-    EXPECT_EQ(order.front(), 1010);
-    EXPECT_EQ(order[29], 1039);
-    EXPECT_EQ(order[30], 200) << "200,5 → к чётному";
-    EXPECT_EQ(order.back(), 220) << "219,5 → к чётному";
-}
-
-TEST(ReactionRing, PartialRingFromZero) {
-    ReactionRing ring;
-    ring.push(5);
-    ring.push(7);
-    EXPECT_EQ(ring.count, 2);
-    EXPECT_EQ(ring.next, 2);
-    EXPECT_EQ(ring.in_order(), (std::vector<int>{5, 7}));
+    const MeasureOptions two = preset_options(2, {});
+    const FinishResult first = finish_game(p, run_of(two, 600, 30, 28));
+    // Первый замер, «Снайпер» (28 из 30 — 93 %), «Обе руки» (600 очков).
+    EXPECT_EQ(first.unlocked, (std::vector<int>{0, 5, 7}));
+    EXPECT_TRUE(finish_game(p, run_of(two, 700)).unlocked.empty());
 }
 
 TEST(Achievements, OnHitEvents) {
@@ -208,9 +155,9 @@ TEST(Achievements, OnHitEvents) {
 
     Profile q;
     const GameEvent tracked{.kind = GameEventKind::Tracked, .position = {}, .score = 5000};
-    EXPECT_TRUE(achievements_on_event(q, tracked).empty()) << "как у образца: только по щелчку";
+    EXPECT_TRUE(achievements_on_event(q, tracked).empty()) << "только по попаданию щелчком";
     EXPECT_FALSE(unlock(q, 8));
-    EXPECT_EQ(kAchievements[7].name, "Мастер Dual");
+    EXPECT_EQ(kAchievements[7].key, "two_hands");
 }
 
 }  // namespace

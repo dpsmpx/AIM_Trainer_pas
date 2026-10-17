@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace aim::platform {
 
@@ -18,10 +19,13 @@ inline constexpr std::string_view kNewline = "\n";
 
 class Storage {
 public:
-    /// Папка игрока: $AIM_TRAINER_DATA_DIR, если задана (проверки), иначе
-    /// SDL_GetPrefPath без организации — на Windows %APPDATA%\AimTrainer\, на
-    /// Linux ~/.local/share/AimTrainer/ (D-30). Нет — пусто и problem.
-    static std::optional<Storage> open_user_folder(std::string& problem);
+    /// Папка по умолчанию: $AIM_TRAINER_DATA_DIR, если задана (проверки),
+    /// иначе SDL_GetPrefPath без организации — на Windows %APPDATA%\AimTrainer\,
+    /// на Linux ~/.local/share/AimTrainer/ (D-30). В ней — aim_trainer.ini и,
+    /// пока игрок не выбрал другую (D-33), файлы игрока. Нет — пусто и problem.
+    static std::optional<Storage> default_folder(std::string& problem);
+    /// Папка dir: нет — создать. Не создаётся — пусто и problem.
+    static std::optional<Storage> open(std::string dir, std::string& problem);
 
     explicit Storage(std::string dir);
 
@@ -37,6 +41,11 @@ public:
     /// Дописать в конец; файла нет — создать.
     bool append(std::string_view name, std::string_view data, std::string& error) const;
     [[nodiscard]] bool exists(std::string_view name) const;
+    /// Имена файлов папки (без вложенных папок); папка не читается — пусто
+    /// и error.
+    [[nodiscard]] std::optional<std::vector<std::string>> files(std::string& error) const;
+    /// В папку можно писать: пробный файл записан и удалён.
+    bool writable(std::string& error) const;
 
 private:
     std::string dir_;

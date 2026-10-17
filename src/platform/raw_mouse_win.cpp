@@ -60,15 +60,17 @@ struct RawMouse::Impl {
 
     std::mutex mutex;
     std::condition_variable started_cv;
-    bool started = false;  // под mutex; active и problem пишутся до него
-    bool active = false;
-    std::string problem;
+    bool started = false;  // под mutex
+    std::atomic<bool> active{false};
+    std::string problem;                 // под mutex
     std::vector<core::RawPress> queue;   // под mutex
     std::condition_variable pressed_cv;  // в queue новые нажатия
 
     void run();
     void handle(HRAWINPUT input, core::Nanoseconds time);
     void finish_start(bool ok, std::string why);
+    /// Поток выходит: active — false, why — почему (AUD-51).
+    void finish_run(std::string why);
 };
 
 void RawMouse::Impl::finish_start(bool ok, std::string why) {
@@ -77,6 +79,16 @@ void RawMouse::Impl::finish_start(bool ok, std::string why) {
     problem = std::move(why);
     started = true;
     started_cv.notify_one();
+}
+
+void RawMouse::Impl::finish_run(std::string why) {
+    {
+        const std::lock_guard lock(mutex);
+        active = false;
+        problem = std::move(why);
+    }
+    // Кто ждёт нажатия — дальше без потока.
+    pressed_cv.notify_all();
 }
 
 void RawMouse::Impl::run() {
@@ -113,12 +125,17 @@ void RawMouse::Impl::run() {
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
     finish_start(true, {});
 
+    std::string why = "поток сырого ввода остановлен";
     for (;;) {
         // MWMO_INPUTAVAILABLE — проснуться и на ввод, который уже лежит в
         // очереди, а не только на новый.
         const DWORD woke =
             MsgWaitForMultipleObjectsEx(1, &stop_event, INFINITE, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
-        if (woke != WAIT_OBJECT_0 + 1) break;  // сигнал остановки или ошибка
+        if (woke == WAIT_OBJECT_0) break;  // сигнал остановки
+        if (woke != WAIT_OBJECT_0 + 1) {
+            why = "поток сырого ввода остановился — " + win32_error("MsgWaitForMultipleObjectsEx");
+            break;
+        }
         MSG msg{};
         while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE) != FALSE) {
             if (msg.message == WM_INPUT) {
@@ -128,6 +145,7 @@ void RawMouse::Impl::run() {
         }
     }
 
+    finish_run(std::move(why));
     device.dwFlags = RIDEV_REMOVE;
     device.hwndTarget = nullptr;
     RegisterRawInputDevices(&device, 1, sizeof device);
@@ -196,11 +214,14 @@ RawMouse::RawMouse() : impl_(std::make_unique<Impl>()) {
     impl_->started_cv.wait(lock, [this] { return impl_->started; });
 }
 
+void RawMouse::stop() {
+    if (!impl_->thread.joinable()) return;
+    SetEvent(impl_->stop_event);
+    impl_->thread.join();
+}
+
 RawMouse::~RawMouse() {
-    if (impl_->thread.joinable()) {
-        SetEvent(impl_->stop_event);
-        impl_->thread.join();
-    }
+    stop();
     if (impl_->stop_event != nullptr) CloseHandle(impl_->stop_event);
     if (impl_->owns_receiver) g_receiver_taken = false;
 }
@@ -209,7 +230,8 @@ bool RawMouse::active() const {
     return impl_->active;
 }
 
-const std::string& RawMouse::problem() const {
+std::string RawMouse::problem() const {
+    const std::lock_guard lock(impl_->mutex);
     return impl_->problem;
 }
 

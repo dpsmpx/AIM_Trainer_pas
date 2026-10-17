@@ -1,9 +1,10 @@
-// Случайные числа и округление — как у PascalABC.NET (docs/ARCHITECTURE.md, §11).
+// Случайные числа и округление — как у PascalABC.NET (archive/pascal/ARCHITECTURE.md, §11).
 
 #include "core/random.h"
 
 #include <gtest/gtest.h>
 
+#include <limits>
 #include <set>
 
 #include "core/rounding.h"
@@ -17,6 +18,15 @@ TEST(RoundHalfEven, HalvesGoToEven) {
     EXPECT_EQ(round_half_even(2.5), 2);
     EXPECT_EQ(round_half_even(-0.5), 0);
     EXPECT_EQ(round_half_even(-1.5), -2);
+}
+
+TEST(RoundHalfEven, OutOfIntRangeIsClampedNotUndefined) {
+    // Число из файла может быть любым (AUD-50): край диапазона, NaN — 0.
+    EXPECT_EQ(round_half_even(1e20), std::numeric_limits<int>::max());
+    EXPECT_EQ(round_half_even(-1e20), std::numeric_limits<int>::min());
+    EXPECT_EQ(round_half_even(std::numeric_limits<double>::infinity()),
+              std::numeric_limits<int>::max());
+    EXPECT_EQ(round_half_even(std::numeric_limits<double>::quiet_NaN()), 0);
 }
 
 TEST(RoundHalfEven, OthersGoToNearest) {
@@ -64,6 +74,18 @@ TEST(EngineRandom, SameSeedSameSequence) {
     EngineRandom b(42);
     for (int i = 0; i < 10; ++i)
         EXPECT_EQ(a.between(0, 1'000'000), b.between(0, 1'000'000));
+}
+
+TEST(EngineRandom, SameNumbersOnEverySystem) {
+    // Числа по началу 42 — одни и те же с libstdc++ (Linux) и libc++ (сборка
+    // для Windows): замер по записанному началу повторяется везде (D-39).
+    EngineRandom rng(42);
+    EXPECT_EQ(rng.between(0, 1'000'000), 198295);
+    EXPECT_EQ(rng.between(0, 1'000'000), 705358);
+    EXPECT_EQ(rng.between(0, 1'000'000), 591599);
+    EXPECT_EQ(rng.between(0, 1'000'000), 350242);
+    EXPECT_DOUBLE_EQ(rng.unit(), 0.90326896642837828);
+    EXPECT_EQ(rng.between(-5, 5), -1);
 }
 
 }  // namespace

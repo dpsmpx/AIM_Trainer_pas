@@ -7,6 +7,9 @@ GoogleTest (D-19), раскладка и проверка (D-20, D-25), текс
 
 ## 1. На Windows — у автора
 
+Готовая сборка — ветка `win_debug_builds`, каталог `AimTrainer/` (D-34):
+«Code» → «Download ZIP». Своя — ниже.
+
 Один раз:
 
 1. **llvm-mingw 20261006** (D-17): архив
@@ -41,6 +44,10 @@ cmake --preset windows
 cmake --build --preset windows
 ```
 
+Версию сборки настройка берёт из `git describe` и печатает строкой «DP AIM
+Trainer, версия …»; исходники из ZIP без Git — «без Git» (D-49). Значок и
+сведения о версии EXE — ресурс `src/app/aim_trainer.rc.in` (`windres`).
+
 Первая настройка качает SDL 3.4.18, SDL3_ttf 3.2.2, FreeType 2.15.0 и
 шрифт DejaVu 2.37 и сверяет SHA-256 (D-18, D-31) — нужен интернет;
 следующие — нет. Итог — `build\windows\AimTrainer.exe` без DLL рядом
@@ -69,6 +76,11 @@ tools/check_cpp.sh --fix           # заодно поправить оформ�
 Итог — таблица в конце вывода: её — в описание PR. Журналы —
 `build/check/`.
 
+Сборку для автора — EXE с `fonts/` — по его запросу выкладывает
+`tools/publish_build.sh` в ветку `win_debug_builds`, каталог `AimTrainer/`
+(D-23, D-29, D-34): собирает пресет `windows-cross` из закоммиченного кода
+и записывает коммит в `AimTrainer/BUILD.md`.
+
 ## 3. Пресеты
 
 | пресет | где | что |
@@ -77,6 +89,8 @@ tools/check_cpp.sh --fix           # заодно поправить оформ�
 | `linux-clang` | сессия | Clang, отладка, тесты |
 | `linux-asan` | сессия | GCC с ASan и UBSan, тесты |
 | `linux-tidy` | сессия | Clang, clang-tidy при сборке; замечание — ошибка |
+| `linux-tsan` | сессия | GCC с ThreadSanitizer, тесты: поток звука, ответ диалога папки (AUD-49) |
+| `linux-coverage` | сессия, по `tools/helpers/coverage.sh` | GCC с `--coverage`: покрытие строк по слоям; в `tools/check_cpp.sh` не входит |
 | `windows-cross` | сессия | llvm-mingw, выпуск; тесты — под Wine |
 | `windows` | Windows у автора | llvm-mingw, выпуск, без тестов |
 
@@ -92,14 +106,33 @@ cmake --preset linux-gcc && cmake --build --preset linux-gcc && ctest --preset l
 
 ## 4. Тесты
 
-- `tests/core/` — логика без окна, GoogleTest.
+- `tests/core/` — логика без окна, GoogleTest. Среди них (AUD-49):
+  прогон замера каждого набора через настоящее меню со сверкой итога с
+  событиями замера и записью в профиле (`preset_run_test.cpp`); фаззинг
+  разбора профиля, последнего профиля, истории, реплея и темы — мутации
+  верных файлов не роняют разбор, прочитанное переживает запись
+  (`parse_fuzz_test.cpp`, под ASan и UBSan — пресет `linux-asan`);
+  перенос строк и обрезка пути по ширине (`wrap_test.cpp`).
 - `tests/platform/` — версия SDL (D-18) и поток сырого ввода (D-24); на
   Linux — что потока нет.
-- `tests/app/` — программа целиком: три кадра на драйвере SDL `offscreen`
-  без экрана и снимок последнего — 800×600, в углах и в центре (там меню
-  ничего не рисует) фон тёмной темы.
+- `tests/app/` — файлы игрока (`player_files_test.cpp`), все экраны
+  (`screens_test.cpp`) и программа целиком: три кадра на драйвере SDL
+  `offscreen` без экрана и снимок последнего — 800×600 и цвет панели
+  туториала в одной точке (`frame_check.cpp`).
+- Обход экранов `screens_test.cpp` (AUD-49) — библиотека `aim_app` без
+  главного цикла, окно `offscreen`, рендер `software`, свои часы и
+  случайные числа: туториал, пункты меню, панели, конструктор, каждый
+  набор (отсчёт, замер ботом, итог), реплей с итога и из «Рекордов
+  наборов», «История» с замерами и уведомлением, меню без эффектов —
+  обоими шрифтами. Каждая надпись помещается в свою рамку, ни один кадр не
+  одного цвета; ASan видит всю отрисовку. Кадры не сверяются с эталоном:
+  их пишет `tools/helpers/snapshots.sh` для сверки до и после правки
+  отрисовки.
 
-Тесты Windows-сборки идут под Wine без экрана. Окно Windows-сборки в
+Тесты Windows-сборки идут под Wine без экрана, с локалью `C.UTF-8`
+(`CMakePresets.json`): в локали «C» Wine не переводит кириллицу имён файлов
+в имена Linux, и файл «лес.ini» не создаётся — у Windows такой беды нет,
+SDL пишет через широкие функции. Окно Windows-сборки в
 сессии можно открыть под Xvfb: `DISPLAY=:99 wine
 build/windows-cross/AimTrainer.exe`; клик — `xdotool`.
 
@@ -133,6 +166,10 @@ ref build` начинает с чистого каталога, `tools/gui.sh Ц
 | `ref_bot.py` | играет по снимкам окна: находит цели и бомбы, щёлкает или наводит курсор; правила — в шапке |
 | `wine_clicks.sh` | щелчки по Windows-сборке под Wine: сколько получили время из сырого ввода (D-24) |
 | `click_debug_log.patch` | временный журнал времени клика в `main.cpp` — для разбора, не для коммита |
+| `profile_menu.sh` | замер кадра меню под Callgrind: инструкции своего кода, вызовы отрисовки и выделения памяти на кадр (AUD-39) |
+| `make_icon.py` | рисует значок «прицел» `src/app/aim_trainer.ico` (Pillow, D-49) |
+| `coverage.sh` | покрытие строк своего кода тестами по слоям `src/core`, `src/platform`, `src/app` (пресет `linux-coverage`, gcov); `--files` — и по файлам (AUD-49) |
+| `snapshots.sh` | кадры всех экранов из теста обхода (`shoot`) и попиксельная сверка двух прогонов (`diff`) — правка отрисовки без изменения картинки (AUD-46) |
 
 ## 6. Откуда зависимости
 
@@ -140,7 +177,7 @@ ref build` начинает с чистого каталога, `tools/gui.sh Ц
 |---|---|---|
 | SDL 3.4.18 | архив выпуска `libsdl-org/SDL`; в сессии — `$AIM_DEPS_DIR` | SHA-256 (D-18), `tools/cmake/dependencies.cmake` |
 | SDL3_ttf 3.2.2, FreeType 2.15.0 | архивы выпусков `libsdl-org/SDL_ttf` и `download.savannah.gnu.org`; в сессии — `$AIM_DEPS_DIR` | SHA-256 и подписи авторов (D-31), `tools/cmake/dependencies.cmake` |
-| шрифт DejaVu Sans Mono 2.37 | архив выпуска `dejavu-fonts/dejavu-fonts`; в сессии — `$AIM_DEPS_DIR` | SHA-256 (D-31); сборка кладёт файлы в `fonts/` рядом с программой |
+| шрифты DejaVu Sans Condensed и Sans Mono 2.37 | архив выпуска `dejavu-fonts/dejavu-fonts`; в сессии — `$AIM_DEPS_DIR` | SHA-256 (D-31); сборка кладёт файлы в `fonts/` рядом с программой |
 | GoogleTest 1.14.0 | пакет Ubuntu 24.04; иначе — тег `v1.14.0` | версия пакета; коммит `f8d7d77c0693` |
 | llvm-mingw 20261006 | выпуск `mstorsjo/llvm-mingw` | SHA-256 (D-17), `tools/setup_env.sh` и раздел 1 |
 

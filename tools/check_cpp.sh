@@ -8,7 +8,9 @@
 #   tools/check_cpp.sh ПРЕСЕТ…      только эти пресеты (остальные проверки — всегда)
 #
 # Пресеты сессии: linux-gcc, linux-clang, linux-asan, linux-tidy (clang-tidy
-# при сборке, замечание — ошибка), windows-cross (llvm-mingw, тесты под Wine).
+# при сборке, замечание — ошибка), linux-tsan (ThreadSanitizer: поток звука,
+# диалог папки), windows-cross (llvm-mingw, тесты под Wine). Покрытие —
+# отдельно: tools/helpers/coverage.sh.
 # Инструменты ставит tools/setup_env.sh; его env.sh подключается сам.
 # Журналы — build/check/. Код возврата: 0 — всё зелёное, 1 — есть провал.
 set -uo pipefail
@@ -20,13 +22,13 @@ ENV_FILE="${AIM_TOOLS_DIR:-$HOME/.local/share/aim-trainer-tools}/env.sh"
 # shellcheck source=/dev/null
 [ -f "$ENV_FILE" ] && source "$ENV_FILE"
 
-ALL_PRESETS=(linux-gcc linux-clang linux-asan linux-tidy windows-cross)
+ALL_PRESETS=(linux-gcc linux-clang linux-asan linux-tidy linux-tsan windows-cross)
 FIX=0
 PRESETS=()
 for arg in "$@"; do
     case "$arg" in
         --fix) FIX=1 ;;
-        -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
         -*) echo "неизвестный ключ: $arg" >&2; exit 2 ;;
         *)
             if [[ " ${ALL_PRESETS[*]} " != *" $arg "* ]]; then
