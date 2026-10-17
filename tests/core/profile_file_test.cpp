@@ -5,7 +5,10 @@
 
 #include <gtest/gtest.h>
 
+#include <array>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace aim::core {
 namespace {
@@ -59,6 +62,23 @@ TEST(ProfileFile, FontWordOrDefault) {
     EXPECT_EQ(odd.profile.settings.font, 0) << "не то слово — Condensed";
     EXPECT_EQ(odd.reset_fields.size(), 1U);
     EXPECT_NE(write_profile(Profile{}, "\n").find("font=condensed"), std::string::npos);
+}
+
+TEST(ProfileFile, ThemeNameWithPathOrControlCharsIsReset) {
+    // Имя темы — имя файла themes/ИМЯ.ini (D-44); найдено фаззингом:
+    // «\r» перед переводом строки оставался в имени, и тема не находилась.
+    const std::array<std::string_view, 4> bads{"a/b", "..\\x", "про\tба",
+                                               std::string_view("x\0y", 3)};
+    for (const std::string_view bad : bads) {
+        const std::string text =
+            std::string(kProfileVersionLine) + "\ntheme=" + std::string(bad) + "\n";
+        const LoadedProfile loaded = read_profile(text);
+        EXPECT_EQ(loaded.profile.settings.theme, "dark") << bad;
+        EXPECT_EQ(loaded.reset_fields, std::vector<std::string>{"theme"}) << bad;
+    }
+    const LoadedProfile ok = read_profile(std::string(kProfileVersionLine) + "\ntheme=проба\n");
+    EXPECT_EQ(ok.profile.settings.theme, "проба");
+    EXPECT_TRUE(ok.reset_fields.empty());
 }
 
 TEST(ProfileFile, CustomItemAndItsBadValues) {

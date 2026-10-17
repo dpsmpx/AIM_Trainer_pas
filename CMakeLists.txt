@@ -16,6 +16,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(AIM_WERROR "Предупреждения своего кода — ошибки (сборки сессии, D-19)" OFF)
 option(AIM_SANITIZE "Собирать свой код с AddressSanitizer и UndefinedBehaviorSanitizer" OFF)
 option(AIM_CLANG_TIDY "Проверять свой код clang-tidy при сборке" OFF)
+option(AIM_SANITIZE_THREAD "Собирать свой код с ThreadSanitizer (AUD-49)" OFF)
+option(AIM_COVERAGE "Собирать свой код с замером покрытия gcov (AUD-49)" OFF)
 
 # ccache ускоряет пересборку и SDL в каждом пресете; без него сборка та же.
 find_program(AIM_CCACHE ccache)
@@ -36,6 +38,14 @@ if(AIM_SANITIZE)
     target_compile_options(aim_options INTERFACE
         -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined)
     target_link_options(aim_options INTERFACE -fsanitize=address,undefined)
+endif()
+if(AIM_SANITIZE_THREAD)
+    target_compile_options(aim_options INTERFACE -fsanitize=thread -fno-omit-frame-pointer)
+    target_link_options(aim_options INTERFACE -fsanitize=thread)
+endif()
+if(AIM_COVERAGE)
+    target_compile_options(aim_options INTERFACE --coverage)
+    target_link_options(aim_options INTERFACE --coverage)
 endif()
 if(MINGW)
     # Один EXE без DLL рядом: libc++, libunwind и winpthreads — внутри (D-17).
@@ -74,7 +84,8 @@ add_library(aim_core STATIC
     src/core/target.cpp
     src/core/text.cpp
     src/core/theme.cpp
-    src/core/tone.cpp)
+    src/core/tone.cpp
+    src/core/wrap.cpp)
 target_include_directories(aim_core PUBLIC src)
 aim_own_code(aim_core)
 

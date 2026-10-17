@@ -15,6 +15,7 @@
 #include "core/menu.h"
 #include "core/records.h"
 #include "core/theme.h"
+#include "core/wrap.h"
 
 namespace aim::app {
 
@@ -91,18 +92,8 @@ void render_help(Canvas& c, const core::Theme& th, int scroll) {
 }
 
 std::string fit_path(Canvas& c, std::string_view prefix, std::string_view path, int width) {
-    std::string tail(path);
-    const auto text = [&](bool cut) { return std::string(prefix) + (cut ? "…" : "") + tail; };
-    bool cut = false;
-    while (!tail.empty() && c.text_width(text(cut), kText) > width) {
-        // Отбросить первый знак UTF-8.
-        std::size_t next = 1;
-        while (next < tail.size() && (static_cast<unsigned char>(tail[next]) & 0xC0U) == 0x80U)
-            ++next;
-        tail.erase(0, next);
-        cut = true;
-    }
-    return text(cut);
+    return core::fit_left(prefix, path, width,
+                          [&](std::string_view line) { return c.text_width(line, kText); });
 }
 
 void render_settings(Canvas& c, const core::Theme& th, const core::Settings& s,

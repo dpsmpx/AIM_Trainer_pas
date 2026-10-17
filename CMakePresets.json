@@ -49,6 +49,18 @@
       "cacheVariables": { "AIM_CLANG_TIDY": "ON" }
     },
     {
+      "name": "linux-tsan",
+      "displayName": "Linux, GCC, ThreadSanitizer",
+      "inherits": "linux-gcc",
+      "cacheVariables": { "AIM_SANITIZE_THREAD": "ON" }
+    },
+    {
+      "name": "linux-coverage",
+      "displayName": "Linux, GCC, замер покрытия (tools/helpers/coverage.sh)",
+      "inherits": "linux-gcc",
+      "cacheVariables": { "AIM_COVERAGE": "ON" }
+    },
+    {
       "name": "windows-cross",
       "displayName": "Windows из Linux: llvm-mingw (D-17), тесты под Wine",
       "inherits": "session",
@@ -77,6 +89,8 @@
     { "name": "linux-clang", "configurePreset": "linux-clang" },
     { "name": "linux-asan", "configurePreset": "linux-asan" },
     { "name": "linux-tidy", "configurePreset": "linux-tidy" },
+    { "name": "linux-tsan", "configurePreset": "linux-tsan" },
+    { "name": "linux-coverage", "configurePreset": "linux-coverage" },
     { "name": "windows-cross", "configurePreset": "windows-cross" },
     { "name": "windows", "configurePreset": "windows" }
   ],
@@ -98,6 +112,13 @@
         "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1"
       }
     },
+    {
+      "name": "linux-tsan",
+      "inherits": "base",
+      "configurePreset": "linux-tsan",
+      "environment": { "TSAN_OPTIONS": "halt_on_error=1:second_deadlock_stack=1" }
+    },
+    { "name": "linux-coverage", "inherits": "base", "configurePreset": "linux-coverage" },
     {
       "name": "windows-cross",
       "inherits": "base",

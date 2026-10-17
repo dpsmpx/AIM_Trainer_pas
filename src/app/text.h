@@ -66,9 +66,8 @@ public:
     int height(Font font);
     /// Кадр показан: давно не рисованные надписи — из кэша.
     void end_frame();
-    /// Строки текста по ширине max_width: перевод строки — новая строка,
-    /// перенос — по пробелам, слово длиннее строки — по знакам, как DrawString
-    /// в прямоугольнике. Пробелы на концах строк отброшены.
+    /// Строки текста по ширине max_width — core::wrap_lines с мерой этого
+    /// шрифта.
     std::vector<std::string> wrap(std::string_view s, Font font, int max_width);
 
 private:

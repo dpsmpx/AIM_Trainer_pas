@@ -85,6 +85,8 @@ tools/check_cpp.sh --fix           # заодно поправить оформ�
 | `linux-clang` | сессия | Clang, отладка, тесты |
 | `linux-asan` | сессия | GCC с ASan и UBSan, тесты |
 | `linux-tidy` | сессия | Clang, clang-tidy при сборке; замечание — ошибка |
+| `linux-tsan` | сессия | GCC с ThreadSanitizer, тесты: поток звука, ответ диалога папки (AUD-49) |
+| `linux-coverage` | сессия, по `tools/helpers/coverage.sh` | GCC с `--coverage`: покрытие строк по слоям; в `tools/check_cpp.sh` не входит |
 | `windows-cross` | сессия | llvm-mingw, выпуск; тесты — под Wine |
 | `windows` | Windows у автора | llvm-mingw, выпуск, без тестов |
 
@@ -100,7 +102,13 @@ cmake --preset linux-gcc && cmake --build --preset linux-gcc && ctest --preset l
 
 ## 4. Тесты
 
-- `tests/core/` — логика без окна, GoogleTest.
+- `tests/core/` — логика без окна, GoogleTest. Среди них (AUD-49):
+  прогон замера каждого набора через настоящее меню со сверкой итога с
+  событиями замера и записью в профиле (`preset_run_test.cpp`); фаззинг
+  разбора профиля, последнего профиля, истории, реплея и темы — мутации
+  верных файлов не роняют разбор, прочитанное переживает запись
+  (`parse_fuzz_test.cpp`, под ASan и UBSan — пресет `linux-asan`);
+  перенос строк и обрезка пути по ширине (`wrap_test.cpp`).
 - `tests/platform/` — версия SDL (D-18) и поток сырого ввода (D-24); на
   Linux — что потока нет.
 - `tests/app/` — файлы игрока (`player_files_test.cpp`), все экраны
@@ -155,6 +163,7 @@ ref build` начинает с чистого каталога, `tools/gui.sh Ц
 | `wine_clicks.sh` | щелчки по Windows-сборке под Wine: сколько получили время из сырого ввода (D-24) |
 | `click_debug_log.patch` | временный журнал времени клика в `main.cpp` — для разбора, не для коммита |
 | `profile_menu.sh` | замер кадра меню под Callgrind: инструкции своего кода, вызовы отрисовки и выделения памяти на кадр (AUD-39) |
+| `coverage.sh` | покрытие строк своего кода тестами по слоям `src/core`, `src/platform`, `src/app` (пресет `linux-coverage`, gcov); `--files` — и по файлам (AUD-49) |
 | `snapshots.sh` | кадры всех экранов из теста обхода (`shoot`) и попиксельная сверка двух прогонов (`diff`) — правка отрисовки без изменения картинки (AUD-46) |
 
 ## 6. Откуда зависимости

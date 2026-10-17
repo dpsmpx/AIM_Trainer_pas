@@ -25,7 +25,9 @@ add_executable(aim_core_tests
     core/game_test.cpp
     core/measure_test.cpp
     core/menu_test.cpp
+    core/parse_fuzz_test.cpp
     core/particles_test.cpp
+    core/preset_run_test.cpp
     core/profile_file_test.cpp
     core/profile_test.cpp
     core/random_test.cpp
@@ -34,7 +36,8 @@ add_executable(aim_core_tests
     core/runs_test.cpp
     core/target_test.cpp
     core/theme_test.cpp
-    core/tone_test.cpp)
+    core/tone_test.cpp
+    core/wrap_test.cpp)
 target_link_libraries(aim_core_tests PRIVATE aim_core GTest::gtest_main)
 aim_own_code(aim_core_tests)
 gtest_discover_tests(aim_core_tests DISCOVERY_MODE PRE_TEST

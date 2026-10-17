@@ -6,6 +6,8 @@
 #include <string>
 #include <utility>
 
+#include "core/wrap.h"
+
 namespace aim::app {
 
 namespace {
@@ -186,58 +188,8 @@ int Text::width(std::string_view s, Font font) {
 }
 
 std::vector<std::string> Text::wrap(std::string_view s, Font font, int max_width) {
-    std::vector<std::string> lines;
-    const auto trimmed = [](std::string line) {
-        while (!line.empty() && line.back() == ' ')
-            line.pop_back();
-        return line;
-    };
-    const auto fits = [&](std::string_view line) { return measure(line, font) <= max_width; };
-    std::size_t start = 0;
-    for (;;) {
-        const std::size_t nl = s.find('\n', start);
-        const std::string_view paragraph =
-            s.substr(start, nl == std::string_view::npos ? std::string_view::npos : nl - start);
-        std::string line;
-        std::size_t at = 0;
-        while (at < paragraph.size()) {
-            // Слово с пробелами за ним.
-            std::size_t end = paragraph.find(' ', at);
-            end = end == std::string_view::npos ? paragraph.size() : end;
-            while (end < paragraph.size() && paragraph[end] == ' ')
-                ++end;
-            const std::string_view word = paragraph.substr(at, end - at);
-            at = end;
-            if (fits(trimmed(line + std::string(word)))) {
-                line += word;
-                continue;
-            }
-            if (!trimmed(line).empty()) lines.push_back(trimmed(line));
-            line.clear();
-            if (fits(trimmed(std::string(word)))) {
-                line = word;
-                continue;
-            }
-            // Слово длиннее строки — по знакам UTF-8.
-            for (std::size_t i = 0; i < word.size();) {
-                std::size_t next = i + 1;
-                while (next < word.size() &&
-                       (static_cast<unsigned char>(word[next]) & 0xC0U) == 0x80U)
-                    ++next;
-                const std::string piece(word.substr(i, next - i));
-                if (!line.empty() && !fits(line + piece)) {
-                    lines.push_back(trimmed(line));
-                    line.clear();
-                }
-                line += piece;
-                i = next;
-            }
-        }
-        lines.push_back(trimmed(line));
-        if (nl == std::string_view::npos) break;
-        start = nl + 1;
-    }
-    return lines;
+    return core::wrap_lines(s, max_width,
+                            [&](std::string_view line) { return measure(line, font); });
 }
 
 int Text::height(Font font) {

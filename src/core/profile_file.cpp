@@ -105,8 +105,14 @@ bool apply(std::string_view key, std::string_view value, Profile& p) {
             s.theme = std::string(kThemes.at(static_cast<std::size_t>(*n)).id);
             return true;
         }
-        s.theme = std::string(value);
-        return !s.theme.empty() && s.theme.find_first_of("/\\") == std::string::npos;
+        // Имя темы — имя файла themes/ИМЯ.ini: без разделителей пути и
+        // управляющих знаков; иное — поле по умолчанию (найдено фаззингом).
+        const bool name_ok = !value.empty() && std::ranges::none_of(value, [](char ch) {
+            const auto u = static_cast<unsigned char>(ch);
+            return u < 0x20U || u == 0x7FU || ch == '/' || ch == '\\';
+        });
+        if (name_ok) s.theme = std::string(value);
+        return name_ok;
     }
     if (key == "font") {
         if (value != "condensed" && value != "mono") return false;
