@@ -30,6 +30,8 @@ fi
 REV="$(git -C "$ROOT" rev-parse HEAD)"
 CODE_REV="$(git -C "$ROOT" log -1 --format=%H -- "${CODE[@]}")"
 SOURCE_BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD)"
+# Версия в программе — та же строка, что даёт настройка CMake (D-49).
+VERSION="$(git -C "$ROOT" describe --tags --always --dirty)"
 
 (cd "$ROOT" && cmake --preset windows-cross >/dev/null && cmake --build --preset windows-cross) >&2
 [ -f "$OUT/AimTrainer.exe" ] || { echo "нет $OUT/AimTrainer.exe" >&2; exit 1; }
@@ -71,6 +73,7 @@ CLANG="$("$LLVM_MINGW/bin/x86_64-w64-mingw32-clang" --version | head -1)"
 {
     echo "# Сборка DP AIM Trainer"
     echo
+    echo "- Версия в программе («Справка», свойства EXE): \`$VERSION\`."
     echo "- Исходники: коммит \`$REV\` ветки \`$SOURCE_BRANCH\` репозитория"
     echo "  \`dpsmpx/AIM_Trainer_pas\`; последняя правка кода — \`$CODE_REV\`."
     echo "- Собрано: $(date -u '+%Y-%m-%d %H:%M UTC'), \`tools/publish_build.sh\`,"

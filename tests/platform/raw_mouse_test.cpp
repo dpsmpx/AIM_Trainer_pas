@@ -43,6 +43,19 @@ TEST_F(RawMouseTest, OnlyOneReceiverPerProcess) {
     EXPECT_FALSE(second.problem().empty());
 }
 
+TEST_F(RawMouseTest, StoppedThreadIsNotActive) {
+    // Поток вышел — программа это видит и не ждёт сырых нажатий (AUD-51).
+    RawMouse mouse;
+    ASSERT_TRUE(mouse.active()) << mouse.problem();
+    mouse.stop();
+    EXPECT_FALSE(mouse.active());
+    EXPECT_FALSE(mouse.problem().empty());
+    const Uint64 start = SDL_GetTicksNS();
+    EXPECT_FALSE(mouse.wait_for_press(50'000'000));
+    EXPECT_LT(SDL_GetTicksNS() - start, 40'000'000U) << "без потока — сразу";
+    mouse.stop();  // второй раз — ничего
+}
+
 TEST_F(RawMouseTest, ReceiverIsFreeAgainAfterStop) {
     {
         const RawMouse first;
@@ -58,6 +71,8 @@ TEST_F(RawMouseTest, NotAvailableOutsideWindows) {
     RawMouse mouse;
     EXPECT_FALSE(mouse.active());
     EXPECT_FALSE(mouse.problem().empty());
+    mouse.stop();  // потока нет — ничего
+    EXPECT_FALSE(mouse.active());
     std::vector<core::RawPress> presses;
     mouse.drain(presses);
     EXPECT_TRUE(presses.empty());

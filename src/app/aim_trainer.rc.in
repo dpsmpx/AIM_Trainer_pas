@@ -1,0 +1,35 @@
+// Ресурсы EXE на Windows (D-49, AUD-52): значок «прицел» — первый значок,
+// его же SDL берёт для окна (SDL_RegisterApp); версия — git describe.
+// Собирается из aim_trainer.rc.in при настройке CMake.
+#pragma code_page(65001)
+#include <winver.h>
+
+1 ICON "@AIM_ICON@"
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION 0,1,@AIM_BUILD_NUMBER@,0
+PRODUCTVERSION 0,1,@AIM_BUILD_NUMBER@,0
+FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+FILEFLAGS 0
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "041904B0"
+        BEGIN
+            VALUE "FileDescription", "DP AIM Trainer — замер реакции"
+            VALUE "FileVersion", "@AIM_VERSION@"
+            VALUE "InternalName", "AimTrainer"
+            VALUE "LegalCopyright", "GNU GPL v3"
+            VALUE "OriginalFilename", "AimTrainer.exe"
+            VALUE "ProductName", "DP AIM Trainer"
+            VALUE "ProductVersion", "@AIM_VERSION@"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x419, 1200
+    END
+END

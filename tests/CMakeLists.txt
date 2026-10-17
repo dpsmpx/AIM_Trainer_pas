@@ -46,6 +46,7 @@ gtest_discover_tests(aim_core_tests DISCOVERY_MODE PRE_TEST
 add_executable(aim_platform_tests
     platform/raw_mouse_test.cpp
     platform/sdl_version_test.cpp
+    platform/single_instance_test.cpp
     platform/sound_test.cpp
     platform/storage_test.cpp)
 target_link_libraries(aim_platform_tests PRIVATE aim_platform GTest::gtest_main)

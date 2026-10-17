@@ -5,7 +5,10 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include "core/profile_file.h"
 
@@ -75,6 +78,29 @@ TEST(Runs, FileSkipsHeaderAndBrokenLines) {
     const std::vector<RunRecord> runs = read_runs(csv, &skipped);
     EXPECT_EQ(runs.size(), 2U);
     EXPECT_EQ(skipped, 3U);
+}
+
+TEST(Runs, OutOfBoundsLineIsBroken) {
+    // Отрицательный счёт и опции вне границ конструктора — не замер: зажатые
+    // в границы, они попали бы в рекорды чужого набора (AUD-50).
+    const auto with_field = [](std::size_t index, std::string_view value) {
+        std::vector<std::string> fields;
+        const std::string line = run_line(sample());
+        std::size_t from = 0;
+        for (std::size_t comma = line.find(','); comma != std::string::npos;
+             from = comma + 1, comma = line.find(',', from))
+            fields.push_back(line.substr(from, comma - from));
+        fields.push_back(line.substr(from));
+        fields.at(index) = value;
+        std::string out;
+        for (const std::string& f : fields)
+            out += (out.empty() ? "" : ",") + f;
+        return out;
+    };
+    EXPECT_TRUE(parse_run_line(with_field(9, "36")).has_value());
+    EXPECT_FALSE(parse_run_line(with_field(9, "500")).has_value()) << "размер цели";
+    EXPECT_FALSE(parse_run_line(with_field(12, "0")).has_value()) << "жизни";
+    EXPECT_FALSE(parse_run_line(with_field(14, "-5")).has_value()) << "счёт";
 }
 
 TEST(Runs, EndWordsAndExportName) {

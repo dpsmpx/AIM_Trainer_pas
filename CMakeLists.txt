@@ -29,6 +29,37 @@ endif()
 include(CTest)
 include(tools/cmake/dependencies.cmake)
 
+# Версия — git describe при настройке (D-49, AUD-52): справка, журнал,
+# свойства EXE. Исходники без Git (ZIP с GitHub) — «без Git». Настройка
+# повторяется, когда меняется HEAD или ветка: после коммита версия новая.
+find_package(Git QUIET)
+set(AIM_VERSION "без Git")
+set(AIM_BUILD_NUMBER 0)
+if(GIT_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git/HEAD")
+    execute_process(COMMAND "${GIT_EXECUTABLE}" describe --tags --always --dirty
+                    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" RESULT_VARIABLE _aim_git
+                    OUTPUT_VARIABLE _aim_describe OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if(_aim_git EQUAL 0)
+        set(AIM_VERSION "${_aim_describe}")
+    endif()
+    execute_process(COMMAND "${GIT_EXECUTABLE}" rev-list --count HEAD
+                    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" RESULT_VARIABLE _aim_git
+                    OUTPUT_VARIABLE _aim_count OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if(_aim_git EQUAL 0)
+        set(AIM_BUILD_NUMBER "${_aim_count}")
+    endif()
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/.git/HEAD")
+    file(READ "${CMAKE_SOURCE_DIR}/.git/HEAD" _aim_head)
+    if(_aim_head MATCHES "^ref: ([^\n]+)")
+        set(_aim_ref "${CMAKE_SOURCE_DIR}/.git/${CMAKE_MATCH_1}")
+        if(EXISTS "${_aim_ref}")
+            set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_aim_ref}")
+        endif()
+    endif()
+endif()
+message(STATUS "DP AIM Trainer, версия ${AIM_VERSION}")
+configure_file(src/app/version.h.in "${CMAKE_BINARY_DIR}/generated/app/version.h" @ONLY)
+
 # Флаги своего кода; чужие библиотеки собираются своими (D-19).
 add_library(aim_options INTERFACE)
 target_compile_options(aim_options INTERFACE
@@ -96,7 +127,8 @@ else()
     add_library(aim_platform STATIC src/platform/raw_mouse_none.cpp)
 endif()
 target_sources(aim_platform PRIVATE
-    src/platform/folders.cpp src/platform/sound.cpp src/platform/storage.cpp)
+    src/platform/folders.cpp src/platform/single_instance.cpp src/platform/sound.cpp
+    src/platform/storage.cpp)
 target_link_libraries(aim_platform PUBLIC aim_core SDL3::SDL3)
 aim_own_code(aim_platform)
 
@@ -114,6 +146,7 @@ add_library(aim_app STATIC
     src/app/text.cpp
     src/app/toast.cpp)
 target_link_libraries(aim_app PUBLIC aim_platform SDL3_ttf::SDL3_ttf)
+target_include_directories(aim_app PUBLIC "${CMAKE_BINARY_DIR}/generated")
 aim_own_code(aim_app)
 
 # Шрифт — рядом с программой, в fonts/ (D-22, D-31); тесты экранов кладут его
@@ -130,6 +163,17 @@ endfunction()
 # SDL_main.h.
 add_executable(AimTrainer WIN32 src/app/main.cpp)
 target_link_libraries(AimTrainer PRIVATE aim_app)
+if(WIN32)
+    # Значок «прицел» и сведения о версии (D-49, AUD-52); значок —
+    # tools/helpers/make_icon.py.
+    enable_language(RC)
+    # Строки ресурса — UTF-8: без кодовой страницы windres читает их как 1252.
+    string(APPEND CMAKE_RC_FLAGS " --codepage=65001")
+    set(AIM_ICON "${CMAKE_SOURCE_DIR}/src/app/aim_trainer.ico")
+    configure_file(src/app/aim_trainer.rc.in "${CMAKE_BINARY_DIR}/generated/aim_trainer.rc" @ONLY)
+    target_sources(AimTrainer PRIVATE "${CMAKE_BINARY_DIR}/generated/aim_trainer.rc")
+
+endif()
 aim_own_code(AimTrainer)
 aim_fonts_next_to(AimTrainer)
 

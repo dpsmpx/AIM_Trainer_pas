@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "app/draw_util.h"
+#include "app/version.h"
 #include "core/help.h"
 #include "core/layout.h"
 #include "core/menu.h"
@@ -72,7 +73,10 @@ void render_help(Canvas& c, const core::Theme& th, int scroll) {
         if (at >= static_cast<int>(core::kHelp.size())) break;
         const core::HelpLine& line = core::kHelp.at(static_cast<std::size_t>(at));
         const int y = top + i * core::kHelpLineH;
-        c.text_centered(p.x1 + 20, y, p.x2 - 30, y + core::kHelpLineH, line.text,
+        // Версия сборки — для отчёта об ошибке (D-49).
+        const std::string text =
+            line.version ? std::string(line.text) + std::string(kVersion) : std::string(line.text);
+        c.text_centered(p.x1 + 20, y, p.x2 - 30, y + core::kHelpLineH, text,
                         line.heading ? kTextBold : kText, line.heading ? th.accent : th.text);
     }
     // Полоса прокрутки: дорожка и бегунок — доля и место видимых строк.

@@ -13,6 +13,7 @@ namespace aim::core {
 struct HelpLine {
     std::string_view text;
     bool heading = false;  ///< заголовок раздела
+    bool version = false;  ///< за текстом — версия сборки: её знает программа (D-49)
 };
 
 // Число строк — по списку: лишней пустой строки в конце не будет.
@@ -59,6 +60,8 @@ inline constexpr auto kHelp = std::to_array<HelpLine>({
     {"по пустому месту меню — то же"},
     {"Своя тема — файл themes/ИМЯ.ini в папке сохранений:"},
     {"строки «ключ=#RRGGBB», выбор — «Тема» в настройках"},
+    {"О программе", true},
+    {"DP AIM Trainer, версия ", false, true},
 });
 
 /// Строк справки на панели сразу.

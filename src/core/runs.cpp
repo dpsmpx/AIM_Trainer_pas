@@ -120,25 +120,29 @@ std::optional<RunRecord> parse_run_line(std::string_view line) {
     if (!score || !hits || !shots || !misses || !expired || !tracked || !max_combo || !accuracy ||
         !precision || !avg || !med || !run_ms || !end)
         return std::nullopt;
-    // Меры вне смысла — испорченная строка, а не замер.
-    if (*hits < 0 || *shots < 0 || *misses < 0 || *expired < 0 || *tracked < 0 || *max_combo < 0 ||
-        *run_ms < 0 || *accuracy < 0 || *accuracy > 100 || *precision < 0 || *precision > 100 ||
-        *avg < 0 || *avg > 1e6 || *med < 0 || *med > 1e6)
+    // Меры вне смысла — испорченная строка, а не замер (AUD-50).
+    if (*score < 0 || *hits < 0 || *shots < 0 || *misses < 0 || *expired < 0 || *tracked < 0 ||
+        *max_combo < 0 || *run_ms < 0 || *accuracy < 0 || *accuracy > 100 || *precision < 0 ||
+        *precision > 100 || *avg < 0 || *avg > 1e6 || *med < 0 || *med > 1e6)
         return std::nullopt;
     run.when = *when;
     GameSummary& s = run.summary;
     s.seed = *seed;
-    s.options = normalized({.stimulus = *stimulus,
-                            .action = *action,
-                            .color_buttons = *buttons,
-                            .moving = *moving,
-                            .grows = *grows,
-                            .bombs = *bombs,
-                            .target_size = *size,
-                            .lifetime_ms = *lifetime,
-                            .ending = *ending,
-                            .lives = *lives,
-                            .duration_s = *duration});
+    const MeasureOptions written{.stimulus = *stimulus,
+                                 .action = *action,
+                                 .color_buttons = *buttons,
+                                 .moving = *moving,
+                                 .grows = *grows,
+                                 .bombs = *bombs,
+                                 .target_size = *size,
+                                 .lifetime_ms = *lifetime,
+                                 .ending = *ending,
+                                 .lives = *lives,
+                                 .duration_s = *duration};
+    // Опции вне границ конструктора — испорченная строка: зажатые в
+    // границы, они попали бы в рекорды чужого набора (AUD-50).
+    if (MeasureOptions bounds = written; reset_out_of_range(bounds) > 0) return std::nullopt;
+    s.options = normalized(written);
     s.score = *score;
     s.hits = *hits;
     s.shots = *shots;

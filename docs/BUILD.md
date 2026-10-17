@@ -44,6 +44,10 @@ cmake --preset windows
 cmake --build --preset windows
 ```
 
+Версию сборки настройка берёт из `git describe` и печатает строкой «DP AIM
+Trainer, версия …»; исходники из ZIP без Git — «без Git» (D-49). Значок и
+сведения о версии EXE — ресурс `src/app/aim_trainer.rc.in` (`windres`).
+
 Первая настройка качает SDL 3.4.18, SDL3_ttf 3.2.2, FreeType 2.15.0 и
 шрифт DejaVu 2.37 и сверяет SHA-256 (D-18, D-31) — нужен интернет;
 следующие — нет. Итог — `build\windows\AimTrainer.exe` без DLL рядом
@@ -163,6 +167,7 @@ ref build` начинает с чистого каталога, `tools/gui.sh Ц
 | `wine_clicks.sh` | щелчки по Windows-сборке под Wine: сколько получили время из сырого ввода (D-24) |
 | `click_debug_log.patch` | временный журнал времени клика в `main.cpp` — для разбора, не для коммита |
 | `profile_menu.sh` | замер кадра меню под Callgrind: инструкции своего кода, вызовы отрисовки и выделения памяти на кадр (AUD-39) |
+| `make_icon.py` | рисует значок «прицел» `src/app/aim_trainer.ico` (Pillow, D-49) |
 | `coverage.sh` | покрытие строк своего кода тестами по слоям `src/core`, `src/platform`, `src/app` (пресет `linux-coverage`, gcov); `--files` — и по файлам (AUD-49) |
 | `snapshots.sh` | кадры всех экранов из теста обхода (`shoot`) и попиксельная сверка двух прогонов (`diff`) — правка отрисовки без изменения картинки (AUD-46) |
 

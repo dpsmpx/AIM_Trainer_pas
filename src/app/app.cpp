@@ -18,6 +18,7 @@
 #include "app/player_files.h"
 #include "app/screens.h"
 #include "app/text.h"
+#include "app/version.h"
 #include "core/click_time.h"
 #include "core/flow.h"
 #include "core/frame_budget.h"
@@ -27,6 +28,7 @@
 #include "core/screen.h"
 #include "core/time.h"
 #include "platform/raw_mouse.h"
+#include "platform/single_instance.h"
 #include "platform/sound.h"
 #include "platform/storage.h"
 
@@ -250,6 +252,7 @@ App::App(const Options& options, SDL_Window* window, SDL_Renderer* renderer, Tex
       flow_(profile_, rng_, menu_, core::engine_random, local_now),
       screens_(window, renderer, text, profile_, files_, rng_, menu_, sound_) {
     const std::string raw_state = raw_mouse_.active() ? "есть" : "нет — " + raw_mouse_.problem();
+    SDL_Log("DP AIM Trainer, версия %.*s", static_cast<int>(kVersion.size()), kVersion.data());
     SDL_Log("SDL %d.%d.%d, рендер %s; сырой ввод мыши: %s; масштаб %.2f; монитор %.1f Гц",
             SDL_VERSIONNUM_MAJOR(SDL_GetVersion()), SDL_VERSIONNUM_MINOR(SDL_GetVersion()),
             SDL_VERSIONNUM_MICRO(SDL_GetVersion()), SDL_GetRendererName(renderer),
@@ -443,6 +446,21 @@ int run(const Options& options) {
         return 1;
     }
     SdlWindow sdl;
+    // Одна копия на папку по умолчанию (D-49): вторая поднимает окно первой
+    // и закрывается.
+    std::string folder_problem;
+    std::optional<platform::SingleInstance> instance;
+    if (const std::optional<platform::Storage> home =
+            platform::Storage::default_folder(folder_problem)) {
+        instance.emplace(home->dir());
+        if (instance->state() == platform::SingleInstance::State::Busy) {
+            SDL_Log("программа уже запущена с папкой %s — её окно вперёд", home->dir().c_str());
+            platform::SingleInstance::raise_other(kWindowTitle);
+            return 0;
+        }
+        if (instance->state() == platform::SingleInstance::State::Unknown)
+            SDL_Log("одна копия программы не проверена: %s", instance->problem().c_str());
+    }
     const float scale = startup_scale();
     const auto scaled = [&](int v) {
         return static_cast<int>(std::lround(static_cast<float>(v) * scale));

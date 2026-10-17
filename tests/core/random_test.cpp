@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <limits>
 #include <set>
 
 #include "core/rounding.h"
@@ -17,6 +18,15 @@ TEST(RoundHalfEven, HalvesGoToEven) {
     EXPECT_EQ(round_half_even(2.5), 2);
     EXPECT_EQ(round_half_even(-0.5), 0);
     EXPECT_EQ(round_half_even(-1.5), -2);
+}
+
+TEST(RoundHalfEven, OutOfIntRangeIsClampedNotUndefined) {
+    // Число из файла может быть любым (AUD-50): край диапазона, NaN — 0.
+    EXPECT_EQ(round_half_even(1e20), std::numeric_limits<int>::max());
+    EXPECT_EQ(round_half_even(-1e20), std::numeric_limits<int>::min());
+    EXPECT_EQ(round_half_even(std::numeric_limits<double>::infinity()),
+              std::numeric_limits<int>::max());
+    EXPECT_EQ(round_half_even(std::numeric_limits<double>::quiet_NaN()), 0);
 }
 
 TEST(RoundHalfEven, OthersGoToNearest) {

@@ -1,0 +1,12 @@
+#pragma once
+
+// Версия сборки — git describe при настройке CMake (D-49, AUD-52): в справке,
+// в журнале и в свойствах EXE. Файл собирается из version.h.in.
+
+#include <string_view>
+
+namespace aim::app {
+
+inline constexpr std::string_view kVersion = "@AIM_VERSION@";
+
+}  // namespace aim::app

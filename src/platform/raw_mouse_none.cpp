@@ -16,9 +16,11 @@ bool RawMouse::active() const {
     return false;
 }
 
-const std::string& RawMouse::problem() const {
+std::string RawMouse::problem() const {
     return impl_->problem;
 }
+
+void RawMouse::stop() {}
 
 void RawMouse::drain(std::vector<core::RawPress>& /*out*/) {}
 

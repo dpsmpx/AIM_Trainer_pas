@@ -207,9 +207,11 @@ TrueJointTileMaker с PascalABC.NET на C++
   (D-36, AUD-53) — `docs/ARCHITECTURE.md` от C++-версии по разделам,
   Pascal-версия — `archive/pascal/ARCHITECTURE.md`; сценарии — шаги
   C++-версии, образец — справочным столбцом — `С`
-- [ ] Мелочи: границы значений файлов, одна копия программы, флаг потока
+- [+] Мелочи: границы значений файлов, одна копия программы, флаг потока
   сырого ввода, перехват исключений, значок «прицел» и версия EXE (D-49;
-  AUD-50, AUD-51, AUD-52) — `М`
+  AUD-50, AUD-51, AUD-52) — `core/rounding.h`, `core/runs.cpp`,
+  `platform/single_instance.h`, `platform/raw_mouse.h`, `app/main.cpp`,
+  `app/aim_trainer.rc.in`, `app/version.h.in`; сценарии 13, 38, 39 — `М`
 
 ### <a id="task-later"></a>[ ] Позже — по слову автора
 
