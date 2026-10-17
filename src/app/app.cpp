@@ -196,7 +196,7 @@ private:
     /// Сырые нажатия из потока — в сопоставление.
     void take_raw();
     /// Время щелчка: сырое нажатие той же кнопки рядом с меткой SDL; не
-    /// пришло — ждать его не дольше kRawWaitNs (docs/ARCHITECTURE.md, §12).
+    /// пришло — ждать его не дольше kRawWaitNs (docs/ARCHITECTURE.md, §3).
     ClickTime click_time(MouseButton button, Nanoseconds event_time);
     /// Ввод, логика, отрисовка и показ кадра.
     void frame();

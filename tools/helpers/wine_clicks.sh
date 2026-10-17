@@ -2,7 +2,7 @@
 # Сколько кликов Windows-сборка получает со временем из сырого ввода (D-24):
 # окно под Wine на Xvfb, щелчки xdotool, источник времени — из заголовка
 # окна (сценарий 21 docs/MANUAL_CHECKS.md, но без Windows). Так найдена гонка
-# потока сырого ввода и события SDL (docs/ARCHITECTURE.md, §12).
+# потока сырого ввода и события SDL (docs/ARCHITECTURE.md, §3).
 #
 #   tools/helpers/wine_clicks.sh [КЛИКОВ] [ЖУРНАЛ]
 #

@@ -1,7 +1,7 @@
 #pragma once
 
 // Звуки образца — тоны Console.Beep (archive/pascal/AIM_Trainer.pas:
-// PlayHitSound, PlayMissSound, PlayGameOverSound; docs/ARCHITECTURE.md, §10).
+// PlayHitSound, PlayMissSound, PlayGameOverSound; archive/pascal/ARCHITECTURE.md, §10).
 // Здесь — только отсчёты тона; играет их platform/sound.h, не задерживая
 // кадр (AUD-06).
 

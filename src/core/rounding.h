@@ -1,7 +1,7 @@
 #pragma once
 
 // Округление, как Round в PascalABC.NET: Convert.ToInt32 — банковское,
-// половина к чётному (docs/ARCHITECTURE.md, §11; docs/PORTING.md, §4).
+// половина к чётному (archive/pascal/ARCHITECTURE.md, §11; docs/PORTING.md, §4).
 // std::lround округлял бы половину от нуля: Round(2.5) у образца — 2.
 
 #include <cmath>

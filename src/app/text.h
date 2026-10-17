@@ -2,7 +2,7 @@
 
 // Текст шрифтом DejaVu (D-31, D-43): Sans Condensed — по умолчанию, Sans
 // Mono — на выбор в настройках; TextOut, TextWidth и DrawTextCentered — как
-// у GraphABC (docs/ARCHITECTURE.md, §11). Размер — в пунктах при 96 точках
+// у GraphABC (archive/pascal/ARCHITECTURE.md, §11). Размер — в пунктах при 96 точках
 // на дюйм.
 
 #include <SDL3/SDL.h>

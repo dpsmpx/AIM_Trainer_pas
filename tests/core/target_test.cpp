@@ -1,4 +1,4 @@
-// Цель и её правила из опций замера (D-21, D-37; docs/ARCHITECTURE.md, §12).
+// Цель и её правила из опций замера (D-21, D-37; docs/ARCHITECTURE.md, §2).
 
 #include "core/target.h"
 

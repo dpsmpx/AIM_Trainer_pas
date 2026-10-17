@@ -1,7 +1,7 @@
 #pragma once
 
 // Разбор текста файлов: строки и числа — как StrToInt и StrToFloat образца
-// (docs/ARCHITECTURE.md, §11): пробелы по краям и знак допускаются, точка —
+// (archive/pascal/ARCHITECTURE.md, §11): пробелы по краям и знак допускаются, точка —
 // разделитель дробной части, всё прочее — не число.
 
 #include <optional>

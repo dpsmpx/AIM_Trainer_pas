@@ -8,8 +8,9 @@
 | что решено и почему | [`direction/DECISIONS.md`](direction/DECISIONS.md) |
 | какие этапы и в каком состоянии | [`ROADMAP/ROADMAP.md`](../ROADMAP/ROADMAP.md) |
 | что не закончено, вопросы автору | [`TODO.md`](../TODO.md) |
-| как устроена программа: модули, экраны, время, ввод, цели, счёт, файлы | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
-| как проверить правку на Windows | [`MANUAL_CHECKS.md`](MANUAL_CHECKS.md) |
+| как устроена программа: слои, логика замера, ввод, главный цикл, экраны, темы, файлы | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| как устроена Pascal-версия (архив) и среда PascalABC.NET | [`archive/pascal/ARCHITECTURE.md`](../archive/pascal/ARCHITECTURE.md) |
+| как проверить правку руками: сценарии C++-версии, прогоны в сессии | [`MANUAL_CHECKS.md`](MANUAL_CHECKS.md) |
 | как собрать C++-версию у автора и в сессии, пресеты, тесты, эталон | [`BUILD.md`](BUILD.md) |
 | перенос на C++: что где, сверка с эталоном, поведение, которое легко потерять | [`PORTING.md`](PORTING.md) |
 | выбор библиотеки: замерщики ввода, как их прогнать и читать журналы | [`LIB_PROBES.md`](LIB_PROBES.md) |

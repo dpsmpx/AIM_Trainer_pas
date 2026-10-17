@@ -1,4 +1,4 @@
-// Случайные числа и округление — как у PascalABC.NET (docs/ARCHITECTURE.md, §11).
+// Случайные числа и округление — как у PascalABC.NET (archive/pascal/ARCHITECTURE.md, §11).
 
 #include "core/random.h"
 

@@ -11,7 +11,7 @@
 #   tools/gui.sh TARGET dir              папка файлов игрока
 #   tools/gui.sh TARGET shot F.png       снимок окна 800×600
 #   tools/gui.sh TARGET title            заголовок окна (_NET_WM_NAME; у port кириллица
-#                                        до него не доходит — docs/ARCHITECTURE.md, §12)
+#                                        до него не доходит — docs/ARCHITECTURE.md, §10)
 #   tools/gui.sh TARGET key KEY...       клавиши: Escape, space, p, Return
 #   tools/gui.sh TARGET move X Y         курсор в точку окна
 #   tools/gui.sh TARGET click X Y [BTN]  щелчок: 1 — ЛКМ, 3 — ПКМ

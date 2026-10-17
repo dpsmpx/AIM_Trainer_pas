@@ -4,7 +4,7 @@
 // стандартной библиотеки, тесты — заданную последовательность.
 //
 // Семантика — как у PascalABC.NET, на которой написан образец
-// (docs/ARCHITECTURE.md, §11): Random — вещественное в [0, 1), Random(a, b) —
+// (archive/pascal/ARCHITECTURE.md, §11): Random — вещественное в [0, 1), Random(a, b) —
 // целое в [a, b] включительно, при a > b границы меняются местами.
 
 #include <cstdint>
