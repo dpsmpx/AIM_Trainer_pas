@@ -3,19 +3,9 @@
 #include <climits>
 #include <utility>
 
+#include "core/overload.h"
+
 namespace aim::core {
-
-namespace {
-
-// Перегрузка лямбд для std::visit.
-template <class... F>
-struct Overload : F... {
-    using F::operator()...;
-};
-template <class... F>
-Overload(F...) -> Overload<F...>;
-
-}  // namespace
 
 Flow::Flow(Profile& profile, Random& seeds, MenuInput& menu, RandomFactory make_random,
            std::function<LocalTime()> clock)
@@ -103,85 +93,90 @@ bool Flow::click_result(const ClickInput& click) {
     return true;
 }
 
+bool Flow::handle_menu(const Input& event) {
+    return std::visit(Overload{[&](const ClickInput& c) {
+                                   const std::optional<MeasureOptions> options = menu_.click(c);
+                                   if (!options) return true;
+                                   options_ = normalized(*options);
+                                   start_countdown(now_);
+                                   return false;
+                               },
+                               [&](const KeyInput& k) {
+                                   menu_.key(k);
+                                   return true;
+                               },
+                               [&](const WheelInput& w) {
+                                   menu_.wheel(w);
+                                   return true;
+                               }},
+                      event);
+}
+
+bool Flow::handle_game(const Input& event) {
+    if (!game_) return true;
+    // Ссылка — до смены экрана: start_countdown сбрасывает замер.
+    Game& game = *game_;
+    if (const auto* c = std::get_if<ClickInput>(&event)) {
+        if (recorder_) recorder_->click(c->button, c->position, c->time, now_);
+        game.click(c->button, c->position, c->time);
+        pass_game_events();
+        if (!game.over()) return true;
+        show_result();
+        return false;
+    }
+    const auto* key = std::get_if<KeyInput>(&event);
+    if (key == nullptr) return true;  // колёсико замер не читает
+    switch (key->key) {
+        case Key::R:  // заново, замер не записывается
+            start_countdown(now_);
+            return false;
+        case Key::M:  // в меню, замер записывается
+            if (recorder_) recorder_->finish(EndReason::ToMenu, key->time, now_);
+            game.finish(EndReason::ToMenu, key->time);
+            finish_run();
+            go(Screen::Menu);
+            return false;
+        case Key::Escape:  // конец попытки (D-40)
+            if (recorder_) recorder_->finish(EndReason::GaveUp, key->time, now_);
+            game.finish(EndReason::GaveUp, key->time);
+            show_result();
+            return false;
+        case Key::Space:
+        case Key::Up:
+        case Key::Down:
+        case Key::PageUp:
+        case Key::PageDown: return true;
+    }
+    return true;
+}
+
+bool Flow::handle_result(const Input& event) {
+    if (const auto* c = std::get_if<ClickInput>(&event)) return click_result(*c);
+    const auto* k = std::get_if<KeyInput>(&event);
+    if (k == nullptr) return true;
+    if (k->key == Key::Space || k->key == Key::M) {
+        go(Screen::Menu);
+        return false;
+    }
+    if (k->key == Key::R) {
+        start_countdown(now_);
+        return false;
+    }
+    return true;
+}
+
 bool Flow::handle(const Input& event) {
     switch (screen_) {
-        case Screen::Menu:
-            return std::visit(Overload{[&](const ClickInput& c) {
-                                           const std::optional<MeasureOptions> options =
-                                               menu_.click(c);
-                                           if (!options) return true;
-                                           options_ = normalized(*options);
-                                           start_countdown(now_);
-                                           return false;
-                                       },
-                                       [&](const KeyInput& k) {
-                                           menu_.key(k);
-                                           return true;
-                                       },
-                                       [&](const WheelInput& w) {
-                                           menu_.wheel(w);
-                                           return true;
-                                       }},
-                              event);
+        case Screen::Menu: return handle_menu(event);
         case Screen::Countdown:
-            // Щелчки отсчёт не читает и гасит: в игру они не попадут (AUD-02).
+            // Щелчки отсчёт не читает и гасит: в замер они не попадут (AUD-02).
             if (const auto* k = std::get_if<KeyInput>(&event); k && k->key == Key::M) {
                 go(Screen::Menu);
                 return false;
             }
             return true;
-        case Screen::Game: {
-            if (!game_) return true;
-            // Ссылка — до смены экрана: start_countdown сбрасывает забег.
-            Game& game = *game_;
-            if (const auto* c = std::get_if<ClickInput>(&event)) {
-                if (recorder_) recorder_->click(c->button, c->position, c->time, now_);
-                game.click(c->button, c->position, c->time);
-                pass_game_events();
-                if (!game.over()) return true;
-                show_result();
-                return false;
-            }
-            const auto* key = std::get_if<KeyInput>(&event);
-            if (key == nullptr) return true;  // колёсико замер не читает
-            const KeyInput& k = *key;
-            switch (k.key) {
-                case Key::R:  // заново, замер не записывается
-                    start_countdown(now_);
-                    return false;
-                case Key::M:  // в меню, замер записывается
-                    if (recorder_) recorder_->finish(EndReason::ToMenu, k.time, now_);
-                    game.finish(EndReason::ToMenu, k.time);
-                    finish_run();
-                    go(Screen::Menu);
-                    return false;
-                case Key::Escape:  // конец попытки (D-40)
-                    if (recorder_) recorder_->finish(EndReason::GaveUp, k.time, now_);
-                    game.finish(EndReason::GaveUp, k.time);
-                    show_result();
-                    return false;
-                case Key::Space:
-                case Key::Up:
-                case Key::Down:
-                case Key::PageUp:
-                case Key::PageDown: return true;
-            }
-            return true;
-        }
-        case Screen::GameOver: {
-            if (const auto* c = std::get_if<ClickInput>(&event)) return click_result(*c);
-            const auto* k = std::get_if<KeyInput>(&event);
-            if (k == nullptr) return true;
-            if (k->key == Key::Space || k->key == Key::M) {
-                go(Screen::Menu);
-                return false;
-            }
-            if (k->key == Key::R) {
-                start_countdown(now_);
-                return false;
-            }
-            return true;
-        }
+        case Screen::Game: return handle_game(event);
+        case Screen::GameOver: return handle_result(event);
         case Screen::Replay: {
             // Реплей только смотрят: щелчки и колёсико — мимо.
             const auto* k = std::get_if<KeyInput>(&event);

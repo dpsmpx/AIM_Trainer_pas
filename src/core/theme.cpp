@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <format>
 #include <system_error>
+#include <tuple>
 
 #include "core/text.h"
 
@@ -49,6 +50,9 @@ const std::array<ThemeKey, 37> kThemeKeys{{
     {"preset_flick", nullptr, 4, "кнопка «Флик»"},
     {"preset_custom", &Theme::custom, -1, "кнопка «Свой набор»"},
 }};
+
+// У каждой роли темы — свой ключ: новая роль без ключа не соберётся.
+static_assert(std::tuple_size_v<decltype(kThemeKeys)> == sizeof(Theme) / sizeof(Rgba));
 
 namespace {
 

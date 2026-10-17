@@ -1,10 +1,9 @@
 #pragma once
 
-// Главное меню и панели поверх него на холсте app/canvas.h: наборы замера
-// и «Свой набор» с конструктором (D-37), рекорд и среднее за N выбранного набора (D-38), график его
-// последних замеров, рекорды всех наборов (щелчок по набору — его реплей,
-// D-39), история замеров с параметрами.
-// Что открыто и что выбрано — core/menu.h.
+// Главное меню на холсте app/canvas.h: наборы замера и «Свой набор» (D-37),
+// плашка-превью, рекорд и среднее за N выбранного набора (D-38), график его
+// последних замеров, кнопки внизу, частицы фона; панели поверх меню —
+// app/panels_view.h. Что открыто и что выбрано — core/menu.h.
 
 #include <span>
 #include <string>
@@ -26,7 +25,7 @@ namespace aim::app {
 
 /// Плавная кривая через точки — DrawSmoothCurve образца (кубические кривые
 /// Безье, DrawBezierLine из Base.pas).
-void draw_smooth_curve(Canvas& c, std::span<const IntPoint> pts, core::Rgba color, int width);
+void draw_smooth_curve(Canvas& c, std::span<const IntPoint> pts, Pen pen);
 
 class MenuView {
 public:

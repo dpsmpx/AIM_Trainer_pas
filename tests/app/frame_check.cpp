@@ -9,6 +9,7 @@
 
 #include <cstdlib>
 
+#include "core/layout.h"
 #include "core/screen.h"
 
 namespace {
@@ -47,9 +48,9 @@ int main(int argc, char* argv[]) {
     }
     bool ok = frame->w == kWidth && frame->h == kHeight;
     if (!ok) SDL_Log("снимок %d×%d вместо %d×%d", frame->w, frame->h, kWidth, kHeight);
-    // Левый верхний угол панели 480×220 в центре окна, внутри скругления.
-    ok = ok && pixel_near(frame, (kWidth - 480) / 2 + 10, (kHeight - 220) / 2 + 10, kPanelR,
-                          kPanelG, kPanelB);
+    // Левый верхний угол панели туториала, внутри скругления.
+    const aim::core::Rect panel = aim::core::tutorial_panel();
+    ok = ok && pixel_near(frame, panel.x1 + 10, panel.y1 + 10, kPanelR, kPanelG, kPanelB);
     SDL_DestroySurface(frame);
     return ok ? 0 : 1;
 }

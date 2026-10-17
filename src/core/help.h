@@ -15,7 +15,8 @@ struct HelpLine {
     bool heading = false;  ///< заголовок раздела
 };
 
-inline constexpr std::array<HelpLine, 42> kHelp{{
+// Число строк — по списку: лишней пустой строки в конце не будет.
+inline constexpr auto kHelp = std::to_array<HelpLine>({
     {"Управление", true},
     {"ЛКМ — выстрел; в «Двух кнопках» — цели с меткой слева"},
     {"ПКМ — в «Двух кнопках» цели с меткой справа"},
@@ -58,7 +59,7 @@ inline constexpr std::array<HelpLine, 42> kHelp{{
     {"по пустому месту меню — то же"},
     {"Своя тема — файл themes/ИМЯ.ini в папке сохранений:"},
     {"строки «ключ=#RRGGBB», выбор — «Тема» в настройках"},
-}};
+});
 
 /// Строк справки на панели сразу.
 inline constexpr int kHelpVisibleLines = 12;

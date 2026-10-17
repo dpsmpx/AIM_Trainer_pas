@@ -134,10 +134,18 @@ inline constexpr int kHistoryW = 620;  ///< строка замера Mono — �
 inline constexpr int kHistoryH = 460;
 Rect history_panel();
 Rect history_export();
+inline constexpr int kAchievementsW = 560;
+inline constexpr int kAchievementsH = 470;
+Rect achievements_panel();
 inline constexpr int kProfilesW = 360;
 inline constexpr int kProfilesH = 320;
 Rect profiles_panel();
 /// Строка профиля number (1…4).
 Rect profile_row(int number);
+
+// ---- Туториал первого запуска ----
+inline constexpr int kTutorialW = 480;
+inline constexpr int kTutorialH = 220;
+Rect tutorial_panel();
 
 }  // namespace aim::core

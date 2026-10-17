@@ -140,6 +140,18 @@ Rect history_export() {
     return {p.x1 + 20, p.y1 + 398, p.x1 + 240, p.y1 + 428};
 }
 
+Rect achievements_panel() {
+    const int x = (kW - kAchievementsW) / 2;
+    const int y = (kH - kAchievementsH) / 2;
+    return {x, y, x + kAchievementsW, y + kAchievementsH};
+}
+
+Rect tutorial_panel() {
+    const int x = (kW - kTutorialW) / 2;
+    const int y = (kH - kTutorialH) / 2;
+    return {x, y, x + kTutorialW, y + kTutorialH};
+}
+
 Rect profiles_panel() {
     const int x = (kW - kProfilesW) / 2;
     const int y = (kH - kProfilesH) / 2;

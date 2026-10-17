@@ -57,6 +57,15 @@ private:
     /// Записать профиль; посреди замера — по его концу (AUD-40): запись в
     /// кадре замера отнимала бы время у кадра.
     void save();
+    /// Смена экрана: меню заново, эффекты замера с нуля, звук конца.
+    void screen_changed(const core::ScreenChanged& s, core::Nanoseconds now);
+    /// Событие замера: эффекты и звук.
+    void game_event(const core::GameEvent& g, bool screen_stimulus, const core::Theme& th,
+                    core::Nanoseconds now);
+    /// Замер записан в профиль: строка истории, реплей рекорда, профиль.
+    void run_finished(const core::RunFinished& run);
+    /// Запрос меню: файлы, папка, тема, реплей.
+    void menu_request(const core::MenuRequest& r, core::Flow& flow, core::Nanoseconds now);
     /// Ответ диалога выбора папки сохранений (D-33): перейти на неё.
     void take_folder_choice();
     /// Звук, если он включён в настройках.

@@ -141,10 +141,10 @@ struct BuiltinTheme {
     Theme theme;
 };
 
-inline constexpr std::array<BuiltinTheme, 3> kThemes{{
+inline constexpr auto kThemes = std::to_array<BuiltinTheme>({
     {"dark", "Тёмная", detail::dark_theme()},
     {"neon", "Неон", detail::neon_theme()},
     {"minimal", "Минимализм", detail::minimal_theme()},
-}};
+});
 
 }  // namespace aim::core

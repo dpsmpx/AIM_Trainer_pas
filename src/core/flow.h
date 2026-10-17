@@ -158,6 +158,9 @@ private:
     void pass_game_events();
     /// Событие экрану; false — экран сменился, остальной ввод кадра — в сторону.
     bool handle(const Input& event);
+    bool handle_menu(const Input& event);
+    bool handle_game(const Input& event);
+    bool handle_result(const Input& event);
 
     Profile& profile_;
     Random& seeds_;

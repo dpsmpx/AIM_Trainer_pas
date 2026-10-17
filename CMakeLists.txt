@@ -92,10 +92,12 @@ aim_own_code(aim_platform)
 # Экраны, холст, текст и файлы игрока — библиотека: её берут программа и
 # тесты экранов (tests/app/screens_test.cpp).
 add_library(aim_app STATIC
+    src/app/app.cpp
     src/app/canvas.cpp
     src/app/effects.cpp
     src/app/game_view.cpp
     src/app/menu_view.cpp
+    src/app/panels_view.cpp
     src/app/player_files.cpp
     src/app/screens.cpp
     src/app/text.cpp

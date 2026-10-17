@@ -5,18 +5,9 @@
 #include <numbers>
 #include <utility>
 
-#include "core/rounding.h"
+#include "app/draw_util.h"
 
 namespace aim::app {
-
-namespace {
-
-// Round образца — банковское округление.
-int round_int(double v) {
-    return core::round_half_even(v);
-}
-
-}  // namespace
 
 void Effects::spawn(Kind kind, double x, double y, double vx, double vy, int duration_ms,
                     core::Rgba color, std::string text, core::Nanoseconds now) {
@@ -73,26 +64,26 @@ void Effects::render(Canvas& c, const core::Theme& theme, core::Nanoseconds now)
         const double t = static_cast<double>(now - e.start) / static_cast<double>(e.duration);
         switch (e.kind) {
             case Kind::Flash:
-                c.brush = with_alpha(e.color, round_int(180 * (1 - t)));
-                c.fill_circle(round_int(e.x), round_int(e.y), round_int(6 + 34 * t));
+                c.fill_circle(round_int(e.x), round_int(e.y), round_int(6 + 34 * t),
+                              with_alpha(e.color, round_int(180 * (1 - t))));
                 break;
             case Kind::Wave:
-                // Circle образца ещё и заливает текущей кистью — как у него.
-                c.pen = with_alpha(theme.wave, round_int(160 * (1 - t)));
-                c.pen_width = 2;
-                c.circle(round_int(e.x), round_int(e.y), round_int(10 + 50 * t));
+                // Только кольцо: Circle образца заливал его ещё и кистью
+                // прошлого эффекта (AUD-46).
+                c.stroke_circle(
+                    round_int(e.x), round_int(e.y), round_int(10 + 50 * t),
+                    {.color = with_alpha(theme.wave, round_int(160 * (1 - t))), .width = 2});
                 break;
             case Kind::Shard:
-                c.brush = with_alpha(e.color, round_int(220 * (1 - t)));
                 c.fill_circle(round_int(e.x + e.vx * t), round_int(e.y + e.vy * t + 40 * t * t),
-                              round_int(4 * (1 - 0.5 * t)));
+                              round_int(4 * (1 - 0.5 * t)),
+                              with_alpha(e.color, round_int(220 * (1 - t))));
                 break;
             case Kind::Points: {
-                c.font.size = e.size;
-                c.font_color = with_alpha(e.color, round_int(255 * (1 - t)));
-                c.brush = {0, 0, 0, 0};  // без плашки под текстом
-                const int tw = c.text_width(e.text);
-                c.text_out(round_int(e.x) - tw / 2, round_int(e.y + e.vy * t) - e.size / 2, e.text);
+                const Font font{.size = e.size};
+                const int tw = c.text_width(e.text, font);
+                c.text(round_int(e.x) - tw / 2, round_int(e.y + e.vy * t) - e.size / 2, e.text,
+                       font, with_alpha(e.color, round_int(255 * (1 - t))));
                 break;
             }
         }
@@ -116,8 +107,8 @@ void CursorTrail::render(Canvas& c, const core::Theme& theme) const {
         const std::size_t idx = (next_ + 2 * kLength - 1 - i) % kLength;
         if (!filled_[idx]) continue;
         const double share = 1 - static_cast<double>(i) / n;
-        c.brush = with_alpha(theme.trail, round_int(140 * share));
-        c.fill_circle(points_[idx].x, points_[idx].y, round_int(5 * share) + 1);
+        c.fill_circle(points_[idx].x, points_[idx].y, round_int(5 * share) + 1,
+                      with_alpha(theme.trail, round_int(140 * share)));
     }
 }
 
