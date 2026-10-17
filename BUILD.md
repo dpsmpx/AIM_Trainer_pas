@@ -1,4 +1,4 @@
-# Отладочные сборки AIM Trainer
+# Отладочные сборки DP AIM Trainer
 
 Ветка только со сборками для проверки у автора на Windows; в `main` не
 вливается (решения D-23 и D-34 в `docs/direction/DECISIONS.md` ветки
