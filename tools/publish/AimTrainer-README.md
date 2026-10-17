@@ -1,8 +1,9 @@
-# AIM Trainer — сборка для Windows
+# DP AIM Trainer — сборка для Windows
 
 Отладочная сборка C++-версии для проверки у автора (D-23, D-34 в
-`docs/direction/DECISIONS.md` ветки `main`). Из какого коммита — `BUILD.md`
-рядом.
+`docs/direction/DECISIONS.md`). Из какого коммита и какой ветки —
+`BUILD.md` рядом: решения, сценарии и устройство — в той ветке, пока она
+не влита в `main`.
 
 ## Запуск
 
@@ -74,7 +75,7 @@ target_left=#40FF60E0
 
 ## Что проверить
 
-Сценарии `docs/MANUAL_CHECKS.md` ветки `main`, прежде всего те, что видны
+Сценарии `docs/MANUAL_CHECKS.md` ветки из `BUILD.md`, прежде всего те, что видны
 только на Windows:
 
 - 4 — FPS на HUD не ниже частоты монитора, без провалов (D-32); с

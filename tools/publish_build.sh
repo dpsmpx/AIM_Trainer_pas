@@ -69,7 +69,7 @@ fi
 
 CLANG="$("$LLVM_MINGW/bin/x86_64-w64-mingw32-clang" --version | head -1)"
 {
-    echo "# Сборка AIM Trainer"
+    echo "# Сборка DP AIM Trainer"
     echo
     echo "- Исходники: коммит \`$REV\` ветки \`$SOURCE_BRANCH\` репозитория"
     echo "  \`dpsmpx/AIM_Trainer_pas\`; последняя правка кода — \`$CODE_REV\`."
